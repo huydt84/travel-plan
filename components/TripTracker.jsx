@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { signIn, signOut } from "next-auth/react";
+import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { formatScheduleHeading, formatTripTitle } from "../lib/trip-date-label.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
 
@@ -277,7 +278,7 @@ export default function TripTracker({ initialData, initialNow, viewer, trips }) 
           <small>{tripDateLabel} · {data.trip.location}</small>
         </label>
         <div className="viewer-actions">
-          {viewer?.isOwner && <a className="admin-link" href="/admin">Quản lý</a>}
+          {viewer?.isOwner && <a className="admin-link" href={ADMIN_ROUTES.trips}>Quản lý</a>}
           {viewer?.authMode === "local-dev" ? (
             <span className="admin-link user-link" title="Local admin dùng Docker Postgres">Local admin</span>
           ) : viewer ? (

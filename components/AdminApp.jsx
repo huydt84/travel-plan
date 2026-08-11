@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { signIn, signOut } from "next-auth/react";
+import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { createScheduleEditor, normalizeScheduleRefs, scheduleEditorIsDirty } from "../lib/schedule-editor-state.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
+import AdminNav from "./AdminNav";
 
 const emptyTrip = { slug: "", title: "", date: "", timezone: "Asia/Tokyo", location: "" };
 const emptySchedule = { start: "", end: "", displayEnd: "", type: "Visit", icon: "📍", title: "", detail: "", refs: [] };
@@ -40,7 +42,7 @@ function Login() {
         <a href="/" className="admin-back">Về lịch</a>
         <h1>Quản lý chuyến đi</h1>
         <p>Đăng nhập bằng Google để xem lịch và gửi góp ý. Chỉ chủ lịch mới có quyền chỉnh sửa.</p>
-        <button className="google-login" type="button" onClick={() => signIn("google", { redirectTo: "/admin" })}>
+        <button className="google-login" type="button" onClick={() => signIn("google", { redirectTo: ADMIN_ROUTES.trips })}>
           <GoogleIcon />
           Tiếp tục với Google
         </button>
@@ -296,6 +298,8 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
       </header>
       {error && <div className="admin-alert" role="alert">{error}<button onClick={() => setError("")} aria-label="Đóng thông báo"><ActionIcon name="close" /></button></div>}
       {notice && <div className="admin-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Đóng thông báo"><ActionIcon name="close" /></button></div>}
+
+      <AdminNav active="trips" />
 
       <div className="admin-grid">
         <aside className="admin-sidebar">

@@ -56,10 +56,15 @@ The Google OAuth callback URLs are:
 | `GET` / `POST` | `/api/trips/:slug/suggestions` | List suggestions or submit one while signed in |
 | `PATCH` / `DELETE` | `/api/trips/:slug/suggestions/:suggestionId` | Owner moderation |
 | `POST` | `/api/trips/:slug/sources` | Add a cited place source as the owner |
+| `POST` | `/api/invitations` | Send owner-only invitation emails |
 
 Create trip fields: `slug`, `title`, `date`, `timezone`, `location`.
 
 Create schedule fields: `start`, `end`, optional `displayEnd`, `type`, `icon`, `title`, `detail`, and optional citation numbers in `refs`.
+
+Invitation requests include `recipients`, `requestId`, `tripSlug`, `subject`, and `message`. The admin selects a trip, receives a subject and message draft generated from its current schedule, and may edit both fields before sending. The server validates the selected trip and the final draft. Addresses are normalized and deduplicated, with a maximum of 100 per request. Each address is sent as a separate Gmail message and cannot see the other recipients. The request UUID is included in the message headers for tracing.
+
+Invitations are sent from the logged-in owner's Gmail account through Google OAuth; there is no separate sender address or mail-service API key. Enable the Gmail API in the same Google Cloud project, add the `https://www.googleapis.com/auth/gmail.send` scope to the OAuth consent screen, and sign out/in once to grant it. OAuth access and refresh tokens remain in the encrypted server session and are never returned to the browser. `APP_URL` becomes the invitation link.
 
 ## Deploy
 

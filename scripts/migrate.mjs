@@ -1,5 +1,6 @@
 import { resolveDatabaseConfig, resolveLocalAdminMode } from "../lib/runtime-config.mjs";
 import { createSqlAdapter } from "../lib/sql-adapter.mjs";
+import { backfillExistingContributorLogins } from "../lib/user-login-store.mjs";
 import { assignItemKeys, slugify } from "./trip-import-utils.mjs";
 
 let seedData;
@@ -80,6 +81,21 @@ await sql`CREATE INDEX IF NOT EXISTS suggestions_trip_created_idx
 
 await sql`CREATE INDEX IF NOT EXISTS suggestions_activity_idx
   ON suggestions (activity_id)`;
+
+await sql`CREATE TABLE IF NOT EXISTS users (
+  name TEXT NOT NULL,
+  email TEXT PRIMARY KEY,
+  first_login TIMESTAMPTZ NOT NULL,
+  last_login TIMESTAMPTZ NOT NULL
+)`;
+
+await sql`CREATE INDEX IF NOT EXISTS users_last_login_idx
+  ON users (last_login DESC)`;
+
+const backfilledUserCount = await backfillExistingContributorLogins(sql);
+if (backfilledUserCount > 0) {
+  console.log(`Synced ${backfilledUserCount} historical contributor identities into users.`);
+}
 
 await sql`ALTER TABLE suggestions DROP CONSTRAINT IF EXISTS suggestions_activity_id_fkey`;
 await sql`ALTER TABLE suggestions ADD CONSTRAINT suggestions_activity_id_fkey

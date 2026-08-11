@@ -11,9 +11,9 @@
     "db:up:local": "node scripts/docker-local.mjs up",
     "db:down:local": "node scripts/docker-local.mjs down",
     "db:migrate": "node --env-file=.env scripts/migrate.mjs",
-    "db:migrate:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node --env-file=.env scripts/migrate.mjs",
+    "db:migrate:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node scripts/migrate.mjs",
     "trip:import": "node --env-file=.env scripts/import-trip.mjs",
-    "trip:import:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node --env-file=.env scripts/import-trip.mjs",
+    "trip:import:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node scripts/import-trip.mjs",
     "vercel:env": "node --env-file=.env scripts/sync-vercel-env.mjs"
   },
   "dependencies": {

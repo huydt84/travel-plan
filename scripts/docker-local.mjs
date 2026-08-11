@@ -3,9 +3,11 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 
+const emptyEnvFile = process.platform === "win32" ? "NUL" : "/dev/null";
+const composeCommand = ["compose", "--env-file", emptyEnvFile];
 const commands = {
-  up: ["compose", "up", "-d", "--wait", "db"],
-  down: ["compose", "down"],
+  up: [...composeCommand, "up", "-d", "--wait", "db"],
+  down: [...composeCommand, "down"],
 };
 
 const action = process.argv[2];
