@@ -1,0 +1,27 @@
+{
+  "name": "trip-schedule-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:admin": "LOCAL_ADMIN_BYPASS=true next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start",
+    "test": "node --test scripts/*.test.mjs",
+    "db:up:local": "node scripts/docker-local.mjs up",
+    "db:down:local": "node scripts/docker-local.mjs down",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "db:migrate:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node --env-file=.env scripts/migrate.mjs",
+    "trip:import": "node --env-file=.env scripts/import-trip.mjs",
+    "trip:import:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node --env-file=.env scripts/import-trip.mjs",
+    "vercel:env": "node --env-file=.env scripts/sync-vercel-env.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "next": "^16.3.0",
+    "next-auth": "^5.0.0-beta.32",
+    "pg": "^8.23.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

@@ -1,0 +1,17 @@
+node_modules
+dist
+.next
+.vercel
+
+# Local credentials and deployment configuration
+.env
+.env.*
+!.env.template
+
+# Personal itineraries and local seed data
+/imports/
+/scripts/seed-data.mjs
+*.personal.*
+
+.DS_Store
+.impeccable

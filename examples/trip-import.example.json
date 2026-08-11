@@ -1,0 +1,36 @@
+{
+  "trip": {
+    "slug": "sample-trip-2030-01-15",
+    "title": "Sample day trip",
+    "date": "2030-01-15",
+    "timezone": "Asia/Tokyo",
+    "location": "Sample City"
+  },
+  "sources": [
+    {
+      "number": 1,
+      "title": "Sample place — official site",
+      "url": "https://example.com/place"
+    }
+  ],
+  "schedule": [
+    {
+      "start": "09:00",
+      "end": "11:30",
+      "type": "Visit",
+      "icon": "⛩️",
+      "title": "Sample place",
+      "detail": "Tham quan điểm chính theo lịch trình mẫu.",
+      "refs": [1]
+    },
+    {
+      "start": "12:00",
+      "end": "13:00",
+      "type": "Lunch",
+      "icon": "🍜",
+      "title": "Ăn trưa",
+      "detail": "Nghỉ và ăn gần ga.",
+      "refs": []
+    }
+  ]
+}
