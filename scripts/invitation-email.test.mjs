@@ -51,22 +51,22 @@ test("normalizes recipients and validates trip plus editable draft fields", () =
   assert.throws(() => parseInvitationInput({ recipients: ["a@example.com"], requestId, tripSlug: trip.slug, subject: "", message }), /Tiêu đề/);
   assert.throws(() => parseInvitationInput({ recipients: ["a@example.com"], requestId, tripSlug: trip.slug, subject, message: "" }), /Nội dung/);
   assert.throws(() => parseInvitationInput({
-    recipients: Array.from({ length: 101 }, (_, index) => `friend-${index}@example.com`),
+    recipients: Array.from({ length: 7 }, (_, index) => `friend-${index}@example.com`),
     requestId,
     tripSlug: trip.slug,
     subject,
     message,
-  }), /tối đa 100/);
+  }), /tối đa 6/);
 });
 
 test("generates an editable invitation draft from the selected trip and schedule", () => {
   const draft = createInvitationDraft({
     trip,
     itinerary,
-    inviter: { name: "Trọng Huy", email: "owner@example.com" },
+    inviter: { name: "John Doe", email: "owner@example.com" },
     url: "https://travel.example/?trip=kasai-evening",
   });
-  assert.match(draft.subject, /Trọng Huy rủ bạn đi Kasai Rinkai Park/);
+  assert.match(draft.subject, /John Doe rủ bạn đi Kasai Rinkai Park/);
   assert.match(draft.message, /Bạn có muốn đi Kasai Rinkai Park cùng mình vào 15:30/);
   assert.match(draft.message, /15:30–16:00 — Đi tàu đến Kasai/);
   assert.match(draft.message, /Cánh đồng hoa hướng dương/);
@@ -136,12 +136,53 @@ test("sends recipients as separate Gmail messages using the edited draft", async
   assert.deepEqual(result, {
     sent: 2,
     ids: ["gmail-one@example.com", "gmail-two@example.com"],
+    deliveries: [
+      {
+        recipient: "one@example.com",
+        status: "sent",
+        gmailMessageId: "gmail-one@example.com",
+        errorCode: null,
+      },
+      {
+        recipient: "two@example.com",
+        status: "sent",
+        gmailMessageId: "gmail-two@example.com",
+        errorCode: null,
+      },
+    ],
   });
   assert.equal(requests.length, 2);
   assert.ok(requests.every((request) => request.url === "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"));
   assert.ok(requests.every((request) => request.options.headers.Authorization === "Bearer google-access-token"));
   assert.ok(requests.every((request) => request.mime.includes("Subject: =?UTF-8?B?")));
   assert.deepEqual(new Set(requests.map((request) => request.recipient)), new Set(["one@example.com", "two@example.com"]));
+});
+
+test("reports per-recipient outcomes when only part of a batch is delivered", async () => {
+  await assert.rejects(sendInvitationBatch({
+    recipients: ["one@example.com", "two@example.com"],
+    requestId,
+    inviter: { email: "owner@example.com" },
+    trip,
+    subject,
+    message,
+    accessToken: "token",
+  }, {
+    env,
+    fetchImpl: async (_url, options) => {
+      const mime = Buffer.from(JSON.parse(options.body).raw, "base64url").toString("utf8");
+      const recipient = mime.match(/^To: (.+)$/m)?.[1].trim();
+      if (recipient === "two@example.com") return { ok: false, status: 500 };
+      return { ok: true, status: 200, json: async () => ({ id: "gmail-one" }) };
+    },
+  }), (error) => {
+    assert.ok(error instanceof InvitationDeliveryError);
+    assert.deepEqual(error.deliveries, [
+      { recipient: "one@example.com", status: "sent", gmailMessageId: "gmail-one", errorCode: null },
+      { recipient: "two@example.com", status: "failed", gmailMessageId: null, errorCode: "INVITATION_DELIVERY_ERROR" },
+    ]);
+    return true;
+  });
 });
 
 test("fails safely when configuration, authorization, or delivery is unavailable", async () => {

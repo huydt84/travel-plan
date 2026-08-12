@@ -5,13 +5,23 @@ import { getCachedItinerary, listCachedTrips } from "../lib/trip-cache";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage({ searchParams }) {
-  const [{ trip: requestedTrip }, trips, viewer] = await Promise.all([searchParams, listCachedTrips(), getViewer()]);
+  const [params, trips, viewer] = await Promise.all([searchParams, listCachedTrips(), getViewer()]);
+  const { trip: requestedTrip, invite, gmail } = params;
   const requestedSlug = typeof requestedTrip === "string" && trips.some((trip) => trip.slug === requestedTrip)
     ? requestedTrip
     : null;
   const selectedSlug = requestedSlug || preferredTripSlug(trips);
   const itinerary = await getCachedItinerary(selectedSlug);
-  return <TripTracker initialData={itinerary} initialNow={Date.now()} viewer={viewer} trips={trips} />;
+  return (
+    <TripTracker
+      initialData={itinerary}
+      initialNow={new Date().getTime()}
+      initialInvitationOpen={invite === "1"}
+      initialGmailReturn={["return", "cancel"].includes(gmail)}
+      viewer={viewer}
+      trips={trips}
+    />
+  );
 }
 
 const preferredTripSlug = (trips) => {

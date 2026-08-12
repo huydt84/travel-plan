@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { signIn, signOut } from "next-auth/react";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { createScheduleEditor, normalizeScheduleRefs, scheduleEditorIsDirty } from "../lib/schedule-editor-state.mjs";
@@ -21,7 +22,7 @@ const api = async (path, options = {}) => {
   return data;
 };
 
-export default function AdminApp({ viewer, initialTrips, initialSelectedSlug, initialPlan, initialSuggestions }) {
+export default function AdminApp({ viewer, initialTrips, initialSelectedSlug, initialPlan, initialSuggestions, pendingInvitationCount = 0 }) {
   if (!viewer?.email) return <Login />;
   if (!viewer.isOwner) return <ContributorOnly user={viewer} />;
   return (
@@ -31,6 +32,7 @@ export default function AdminApp({ viewer, initialTrips, initialSelectedSlug, in
       initialSelectedSlug={initialSelectedSlug}
       initialPlan={initialPlan}
       initialSuggestions={initialSuggestions}
+      pendingInvitationCount={pendingInvitationCount}
     />
   );
 }
@@ -39,7 +41,7 @@ function Login() {
   return (
     <main className="admin-shell admin-login-shell">
       <section className="admin-login-card">
-        <a href="/" className="admin-back">Về lịch</a>
+        <Link href="/" className="admin-back">Về lịch</Link>
         <h1>Quản lý chuyến đi</h1>
         <p>Đăng nhập bằng Google để xem lịch và gửi góp ý. Chỉ chủ lịch mới có quyền chỉnh sửa.</p>
         <button className="google-login" type="button" onClick={() => signIn("google", { redirectTo: ADMIN_ROUTES.trips })}>
@@ -55,17 +57,17 @@ function ContributorOnly({ user }) {
   return (
     <main className="admin-shell admin-login-shell">
       <section className="admin-login-card">
-        <a href="/" className="admin-back">Về lịch</a>
+        <Link href="/" className="admin-back">Về lịch</Link>
         <h1>Gửi góp ý trên lịch</h1>
         <p><strong>{user.email}</strong> đã đăng nhập. Bạn có thể comment hoặc tạo suggestion ở từng mục lịch, nhưng không thể sửa trực tiếp trip plan.</p>
-        <a className="google-login contributor-link" href="/">Mở lịch để góp ý</a>
+        <Link className="google-login contributor-link" href="/">Mở lịch để góp ý</Link>
         <button className="admin-ghost contributor-logout" type="button" onClick={() => signOut({ redirectTo: "/" })}>Đăng xuất</button>
       </section>
     </main>
   );
 }
 
-function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initialSuggestions }) {
+function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initialSuggestions, pendingInvitationCount }) {
   const [trips, setTrips] = useState(initialTrips);
   const [selectedSlug, setSelectedSlug] = useState(initialSelectedSlug);
   const [plan, setPlan] = useState(initialPlan);
@@ -82,11 +84,12 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
   const pendingScheduleActionRef = useRef(null);
   const scheduleReturnFocusRef = useRef(null);
   const scheduleDirty = scheduleEditorIsDirty(scheduleEditor);
+  const scheduleEditorKey = scheduleEditor?.key;
 
   useEffect(() => {
-    if (!scheduleEditor) return undefined;
+    if (!scheduleEditorKey) return undefined;
     const frame = requestAnimationFrame(() => {
-      const editor = document.getElementById(`schedule-editor-${scheduleEditor.key}`);
+      const editor = document.getElementById(`schedule-editor-${scheduleEditorKey}`);
       if (!editor) return;
       editor.scrollIntoView({
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
@@ -95,7 +98,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
       editor.querySelector("[data-editor-heading]")?.focus({ preventScroll: true });
     });
     return () => cancelAnimationFrame(frame);
-  }, [scheduleEditor?.key]);
+  }, [scheduleEditorKey]);
 
   useEffect(() => {
     if (!scheduleDirty) return undefined;
@@ -290,7 +293,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
     <main className="admin-shell">
       <header className="admin-header">
         <div>
-          <a href="/" className="admin-back">Về lịch</a>
+          <Link href="/" className="admin-back">Về lịch</Link>
           <h1>Quản lý lịch</h1>
           <small className="admin-user">{user.authMode === "local-dev" ? "Local admin · Docker Postgres" : user.email}</small>
         </div>
@@ -299,7 +302,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
       {error && <div className="admin-alert" role="alert">{error}<button onClick={() => setError("")} aria-label="Đóng thông báo"><ActionIcon name="close" /></button></div>}
       {notice && <div className="admin-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Đóng thông báo"><ActionIcon name="close" /></button></div>}
 
-      <AdminNav active="trips" />
+      <AdminNav active="trips" pendingInvitationCount={pendingInvitationCount} />
 
       <div className="admin-grid">
         <aside className="admin-sidebar">
@@ -584,10 +587,11 @@ function DiscardChangesDialog({ message, onKeep, onDiscard }) {
   const dialogRef = useRef(null);
   const safeActionRef = useRef(null);
   const returnFocusRef = useRef(null);
+  const keepDraft = useEffectEvent(onKeep);
   useEffect(() => {
     returnFocusRef.current = document.activeElement;
     safeActionRef.current?.focus();
-    const handleEscape = (event) => { if (event.key === "Escape") onKeep(); };
+    const handleEscape = (event) => { if (event.key === "Escape") keepDraft(); };
     document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("keydown", handleEscape);

@@ -31,6 +31,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Test the local app at `http://127.0.0.1:3000`. Keep the development server running while using the in-app Browser, and rely on Fast Refresh or reload the page after changes.
 - Manage the isolated Rancher database with `npm run db:up:local`, `npm run db:migrate:local`, and `npm run db:down:local`.
 
+## Engineering decision quality
+
+- Prefer established ecosystem practices and maintained tooling when they solve the actual problem. Evaluate decisions by correctness, maintainability, portability, diagnostics, CI support, and onboarding across the full lifecycle.
+- Treat local optimizations such as minimizing dependency count, setup steps, or lines of configuration as secondary trade-offs. Do not replace mature tooling with bespoke infrastructure solely to optimize those local costs.
+- When deviating from an established practice, identify the concrete project constraint, compare the lifecycle costs, and leave the reasoning discoverable in the relevant code or documentation.
+- Match verification to the failure mode. Build and unit checks do not substitute for real-browser end-to-end coverage of browser runtime, hydration, navigation, and user-visible integration failures.
+
 ## Vercel deployment
 
 Use this runbook for a production deploy from Codex desktop.

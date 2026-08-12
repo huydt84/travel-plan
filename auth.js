@@ -4,6 +4,7 @@ import { ADMIN_ROUTES } from "./lib/admin-routes.mjs";
 import { recordUserLogin } from "./lib/user-repository";
 
 export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+export const BASIC_GOOGLE_SCOPE = "openid email profile";
 
 export const ownerEmail = () => {
   const email = process.env.AUTH_OWNER_EMAIL?.trim().toLowerCase();
@@ -20,9 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
       authorization: {
         params: {
-          scope: `openid email profile ${GMAIL_SEND_SCOPE}`,
-          access_type: "offline",
-          prompt: "consent",
+          scope: BASIC_GOOGLE_SCOPE,
           response_type: "code",
           include_granted_scopes: "true",
         },
@@ -31,7 +30,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   pages: {
     signIn: ADMIN_ROUTES.trips,
-    error: ADMIN_ROUTES.trips,
+    error: "/auth/invitation-error",
   },
   callbacks: {
     async signIn({ account, profile }) {

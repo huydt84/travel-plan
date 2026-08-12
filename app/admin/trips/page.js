@@ -1,6 +1,7 @@
 import AdminApp from "../../../components/AdminApp";
 import { getViewer } from "../../../lib/auth";
 import { listSuggestions } from "../../../lib/suggestion-repository";
+import { countPendingInvitationRequests } from "../../../lib/invitation-permission-repository";
 import { getCachedItinerary, listCachedTrips } from "../../../lib/trip-cache";
 
 export const metadata = { title: "Quản lý lịch chuyến đi" };
@@ -12,9 +13,10 @@ export default async function TripsAdminPage() {
   let initialSelectedSlug = "";
   let initialPlan = null;
   let initialSuggestions = [];
+  let pendingInvitationCount = 0;
 
   if (viewer?.isOwner) {
-    initialTrips = await listCachedTrips();
+    [initialTrips, pendingInvitationCount] = await Promise.all([listCachedTrips(), countPendingInvitationRequests()]);
     initialSelectedSlug = initialTrips[0]?.slug || "";
     if (initialSelectedSlug) {
       [initialPlan, initialSuggestions] = await Promise.all([
@@ -31,6 +33,7 @@ export default async function TripsAdminPage() {
       initialSelectedSlug={initialSelectedSlug}
       initialPlan={initialPlan}
       initialSuggestions={initialSuggestions}
+      pendingInvitationCount={pendingInvitationCount}
     />
   );
 }

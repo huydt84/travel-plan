@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { signIn, signOut } from "next-auth/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { signIn } from "next-auth/react";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { formatScheduleHeading, formatTripTitle } from "../lib/trip-date-label.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
+import InvitationDialog from "./InvitationDialog";
+import ViewerMenu from "./ViewerMenu";
 
 const JST_OFFSET = "+09:00";
 
@@ -33,13 +37,16 @@ const getState = (now, itinerary) => {
   return { mode: "gap", current: itinerary[nextIndex], index: nextIndex - 1, next: itinerary[nextIndex + 1] || null };
 };
 
-export default function TripTracker({ initialData, initialNow, viewer, trips }) {
+export default function TripTracker({ initialData, initialNow, initialInvitationOpen = false, initialGmailReturn = false, viewer, trips }) {
+  const router = useRouter();
   const [data, setData] = useState(initialData);
   const [now, setNow] = useState(() => new Date(initialNow));
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionTarget, setSuggestionTarget] = useState(null);
   const [suggestionError, setSuggestionError] = useState("");
   const [suggestionAction, setSuggestionAction] = useState({ id: null, error: "" });
+  const [invitationOpen, setInvitationOpen] = useState(initialInvitationOpen);
+  const [gmailReturn, setGmailReturn] = useState(initialGmailReturn);
   const routeListRef = useRef(null);
   const activeStopRef = useRef(null);
   const stationStageRef = useRef(null);
@@ -56,6 +63,18 @@ export default function TripTracker({ initialData, initialNow, viewer, trips }) 
       .catch(() => {});
     return () => window.clearInterval(timer);
   }, [initialData.trip.slug]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("invite") === "1") {
+      window.sessionStorage.removeItem("travel-plan:invite:return");
+    }
+    if (url.searchParams.has("invite") || url.searchParams.has("gmail")) {
+      url.searchParams.delete("invite");
+      url.searchParams.delete("gmail");
+      window.history.replaceState({}, "", url);
+    }
+  }, []);
 
   const itinerary = useMemo(() => data.itinerary.map((item) => ({
     ...item,
@@ -128,7 +147,7 @@ export default function TripTracker({ initialData, initialNow, viewer, trips }) 
         <section className="now-card error-card">
           <h1>Chưa có hoạt động</h1>
           <p>Chuyến đi này chưa có mục lịch trình nào.</p>
-          <a className="jump-button" href="/">Chọn chuyến khác</a>
+          <Link className="jump-button" href="/">Chọn chuyến khác</Link>
         </section>
       </main>
     );
@@ -262,31 +281,30 @@ export default function TripTracker({ initialData, initialNow, viewer, trips }) 
           <TypeIcon type="Transit" />
           <span>Lịch trình chuyến đi</span>
         </a>
-        <label className="trip-picker">
-          <span className="sr-only">Chọn chuyến đi</span>
-          <span className="trip-picker-control">
-            <select value={data.trip.slug} onChange={(event) => { window.location.href = `/?trip=${encodeURIComponent(event.target.value)}`; }}>
-              {trips.map((trip) => (
-                <option value={trip.slug} key={trip.slug}>{formatTripTitle(trip.title, trip.date, trip.timezone, now)}</option>
-              ))}
-            </select>
-            <span className="trip-picker-affordance" aria-hidden="true">
-              <span>Đổi</span>
-              <ActionIcon name="down" />
+        <div className="trip-context">
+          <label className="trip-picker">
+            <span className="sr-only">Chọn chuyến đi</span>
+            <span className="trip-picker-control">
+              <select value={data.trip.slug} onChange={(event) => router.push(`/?trip=${encodeURIComponent(event.target.value)}`)}>
+                {trips.map((trip) => (
+                  <option value={trip.slug} key={trip.slug}>{formatTripTitle(trip.title, trip.date, trip.timezone, now)}</option>
+                ))}
+              </select>
+              <span className="trip-picker-affordance" aria-hidden="true">
+                <span>Đổi</span>
+                <ActionIcon name="down" />
+              </span>
             </span>
-          </span>
-          <small>{tripDateLabel} · {data.trip.location}</small>
-        </label>
-        <div className="viewer-actions">
-          {viewer?.isOwner && <a className="admin-link" href={ADMIN_ROUTES.trips}>Quản lý</a>}
-          {viewer?.authMode === "local-dev" ? (
-            <span className="admin-link user-link" title="Local admin dùng Docker Postgres">Local admin</span>
-          ) : viewer ? (
-            <button className="admin-link user-link" type="button" onClick={() => signOut({ redirectTo: "/" })} title="Đăng xuất">
-              {viewer.image && <img src={viewer.image} alt="" referrerPolicy="no-referrer" />}
-              <span>{viewer.name || viewer.email}</span>
-            </button>
-          ) : (
+            <small>{tripDateLabel} · {data.trip.location}</small>
+          </label>
+          <button className="admin-link invite-link" type="button" onClick={() => setInvitationOpen(true)}>
+            <ActionIcon name="invite" />
+            <span>Rủ bạn đi cùng</span>
+          </button>
+        </div>
+        <div className="viewer-utilities">
+          {viewer?.isOwner && <Link className="admin-link desktop-manage-link" href={ADMIN_ROUTES.trips}>Quản lý</Link>}
+          {viewer ? <ViewerMenu viewer={viewer} /> : (
             <button className="admin-link user-link" type="button" onClick={() => signIn("google", { redirectTo: "/" })}>Đăng nhập</button>
           )}
         </div>
@@ -466,6 +484,7 @@ export default function TripTracker({ initialData, initialNow, viewer, trips }) 
           catch (error) { setSuggestionError(error.message); }
         }} />
       )}
+      {invitationOpen && <InvitationDialog open onClose={() => { setInvitationOpen(false); setGmailReturn(false); }} viewer={viewer} trip={data.trip} itinerary={data.itinerary} gmailReturn={gmailReturn} />}
     </main>
   );
 }
@@ -507,10 +526,11 @@ function SuggestionComposer({ target, error, onClose, onSubmit }) {
   const [busy, setBusy] = useState(false);
   const dialogRef = useRef(null);
   const returnFocusRef = useRef(null);
+  const closeComposer = useEffectEvent(onClose);
 
   useEffect(() => {
     returnFocusRef.current = document.activeElement;
-    const handleEscape = (event) => { if (event.key === "Escape") onClose(); };
+    const handleEscape = (event) => { if (event.key === "Escape") closeComposer(); };
     document.addEventListener("keydown", handleEscape);
     return () => {
       document.removeEventListener("keydown", handleEscape);
