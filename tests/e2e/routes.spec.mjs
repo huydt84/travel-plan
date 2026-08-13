@@ -69,6 +69,15 @@ test("mobile clock stays in its cell and the active route connector shares the r
   expect(Math.abs(geometry.connectorCenter - geometry.railCenter)).toBeLessThanOrEqual(0.5);
 });
 
+test("laptop timeline has no viewport guide crossing its content", async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await gotoHealthy(page, "/");
+
+  const bodyBackground = await page.locator("body").evaluate((body) => getComputedStyle(body).backgroundImage);
+
+  expect(bodyBackground).not.toContain("90deg");
+});
+
 for (const route of ownerRoutes) {
   test(`${route.path} renders the owner surface`, async ({ page }) => {
     await gotoHealthy(page, route.path);

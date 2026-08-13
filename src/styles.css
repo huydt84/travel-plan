@@ -28,9 +28,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background:
-    linear-gradient(90deg, transparent 24.9%, rgba(16, 36, 61, .055) 25%, transparent 25.1%),
-    linear-gradient(180deg, var(--paper-bright), var(--paper));
+  background: linear-gradient(180deg, var(--paper-bright), var(--paper));
 }
 body.has-dialog { overflow: hidden; }
 button, input, textarea, select { font: inherit; }
