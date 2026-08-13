@@ -66,9 +66,19 @@ Invitation requests include `recipients`, `requestId`, `tripSlug`, `subject`, an
 
 Invitations are sent from the logged-in owner's Gmail account through Google OAuth; there is no separate sender address or mail-service API key. Enable the Gmail API in the same Google Cloud project, add the `https://www.googleapis.com/auth/gmail.send` scope to the OAuth consent screen, and sign out/in once to grant it. OAuth access and refresh tokens remain in the encrypted server session and are never returned to the browser. `APP_URL` becomes the invitation link.
 
+## Notifications
+
+Contributors receive in-app notifications when another participant comments or suggests a change in a trip they have contributed to. Participation persists after contribution deletion. When the owner changes a contribution status, its author receives an in-app update. The owner intentionally has no notification bell.
+
+New contributions also enqueue a private owner email through Resend. Create a sending-only Resend API key, register Resend with the same address as `AUTH_OWNER_EMAIL`, and configure `RESEND_API_KEY`. The free `onboarding@resend.dev` sender can then deliver to that owner address without a custom domain. Email delivery happens after the contribution response; failures never roll back the contribution.
+
+Pending owner emails retry immediately and through the daily Vercel cron route. Configure a random `CRON_SECRET` of at least 16 bytes; Vercel supplies it as the cron route's bearer token. The worker stops after five failed attempts and never logs message bodies or secrets.
+
+This feature adds database tables, so run `npm run db:migrate` intentionally before deploying code that depends on it.
+
 ## Deploy
 
-Run `npm run vercel:env` to add the Neon and Auth.js values to Vercel, then run `npx vercel deploy --prod`.
+Run `npm run vercel:env` to sync every non-`LOCAL_` variable declared in `.env.template` from the local `.env` into Vercel Production and Preview, then run `npx vercel deploy --prod`. The template is the deployment allowlist; adding a deployable variable never requires editing the sync script. The command only upserts declared variables and does not remove unrelated Vercel configuration.
 
 ## Import a trip with Codex
 

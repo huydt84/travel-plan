@@ -14,7 +14,7 @@ export default function ViewerMenu({ viewer }) {
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const localDev = viewer.authMode === "local-dev";
-  const label = localDev ? "Local admin" : viewer.name || viewer.email;
+  const label = localDev && viewer.isOwner ? "Local admin" : viewer.name || viewer.email;
   const initial = label?.trim().charAt(0).toLocaleUpperCase("vi") || "T";
   const manageClassName = localDev ? "viewer-menu-item" : "viewer-menu-item mobile-manage-link";
 

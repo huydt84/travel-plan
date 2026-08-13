@@ -8,9 +8,11 @@ import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { formatScheduleHeading, formatTripTitle } from "../lib/trip-date-label.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
 import InvitationDialog from "./InvitationDialog";
+import NotificationCenter from "./NotificationCenter";
 import ViewerMenu from "./ViewerMenu";
 
 const JST_OFFSET = "+09:00";
+const NOTIFICATION_NAVIGATION_EVENT = "travel-plan:notification-navigation";
 
 const toDate = (date, time) => new Date(`${date}T${time}:00${JST_OFFSET}`);
 
@@ -75,6 +77,38 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       window.history.replaceState({}, "", url);
     }
   }, []);
+
+  useEffect(() => {
+    if (!suggestions.length) return undefined;
+    let frame;
+    let timer;
+    const revealContribution = (event) => {
+      const url = new URL(event?.detail?.targetUrl || window.location.href, window.location.origin);
+      const targetTrip = url.searchParams.get("trip");
+      if (targetTrip && targetTrip !== data.trip.slug) return;
+      const match = url.hash.match(/^#contribution-(\d+)$/);
+      if (!match) return;
+      const target = document.getElementById(`contribution-${match[1]}`);
+      if (!target) return;
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      frame = window.requestAnimationFrame(() => {
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.classList.add("is-notification-target");
+      });
+      timer = window.setTimeout(() => target.classList.remove("is-notification-target"), 2_800);
+    };
+    revealContribution();
+    window.addEventListener("hashchange", revealContribution);
+    window.addEventListener(NOTIFICATION_NAVIGATION_EVENT, revealContribution);
+    return () => {
+      window.removeEventListener("hashchange", revealContribution);
+      window.removeEventListener(NOTIFICATION_NAVIGATION_EVENT, revealContribution);
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [data.trip.slug, suggestions]);
 
   const itinerary = useMemo(() => data.itinerary.map((item) => ({
     ...item,
@@ -304,6 +338,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
         </div>
         <div className="viewer-utilities">
           {viewer?.isOwner && <Link className="admin-link desktop-manage-link" href={ADMIN_ROUTES.trips}>Quản lý</Link>}
+          {viewer && !viewer.isOwner && <NotificationCenter />}
           {viewer ? <ViewerMenu viewer={viewer} /> : (
             <button className="admin-link user-link" type="button" onClick={() => signIn("google", { redirectTo: "/" })}>Đăng nhập</button>
           )}
@@ -363,7 +398,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
               </button>
               <span>{(suggestionsByActivity.get(state.current.id) || []).length} ghi chú</span>
             </div>
-            <SuggestionList suggestions={suggestionsByActivity.get(state.current.id) || []} {...suggestionListProps} />
+            <SuggestionList suggestions={suggestionsByActivity.get(state.current.id) || []} anchorItems={false} {...suggestionListProps} />
           </section>
 
           {state.next && (
@@ -489,12 +524,17 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
   );
 }
 
-function SuggestionList({ suggestions, action, onDelete, onToggleResolved }) {
+function SuggestionList({ suggestions, action, onDelete, onToggleResolved, anchorItems = true }) {
   if (!suggestions.length) return null;
   return (
     <div className="suggestion-list">
       {suggestions.map((suggestion) => (
-        <article className={`suggestion-note ${suggestion.kind}`} key={suggestion.id}>
+        <article
+          className={`suggestion-note ${suggestion.kind}`}
+          id={anchorItems ? `contribution-${suggestion.id}` : undefined}
+          tabIndex={anchorItems ? -1 : undefined}
+          key={suggestion.id}
+        >
           <div className="suggestion-note-head">
             <div className="suggestion-note-meta">
               <strong>{suggestion.author.name}</strong>

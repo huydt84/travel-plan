@@ -1,0 +1,78 @@
+import { createPostgresSql } from "../../lib/sql-adapter.mjs";
+import { processAdminNotificationOutboxRecords } from "../../lib/admin-notification-outbox-store.mjs";
+import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
+import { expect, gotoHealthy, test } from "./fixtures.mjs";
+
+const localHeaders = (email, name) => ({
+  "x-local-viewer-email": email,
+  "x-local-viewer-name": name,
+});
+
+test("concurrent outbox workers deliver one contribution email once", async ({ browser, baseURL }) => {
+  const marker = Date.now();
+  const contributorContext = await browser.newContext({
+    baseURL,
+    extraHTTPHeaders: localHeaders(`outbox-${marker}@localhost.invalid`, "Outbox Contributor"),
+  });
+  const ownerContext = await browser.newContext({ baseURL });
+  const page = await contributorContext.newPage();
+  const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
+  let suggestion;
+  let slug;
+
+  try {
+    await gotoHealthy(page, "/");
+    slug = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+    const response = await contributorContext.request.post(`/api/trips/${encodeURIComponent(slug)}/suggestions`, {
+      data: { activityId: null, kind: "comment", body: `Outbox concurrency ${marker}` },
+    });
+    expect(response.status()).toBe(201);
+    suggestion = await response.json();
+
+    let outbox;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      [outbox] = await sql`
+        SELECT id, status
+        FROM admin_notification_outbox
+        WHERE suggestion_id = ${suggestion.id}
+      `;
+      if (outbox && outbox.status !== "sending") break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    expect(outbox).toBeTruthy();
+
+    await sql`
+      UPDATE admin_notification_outbox
+      SET status = 'pending', attempt_count = 0, next_attempt_at = NOW(), lease_expires_at = NULL
+      WHERE id = ${outbox.id}
+    `;
+
+    let sends = 0;
+    const sendImpl = async () => {
+      sends += 1;
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      return `resend-${marker}`;
+    };
+    const dependencies = { sendImpl, logger: { error() {} } };
+    const [firstWorker, secondWorker] = await Promise.all([
+      processAdminNotificationOutboxRecords(sql, { outboxId: outbox.id }, dependencies),
+      processAdminNotificationOutboxRecords(sql, { outboxId: outbox.id }, dependencies),
+    ]);
+
+    expect(sends).toBe(1);
+    expect([...firstWorker, ...secondWorker]).toHaveLength(1);
+    expect([...firstWorker, ...secondWorker][0]).toMatchObject({
+      outboxId: String(outbox.id),
+      status: "sent",
+      resendMessageId: `resend-${marker}`,
+    });
+  } finally {
+    if (suggestion && slug) {
+      await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}/suggestions/${suggestion.id}`);
+    }
+    await sql.end();
+    await page.close();
+    await contributorContext.close();
+    await ownerContext.close();
+  }
+});

@@ -1,15 +1,14 @@
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 
-const variables = {
-  POSTGRES_URI: process.env.POSTGRES_URI,
-  AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID,
-  AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET,
-  AUTH_SECRET: process.env.AUTH_SECRET,
-  AUTH_OWNER_EMAIL: process.env.AUTH_OWNER_EMAIL,
-  APP_URL: process.env.APP_URL,
-};
+const template = await readFile(new URL("../.env.template", import.meta.url), "utf8");
+const variableNames = [...template.matchAll(/^([A-Z][A-Z0-9_]*)\s*=/gm)]
+  .map((match) => match[1])
+  .filter((name) => !name.startsWith("LOCAL_"));
+if (!variableNames.length) throw new Error(".env.template does not declare any deployable environment variables.");
 
-for (const [name, value] of Object.entries(variables)) {
+for (const name of variableNames) {
+  const value = process.env[name];
   if (!value) throw new Error(`${name} is missing from the process environment.`);
   const child = spawn(
     "npx",

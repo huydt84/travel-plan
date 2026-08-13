@@ -36,6 +36,27 @@ test("local admin returns an owner viewer and exclusively selects the local data
   });
 });
 
+test("local mode can represent a contributor without weakening production auth", () => {
+  const viewer = resolveLocalAdminViewer({
+    NODE_ENV: "development",
+    LOCAL_ADMIN_BYPASS: "true",
+    LOCAL_VIEWER_EMAIL: "friend@localhost.invalid",
+    LOCAL_VIEWER_NAME: "Local Friend",
+  });
+  assert.deepEqual(viewer, {
+    email: "friend@localhost.invalid",
+    name: "Local Friend",
+    image: null,
+    isOwner: false,
+    authMode: "local-dev",
+  });
+  assert.throws(() => resolveLocalAdminViewer({
+    NODE_ENV: "production",
+    LOCAL_ADMIN_BYPASS: "true",
+    LOCAL_VIEWER_EMAIL: "friend@localhost.invalid",
+  }), /only allowed with NODE_ENV=development/);
+});
+
 test("local admin fails closed outside development", () => {
   const env = {
     NODE_ENV: "production",
