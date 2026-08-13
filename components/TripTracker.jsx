@@ -6,6 +6,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState }
 import { signIn } from "next-auth/react";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { formatScheduleHeading, formatTripTitle } from "../lib/trip-date-label.mjs";
+import { getTripPageTitle } from "../lib/trip-page-title.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
 import InvitationDialog from "./InvitationDialog";
 import NotificationCenter from "./NotificationCenter";
@@ -125,6 +126,16 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     return grouped;
   }, [suggestions]);
   const resolvedState = itinerary.length ? getState(now, itinerary) : null;
+  const tripTitle = formatTripTitle(data.trip.title, data.trip.date, data.trip.timezone, now);
+  const pageTitle = getTripPageTitle({
+    mode: resolvedState?.mode,
+    tripTitle,
+    activityTitle: resolvedState?.current?.title,
+  });
+
+  useEffect(() => {
+    document.title = pageTitle;
+  }, [pageTitle]);
 
   useLayoutEffect(() => {
     const list = routeListRef.current;
@@ -241,7 +252,6 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     month: "2-digit",
     year: "numeric",
   }).format(toDate(data.trip.date, "00:00"));
-  const tripTitle = formatTripTitle(data.trip.title, data.trip.date, data.trip.timezone, now);
   const scheduleHeading = formatScheduleHeading(data.trip.date, data.trip.timezone, now);
 
   const jumpToCurrent = () => {
