@@ -29,17 +29,17 @@ test("concurrent outbox workers deliver one contribution email once", async ({ b
     expect(response.status()).toBe(201);
     suggestion = await response.json();
 
-    let outbox;
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+    let outbox = null;
+    await expect.poll(async () => {
       [outbox] = await sql`
-        SELECT id, status
+        SELECT id, status, resend_message_id
         FROM admin_notification_outbox
         WHERE suggestion_id = ${suggestion.id}
       `;
-      if (outbox && outbox.status !== "sending") break;
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
-    expect(outbox).toBeTruthy();
+      return outbox?.status;
+    }, { timeout: 5_000 }).toBe("sent");
+    expect(outbox.status).toBe("sent");
+    expect(outbox.resend_message_id).toMatch(/^fake-resend-/);
 
     await sql`
       UPDATE admin_notification_outbox

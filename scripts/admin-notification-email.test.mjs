@@ -51,6 +51,49 @@ test("Resend delivery uses a stable idempotency key", async () => {
   assert.equal(requests[0].options.headers.Authorization, "Bearer re_test");
 });
 
+test("Resend delivery accepts a loopback endpoint only in local admin development", async () => {
+  const localEnv = {
+    ...env,
+    NODE_ENV: "development",
+    LOCAL_ADMIN_BYPASS: "true",
+    RESEND_API_ENDPOINT: "http://127.0.0.1:3101/emails",
+  };
+  const requests = [];
+  await sendAdminContributionEmail(contribution, {
+    env: localEnv,
+    fetchImpl: async (url) => {
+      requests.push(url);
+      return { ok: true, status: 200, json: async () => ({ id: "local-resend-42" }) };
+    },
+  });
+  assert.equal(requests[0], localEnv.RESEND_API_ENDPOINT);
+});
+
+for (const [description, overrides] of [
+  ["ordinary development", { NODE_ENV: "development" }],
+  ["production", { NODE_ENV: "production", LOCAL_ADMIN_BYPASS: "true" }],
+  ["malformed", { RESEND_API_ENDPOINT: "not-a-url" }],
+  ["remote", {
+    NODE_ENV: "development",
+    LOCAL_ADMIN_BYPASS: "true",
+    RESEND_API_ENDPOINT: "https://api.example.test/emails",
+  }],
+]) {
+  test(`Resend endpoint override rejects ${description}`, async () => {
+    await assert.rejects(
+      () => sendAdminContributionEmail(contribution, {
+        env: {
+          ...env,
+          RESEND_API_ENDPOINT: "http://127.0.0.1:3101/emails",
+          ...overrides,
+        },
+        fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ id: "unexpected" }) }),
+      }),
+      (error) => error instanceof AdminNotificationEmailError && error.code === "RESEND_CONFIG_ERROR",
+    );
+  });
+}
+
 test("Resend configuration and delivery failures use stable error codes", async () => {
   await assert.rejects(
     () => sendAdminContributionEmail(contribution, { env: { ...env, RESEND_API_KEY: "" } }),
