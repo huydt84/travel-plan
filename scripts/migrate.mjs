@@ -86,11 +86,16 @@ await sql`CREATE TABLE IF NOT EXISTS users (
   name TEXT NOT NULL,
   email TEXT PRIMARY KEY,
   first_login TIMESTAMPTZ NOT NULL,
-  last_login TIMESTAMPTZ NOT NULL
+  last_login TIMESTAMPTZ NOT NULL,
+  last_active_at TIMESTAMPTZ NOT NULL
 )`;
 
-await sql`CREATE INDEX IF NOT EXISTS users_last_login_idx
-  ON users (last_login DESC)`;
+await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ`;
+await sql`UPDATE users SET last_active_at = last_login WHERE last_active_at IS NULL`;
+await sql`ALTER TABLE users ALTER COLUMN last_active_at SET NOT NULL`;
+await sql`DROP INDEX IF EXISTS users_last_login_idx`;
+await sql`CREATE INDEX IF NOT EXISTS users_last_active_at_idx
+  ON users (last_active_at DESC)`;
 
 await sql`CREATE TABLE IF NOT EXISTS invitation_permissions (
   id BIGSERIAL PRIMARY KEY,

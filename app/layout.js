@@ -1,5 +1,6 @@
 import "../src/styles.css";
 import { Barlow_Condensed, Noto_Sans } from "next/font/google";
+import ActivityHeartbeat from "../components/ActivityHeartbeat";
 
 const bodyFont = Noto_Sans({
   subsets: ["latin", "vietnamese"],
@@ -42,6 +43,7 @@ export default function RootLayout({ children }) {
     <html lang="vi" className={`${bodyFont.variable} ${displayFont.variable}`} data-scroll-behavior="smooth">
       <body>
         {children}
+        <ActivityHeartbeat />
       </body>
     </html>
   );

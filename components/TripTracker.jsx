@@ -134,7 +134,14 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
   });
 
   useEffect(() => {
-    document.title = pageTitle;
+    const applyTitle = () => {
+      if (document.title !== pageTitle) document.title = pageTitle;
+    };
+
+    applyTitle();
+    const headObserver = new MutationObserver(applyTitle);
+    headObserver.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => headObserver.disconnect();
   }, [pageTitle]);
 
   useLayoutEffect(() => {

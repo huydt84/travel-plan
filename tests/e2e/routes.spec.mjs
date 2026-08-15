@@ -21,7 +21,7 @@ const ownerRoutes = [
   {
     path: "/admin/users",
     heading: "Người dùng",
-    section: "Lịch sử đăng nhập",
+    section: "Hoạt động người dùng",
     currentNav: "Người dùng",
   },
 ];
@@ -32,6 +32,42 @@ test("public tracker renders its primary controls", async ({ page }) => {
   await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Rủ bạn đi cùng", exact: true })).toBeVisible();
   await expect(page.getByText("Local admin", { exact: true })).toBeVisible();
+});
+
+test("public tracker title reflects the current trip state", async ({ page }) => {
+  await gotoHealthy(page, "/");
+
+  await expect(page).toHaveTitle(/^(Sắp bắt đầu|Đang diễn ra|Đang chờ|Đã kết thúc) · /);
+});
+
+test("activity heartbeat pauses in hidden tabs and resumes when visible", async ({ page }) => {
+  let activityRequests = 0;
+  await page.addInitScript(() => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => window.__activityTestVisibility || "visible",
+    });
+  });
+  await page.clock.install({ time: new Date("2026-08-15T00:00:00.000Z") });
+  await page.route("**/api/activity", async (route) => {
+    activityRequests += 1;
+    await route.fulfill({ status: 204 });
+  });
+
+  await gotoHealthy(page, "/");
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(activityRequests).toBeGreaterThan(0);
+  const visibleRequestCount = activityRequests;
+
+  await page.evaluate(() => { window.__activityTestVisibility = "hidden"; });
+  await page.clock.fastForward(5 * 60 * 1000);
+  expect(activityRequests).toBe(visibleRequestCount);
+
+  await page.evaluate(() => {
+    window.__activityTestVisibility = "visible";
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect.poll(() => activityRequests).toBe(visibleRequestCount + 1);
 });
 
 test("mobile clock stays in its cell and the active route connector shares the rail axis", async ({ page }) => {
@@ -91,3 +127,14 @@ for (const route of ownerRoutes) {
     await expect(page.locator('body > script[aria-hidden="true"]:not([src])')).toHaveCount(0);
   });
 }
+
+test("user management shows the current owner as recently active", async ({ page }) => {
+  await gotoHealthy(page, "/admin/users");
+
+  const ownerRow = page.getByRole("row").filter({ hasText: "local-admin@localhost.invalid" });
+  await expect(page.getByRole("columnheader", { name: "Hoạt động gần nhất" })).toBeVisible();
+  await expect(ownerRow.getByText("JST").last()).toBeVisible();
+
+  const lastActive = await ownerRow.locator("time").last().getAttribute("datetime");
+  expect(Date.now() - new Date(lastActive).getTime()).toBeLessThan(6 * 60 * 1000);
+});
