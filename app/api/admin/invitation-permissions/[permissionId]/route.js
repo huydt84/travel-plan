@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getViewer, requireOwner } from "../../../../../lib/auth";
+import { getViewer, requireAdmin } from "../../../../../lib/auth";
 import { InvitationPermissionError } from "../../../../../lib/invitation-permission-store.mjs";
 import { updateInvitationPermission } from "../../../../../lib/invitation-permission-repository";
 import { readJsonBody, ValidationError } from "../../../../../lib/validation";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function PATCH(request, { params }) {
-  const unauthorized = await requireOwner();
+  const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
 
   try {
@@ -38,4 +38,3 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: "Không thể cập nhật quyền lúc này" }, { status: 500 });
   }
 }
-

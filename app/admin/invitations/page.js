@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function InvitationsAdminPage({ searchParams }) {
   const viewer = await getViewer();
-  if (!viewer?.isOwner) {
+  if (!viewer?.isAdmin) {
     return <AdminApp viewer={viewer} initialTrips={[]} initialSelectedSlug="" initialPlan={null} initialSuggestions={[]} />;
   }
   const [{ view }, permissions, history] = await Promise.all([

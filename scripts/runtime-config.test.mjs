@@ -32,6 +32,8 @@ test("local admin returns an owner viewer and exclusively selects the local data
     name: "Local Admin",
     image: null,
     isOwner: true,
+    isAdmin: true,
+    role: "owner",
     authMode: "local-dev",
   });
 });
@@ -48,6 +50,8 @@ test("local mode can represent a contributor without weakening production auth",
     name: "Local Friend",
     image: null,
     isOwner: false,
+    isAdmin: false,
+    role: "member",
     authMode: "local-dev",
   });
   assert.throws(() => resolveLocalAdminViewer({

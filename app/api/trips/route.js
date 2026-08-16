@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "../../../lib/api-response";
-import { requireOwner } from "../../../lib/auth";
+import { requireAdmin } from "../../../lib/auth";
 import { createTrip } from "../../../lib/itinerary-repository";
 import { expireTravelPlansCache, listCachedTrips } from "../../../lib/trip-cache";
 import { parseTripInput, readJsonBody } from "../../../lib/validation";
@@ -14,7 +14,7 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const unauthorized = await requireOwner();
+  const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
   try {
     const input = parseTripInput(await readJsonBody(request));

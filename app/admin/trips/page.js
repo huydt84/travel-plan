@@ -15,7 +15,7 @@ export default async function TripsAdminPage() {
   let initialSuggestions = [];
   let pendingInvitationCount = 0;
 
-  if (viewer?.isOwner) {
+  if (viewer?.isAdmin) {
     [initialTrips, pendingInvitationCount] = await Promise.all([listCachedTrips(), countPendingInvitationRequests()]);
     initialSelectedSlug = initialTrips[0]?.slug || "";
     if (initialSelectedSlug) {

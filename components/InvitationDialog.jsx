@@ -142,7 +142,7 @@ export default function InvitationDialog({ open, onClose, viewer, trip, itinerar
 
   const permissionStatus = access?.permission?.status || "not_requested";
   const approved = permissionStatus === "approved";
-  const isOwner = Boolean(viewer?.isOwner || access?.isOwner);
+  const isOwner = Boolean(viewer?.isAdmin || access?.isAdmin || viewer?.isOwner || access?.isOwner);
   const quota = access?.quota;
   const quotaExhausted = quota?.batchesRemaining === 0;
   const typedRecipient = email.trim().toLowerCase();

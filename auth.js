@@ -2,11 +2,13 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { ADMIN_ROUTES } from "./lib/admin-routes.mjs";
 import { recordUserLogin } from "./lib/user-repository";
+import { resolveLocalAdminMode } from "./lib/runtime-config.mjs";
 
 export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
 export const BASIC_GOOGLE_SCOPE = "openid email profile";
 
 export const ownerEmail = () => {
+  if (resolveLocalAdminMode().enabled) return "local-admin@localhost.invalid";
   const email = process.env.AUTH_OWNER_EMAIL?.trim().toLowerCase();
   if (!email) throw new Error("AUTH_OWNER_EMAIL is missing from the process environment.");
   return email;
@@ -50,7 +52,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const email = session.user?.email?.toLowerCase();
       const isOwner = Boolean(email && email === ownerEmail());
       session.user.isOwner = isOwner;
-      session.user.role = isOwner ? "owner" : "contributor";
+      session.user.isAdmin = isOwner;
+      session.user.role = isOwner ? "owner" : "member";
       return session;
     },
   },

@@ -7,6 +7,7 @@ import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { createScheduleEditor, normalizeScheduleRefs, scheduleEditorIsDirty } from "../lib/schedule-editor-state.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
 import AdminNav from "./AdminNav";
+import ConfirmDialog from "./ConfirmDialog";
 
 const emptyTrip = { slug: "", title: "", date: "", timezone: "Asia/Tokyo", location: "" };
 const emptySchedule = { start: "", end: "", displayEnd: "", type: "Visit", icon: "📍", title: "", detail: "", refs: [] };
@@ -24,7 +25,7 @@ const api = async (path, options = {}) => {
 
 export default function AdminApp({ viewer, initialTrips, initialSelectedSlug, initialPlan, initialSuggestions, pendingInvitationCount = 0 }) {
   if (!viewer?.email) return <Login />;
-  if (!viewer.isOwner) return <ContributorOnly user={viewer} />;
+  if (!viewer.isAdmin) return <ContributorOnly user={viewer} />;
   return (
     <Dashboard
       user={viewer}
@@ -81,6 +82,9 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [scheduleError, setScheduleError] = useState("");
   const [discardPrompt, setDiscardPrompt] = useState(null);
+  const [suggestionFilter, setSuggestionFilter] = useState("visible");
+  const [suggestionToDelete, setSuggestionToDelete] = useState(null);
+  const [suggestionDeleteError, setSuggestionDeleteError] = useState("");
   const pendingScheduleActionRef = useRef(null);
   const scheduleReturnFocusRef = useRef(null);
   const scheduleDirty = scheduleEditorIsDirty(scheduleEditor);
@@ -279,12 +283,34 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
     setSuggestions((current) => current.map((item) => item.id === suggestionId ? updated : item));
   });
 
-  const removeSuggestion = (suggestionId) => {
-    if (!window.confirm("Xoá vĩnh viễn góp ý này?")) return;
-    run(async () => {
-      await api(`/api/trips/${encodeURIComponent(selectedSlug)}/suggestions/${suggestionId}`, { method: "DELETE" });
-      setSuggestions((current) => current.filter((item) => item.id !== suggestionId));
+  const updateSuggestionVisibility = (suggestion) => run(async () => {
+    const updated = await api(`/api/trips/${encodeURIComponent(selectedSlug)}/suggestions/${suggestion.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ hidden: !suggestion.hidden }),
     });
+    setSuggestions((current) => current.map((item) => item.id === suggestion.id ? updated : item));
+    setNotice(updated.hidden ? "Đã ẩn nội dung khỏi lịch công khai." : "Đã hiện lại nội dung trên lịch.");
+  });
+
+  const requestRemoveSuggestion = (suggestion) => {
+    setSuggestionDeleteError("");
+    setSuggestionToDelete(suggestion);
+  };
+
+  const confirmRemoveSuggestion = async () => {
+    if (!suggestionToDelete) return;
+    setBusy(true);
+    setSuggestionDeleteError("");
+    try {
+      await api(`/api/trips/${encodeURIComponent(selectedSlug)}/suggestions/${suggestionToDelete.id}`, { method: "DELETE" });
+      setSuggestions((current) => current.filter((item) => item.id !== suggestionToDelete.id));
+      setSuggestionToDelete(null);
+      setNotice("Đã xoá vĩnh viễn nội dung.");
+    } catch (requestError) {
+      setSuggestionDeleteError(`${requestError.message}. Hãy thử lại.`);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const logout = () => signOut({ redirectTo: "/" });
@@ -396,16 +422,23 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
                 })}
               </div>
 
-              <div className="admin-section-head suggestion-admin-heading"><div><h2>{suggestions.length} góp ý</h2></div></div>
+              <div className="admin-section-head suggestion-admin-heading">
+                <div><h2>{suggestions.length} góp ý</h2><p>Quản lý trạng thái và mức hiển thị trên lịch công khai.</p></div>
+                <div className="admin-suggestion-filters" role="group" aria-label="Lọc góp ý theo hiển thị">
+                  <button type="button" aria-pressed={suggestionFilter === "visible"} onClick={() => setSuggestionFilter("visible")}>Đang hiện <span>{suggestions.filter((item) => !item.hidden).length}</span></button>
+                  <button type="button" aria-pressed={suggestionFilter === "hidden"} onClick={() => setSuggestionFilter("hidden")}>Đã ẩn <span>{suggestions.filter((item) => item.hidden).length}</span></button>
+                </div>
+              </div>
               <div className="admin-suggestion-list">
-                {suggestions.map((suggestion) => {
+                {suggestions.filter((suggestion) => suggestionFilter === "hidden" ? suggestion.hidden : !suggestion.hidden).map((suggestion) => {
                   const activity = plan.itinerary.find((item) => item.id === suggestion.activityId);
                   return (
-                    <article className="admin-suggestion-item" key={suggestion.id}>
+                    <article className={`admin-suggestion-item${suggestion.hidden ? " is-hidden" : ""}`} key={suggestion.id}>
                       <div className="admin-suggestion-meta">
                         <span>{suggestion.kind === "comment" ? "Bình luận" : "Đề xuất"}</span>
                         <strong>{suggestion.author.name}</strong>
                         <small>{suggestion.author.email}</small>
+                        {suggestion.hidden && <em>Đã ẩn</em>}
                       </div>
                       <div className="admin-suggestion-copy">
                         <small>{activity ? `${activity.start} · ${activity.title}` : "Góp ý chung cho chuyến đi"}</small>
@@ -418,12 +451,16 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
                           <option value="resolved">Đã xử lý</option>
                           <option value="rejected">Từ chối</option>
                         </select>
-                        <button className="admin-danger" onClick={() => removeSuggestion(suggestion.id)}>Xoá</button>
+                        <button className="admin-ghost" type="button" onClick={() => updateSuggestionVisibility(suggestion)} disabled={busy}>{suggestion.hidden ? "Hiện lại" : "Ẩn"}</button>
+                        <AdminSuggestionMenu suggestion={suggestion} busy={busy} onDelete={requestRemoveSuggestion} />
                       </div>
                     </article>
                   );
                 })}
                 {!suggestions.length && <p className="admin-empty">Chưa có góp ý nào.</p>}
+                {suggestions.length > 0 && !suggestions.some((suggestion) => suggestionFilter === "hidden" ? suggestion.hidden : !suggestion.hidden) && (
+                  <p className="admin-empty">{suggestionFilter === "hidden" ? "Chưa có nội dung nào bị ẩn." : "Không còn nội dung đang hiển thị."}</p>
+                )}
               </div>
             </>
           )}
@@ -431,7 +468,49 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
         </section>
       </div>
       {discardPrompt && <DiscardChangesDialog message={discardPrompt.message} onKeep={keepScheduleDraft} onDiscard={discardScheduleDraft} />}
+      {suggestionToDelete && (
+        <ConfirmDialog
+          title="Xoá vĩnh viễn nội dung này?"
+          description={`Nội dung của ${suggestionToDelete.author.name} sẽ biến mất và không thể khôi phục.`}
+          preview={suggestionToDelete.body}
+          confirmLabel="Xoá vĩnh viễn"
+          pendingLabel="Đang xoá…"
+          pending={busy}
+          error={suggestionDeleteError}
+          onCancel={() => { setSuggestionToDelete(null); setSuggestionDeleteError(""); }}
+          onConfirm={confirmRemoveSuggestion}
+        />
+      )}
     </main>
+  );
+}
+
+function AdminSuggestionMenu({ suggestion, busy, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+  const triggerRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOutside = (event) => { if (!rootRef.current?.contains(event.target)) setOpen(false); };
+    const closeEscape = (event) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeEscape);
+    };
+  }, [open]);
+
+  return (
+    <div className="admin-suggestion-menu" ref={rootRef}>
+      <button className="admin-ghost" type="button" aria-expanded={open} onClick={() => setOpen((current) => !current)} disabled={busy} ref={triggerRef}>Thêm</button>
+      {open && <div><button className="admin-danger" type="button" onClick={() => onDelete(suggestion)}>Xoá vĩnh viễn</button></div>}
+    </div>
   );
 }
 

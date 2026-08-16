@@ -70,20 +70,20 @@ test("activity heartbeat pauses in hidden tabs and resumes when visible", async 
   await expect.poll(() => activityRequests).toBe(visibleRequestCount + 1);
 });
 
-test("mobile clock stays in its cell and the active route connector shares the rail axis", async ({ page }) => {
+test("mobile clock stays in its cell and the focused route connector shares the rail axis", async ({ page }) => {
   await page.setViewportSize({ width: 590, height: 844 });
   await gotoHealthy(page, "/");
 
   const geometry = await page.evaluate(() => {
     const clock = document.querySelector(".live-clock").getBoundingClientRect();
     const clockValue = document.querySelector(".live-clock span:last-child").getBoundingClientRect();
-    const activeStop = document.querySelector(".mobile-route-stop.is-active");
+    const focusedStop = document.querySelector(".mobile-route-stop:is(.is-active, .is-terminus)");
     const foldout = document.querySelector(".mobile-active-foldout");
-    const railStyle = getComputedStyle(activeStop, "::before");
+    const railStyle = getComputedStyle(focusedStop, "::before");
     const connectorStyle = getComputedStyle(foldout, "::before");
-    const railBox = activeStop.getBoundingClientRect();
+    const railBox = focusedStop.getBoundingClientRect();
     const foldoutBox = foldout.getBoundingClientRect();
-    const nodeBox = activeStop.querySelector(".mobile-stop-label > i").getBoundingClientRect();
+    const nodeBox = focusedStop.querySelector(".mobile-stop-label > i").getBoundingClientRect();
     const foldoutStyle = getComputedStyle(foldout);
     const connectorTransform = new DOMMatrixReadOnly(connectorStyle.transform);
 

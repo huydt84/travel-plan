@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export async function POST(request) {
   const { viewer, response } = await requireAuthenticated();
   if (response) return response;
-  if (viewer.isOwner) {
+  if (viewer.isAdmin) {
     return NextResponse.json({ status: "approved", implicitOwner: true });
   }
 
@@ -34,4 +34,3 @@ export async function POST(request) {
     return NextResponse.json({ error: "Không thể gửi yêu cầu lúc này" }, { status: 500 });
   }
 }
-

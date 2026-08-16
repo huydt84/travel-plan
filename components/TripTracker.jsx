@@ -7,7 +7,9 @@ import { signIn } from "next-auth/react";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { formatScheduleHeading, formatTripTitle } from "../lib/trip-date-label.mjs";
 import { getTripPageTitle } from "../lib/trip-page-title.mjs";
+import { getTripTrackerState } from "../lib/trip-tracker-state.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
+import ConfirmDialog from "./ConfirmDialog";
 import InvitationDialog from "./InvitationDialog";
 import NotificationCenter from "./NotificationCenter";
 import ViewerMenu from "./ViewerMenu";
@@ -27,19 +29,6 @@ const formatDuration = (milliseconds) => {
   return { value: `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`, unit: "phút · giây" };
 };
 
-const getState = (now, itinerary) => {
-  const first = itinerary[0];
-  const last = itinerary.at(-1);
-  if (now < first.startAt) return { mode: "before", current: first, index: -1, next: itinerary[1] || null };
-  if (now > last.endAt) return { mode: "after", current: last, index: itinerary.length, next: null };
-
-  const index = itinerary.findIndex((item) => now >= item.startAt && now < item.endAt);
-  if (index >= 0) return { mode: "active", current: itinerary[index], index, next: itinerary[index + 1] || null };
-
-  const nextIndex = itinerary.findIndex((item) => now < item.startAt);
-  return { mode: "gap", current: itinerary[nextIndex], index: nextIndex - 1, next: itinerary[nextIndex + 1] || null };
-};
-
 export default function TripTracker({ initialData, initialNow, initialInvitationOpen = false, initialGmailReturn = false, viewer, trips }) {
   const router = useRouter();
   const [data, setData] = useState(initialData);
@@ -48,6 +37,9 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
   const [suggestionTarget, setSuggestionTarget] = useState(null);
   const [suggestionError, setSuggestionError] = useState("");
   const [suggestionAction, setSuggestionAction] = useState({ id: null, error: "" });
+  const [deletionCandidate, setDeletionCandidate] = useState(null);
+  const [deletionError, setDeletionError] = useState("");
+  const [announcement, setAnnouncement] = useState("");
   const [invitationOpen, setInvitationOpen] = useState(initialInvitationOpen);
   const [gmailReturn, setGmailReturn] = useState(initialGmailReturn);
   const routeListRef = useRef(null);
@@ -89,16 +81,23 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       if (targetTrip && targetTrip !== data.trip.slug) return;
       const match = url.hash.match(/^#contribution-(\d+)$/);
       if (!match) return;
-      const target = document.getElementById(`contribution-${match[1]}`);
-      if (!target) return;
+      let attempts = 0;
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
-      frame = window.requestAnimationFrame(() => {
+      const focusTarget = () => {
+        const target = document.getElementById(`contribution-${match[1]}`);
+        if (!target && attempts < 10) {
+          attempts += 1;
+          frame = window.requestAnimationFrame(focusTarget);
+          return;
+        }
+        if (!target) return;
         target.focus({ preventScroll: true });
         target.scrollIntoView({ behavior: "smooth", block: "center" });
         target.classList.add("is-notification-target");
-      });
-      timer = window.setTimeout(() => target.classList.remove("is-notification-target"), 2_800);
+        timer = window.setTimeout(() => target.classList.remove("is-notification-target"), 2_800);
+      };
+      frame = window.requestAnimationFrame(focusTarget);
     };
     revealContribution();
     window.addEventListener("hashchange", revealContribution);
@@ -125,7 +124,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     }
     return grouped;
   }, [suggestions]);
-  const resolvedState = itinerary.length ? getState(now, itinerary) : null;
+  const resolvedState = itinerary.length ? getTripTrackerState(now, itinerary) : null;
   const tripTitle = formatTripTitle(data.trip.title, data.trip.date, data.trip.timezone, now);
   const pageTitle = getTripPageTitle({
     mode: resolvedState?.mode,
@@ -191,7 +190,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       window.removeEventListener("resize", align);
       resizeObserver.disconnect();
     };
-  }, [resolvedState?.current?.id, itinerary.length]);
+  }, [resolvedState?.anchor?.id, itinerary.length]);
 
   if (!itinerary.length) {
     return (
@@ -224,14 +223,11 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     range = `Bắt đầu ${state.current.start}`;
     countdownLabel = "đến giờ đi";
   } else if (state.mode === "after") {
-    countdown = { value: "✓", unit: "hoàn tất" };
-    progress = 1;
     status = "Đã kết thúc";
     kicker = "Hành trình hoàn tất";
     title = "Chuyến đi đã hoàn tất";
     detail = `Đã đi qua ${itinerary.length} hoạt động trong lịch trình.`;
-    range = `Kết thúc ${state.current.displayEnd || state.current.end}`;
-    countdownLabel = "hẹn chuyến sau";
+    range = `Hoàn tất lúc ${state.anchor.end}`;
   } else {
     const item = state.current;
     const target = state.mode === "gap" ? item.startAt : item.endAt;
@@ -260,9 +256,15 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     year: "numeric",
   }).format(toDate(data.trip.date, "00:00"));
   const scheduleHeading = formatScheduleHeading(data.trip.date, data.trip.timezone, now);
+  const isAfter = state.mode === "after";
+  const jumpLabel = isAfter ? "Điểm cuối" : "Hiện tại";
+  const stationSuggestionActivityId = isAfter ? null : state.current.id;
+  const stationSuggestionTarget = isAfter ? "cả chuyến đi" : state.current.title;
+  const stationSuggestionKey = stationSuggestionActivityId || "trip";
+  const stationSuggestionLabel = isAfter ? "Góp ý cho cả chuyến" : "Góp ý tại ga này";
 
   const jumpToCurrent = () => {
-    const target = state.mode === "active" ? state.current.id : (state.next?.id || itinerary.at(-1).id);
+    const target = isAfter ? state.anchor.id : (state.mode === "active" ? state.current.id : (state.next?.id || itinerary.at(-1).id));
     document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
@@ -300,33 +302,68 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       if (!response.ok) throw new Error(result.error || "Không cập nhật được góp ý");
       setSuggestions((current) => current.map((item) => item.id === suggestion.id ? result : item));
       setSuggestionAction({ id: null, error: "" });
+      setAnnouncement(result.status === "resolved" ? "Đã đánh dấu bình luận là đã xử lý." : "Đã mở lại bình luận.");
+      return true;
     } catch (error) {
       setSuggestionAction({ id: suggestion.id, error: error.message });
+      return false;
     }
   };
 
-  const deleteContribution = async (suggestion) => {
-    if (!window.confirm("Xoá vĩnh viễn góp ý này?")) return;
+  const updateContributionVisibility = async (suggestion) => {
+    const hidden = !suggestion.hidden;
     setSuggestionAction({ id: suggestion.id, error: "" });
+    try {
+      const response = await fetch(`/api/trips/${encodeURIComponent(data.trip.slug)}/suggestions/${suggestion.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ hidden }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Không đổi được hiển thị góp ý");
+      setSuggestions((current) => current.map((item) => item.id === suggestion.id ? result : item));
+      setSuggestionAction({ id: null, error: "" });
+      setAnnouncement(hidden ? "Đã ẩn nội dung khỏi lịch công khai." : "Đã hiện lại nội dung trên lịch.");
+      return true;
+    } catch (error) {
+      setSuggestionAction({ id: suggestion.id, error: error.message });
+      return false;
+    }
+  };
+
+  const requestDeleteContribution = (suggestion) => {
+    setDeletionError("");
+    setDeletionCandidate(suggestion);
+  };
+
+  const confirmDeleteContribution = async () => {
+    const suggestion = deletionCandidate;
+    if (!suggestion) return;
+    setSuggestionAction({ id: suggestion.id, error: "" });
+    setDeletionError("");
     try {
       const response = await fetch(`/api/trips/${encodeURIComponent(data.trip.slug)}/suggestions/${suggestion.id}`, { method: "DELETE" });
       const result = response.status === 204 ? null : await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result?.error || "Không xoá được góp ý");
       setSuggestions((current) => current.filter((item) => item.id !== suggestion.id));
       setSuggestionAction({ id: null, error: "" });
+      setDeletionCandidate(null);
+      setAnnouncement("Đã xoá vĩnh viễn nội dung.");
     } catch (error) {
-      setSuggestionAction({ id: suggestion.id, error: error.message });
+      setSuggestionAction({ id: null, error: "" });
+      setDeletionError(`${error.message}. Hãy thử lại.`);
     }
   };
 
   const suggestionListProps = {
     action: suggestionAction,
-    onDelete: deleteContribution,
+    onDelete: requestDeleteContribution,
     onToggleResolved: updateContributionStatus,
+    onToggleVisibility: updateContributionVisibility,
   };
 
   return (
-    <main className="shell">
+    <main className="shell" data-trip-mode={state.mode}>
       <header className="trip-bar" id="top">
         <a className="product-mark" href="#top" aria-label="Đầu trang">
           <TypeIcon type="Transit" />
@@ -354,7 +391,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
           </button>
         </div>
         <div className="viewer-utilities">
-          {viewer?.isOwner && <Link className="admin-link desktop-manage-link" href={ADMIN_ROUTES.trips}>Quản lý</Link>}
+          {viewer?.isAdmin && <Link className="admin-link desktop-manage-link" href={ADMIN_ROUTES.trips}>Quản lý</Link>}
           {viewer && !viewer.isOwner && <NotificationCenter />}
           {viewer ? <ViewerMenu viewer={viewer} /> : (
             <button className="admin-link user-link" type="button" onClick={() => signIn("google", { redirectTo: "/" })}>Đăng nhập</button>
@@ -370,14 +407,15 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
         <aside className="route-overview">
           <div className="route-overview-head">
             <h2>{scheduleHeading}</h2>
-            <button type="button" onClick={jumpToCurrent}>Hiện tại</button>
+            <button type="button" onClick={jumpToCurrent}>{jumpLabel}</button>
           </div>
           <ol className="route-stops" ref={routeListRef}>
             {itinerary.map((item, index) => {
-              const isFocused = item.id === state.current?.id;
+              const isFocused = item.id === state.anchor.id;
               const isDone = index < state.index || state.mode === "after";
+              const isTerminus = isAfter && isFocused;
               return (
-                <li className={`${isFocused ? "is-active" : ""}${isDone ? " is-done" : ""}`} ref={isFocused ? activeStopRef : null} key={item.id}>
+                <li className={`${isFocused && !isAfter ? "is-active" : ""}${isDone ? " is-done" : ""}${isTerminus ? " is-terminus" : ""}`} ref={isFocused ? activeStopRef : null} key={item.id}>
                   <a href={`#${item.id}`}>
                     <time>{item.start}</time>
                     <span className="route-node" aria-hidden="true" />
@@ -391,31 +429,31 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
 
         <div className="station-stage" ref={stationStageRef}>
           <p className="sr-only" role="status" aria-live="polite">{status}: {title}. {range}</p>
-          <section className="now-station">
+          <section className="now-station" data-mode={state.mode}>
             <div className="station-status"><span>{kicker}</span><strong>{status}</strong></div>
             <div className="station-main">
               <div className="station-copy">
-                <span className="station-icon" aria-hidden="true"><TypeIcon type={state.current?.type || "Visit"} /></span>
+                <span className="station-icon" aria-hidden="true">{isAfter ? <ActionIcon name="check" /> : <TypeIcon type={state.current.type} />}</span>
                 <div><h1>{title}</h1><p className="station-range">{range}</p></div>
               </div>
-              <div className="countdown-wrap">
+              {!isAfter && <div className="countdown-wrap">
                 <span>{countdownLabel}</span>
                 <strong>{countdown.value}</strong>
                 <small>{countdown.unit}</small>
                 <i className="countdown-progress" style={{ "--progress": Math.min(1, progress) }} aria-hidden="true" />
-              </div>
+              </div>}
             </div>
             <p className="now-detail">{detail}</p>
-            {state.current?.refs?.length > 0 && (
+            {!isAfter && state.current.refs.length > 0 && (
               <div className="citations">{state.current.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>
             )}
             <div className="station-actions">
-              <button type="button" onClick={() => openSuggestion(state.current.id, state.current.title)}>
-                {viewer ? "Góp ý tại ga này" : "Đăng nhập để góp ý"}
+              <button type="button" onClick={() => openSuggestion(stationSuggestionActivityId, stationSuggestionTarget)}>
+                {viewer ? stationSuggestionLabel : "Đăng nhập để góp ý"}
               </button>
-              <span>{(suggestionsByActivity.get(state.current.id) || []).length} ghi chú</span>
+              <span>{(suggestionsByActivity.get(stationSuggestionKey) || []).length} ghi chú</span>
             </div>
-            <SuggestionList suggestions={suggestionsByActivity.get(state.current.id) || []} anchorItems={false} {...suggestionListProps} />
+            <SuggestionList suggestions={suggestionsByActivity.get(stationSuggestionKey) || []} anchorItems={false} {...suggestionListProps} />
           </section>
 
           {state.next && (
@@ -437,13 +475,14 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       </section>
 
       <section className="mobile-route-board" aria-label="Tuyến lịch trình hiện tại">
-        <div className="mobile-route-head"><h2>{scheduleHeading}</h2><button type="button" onClick={jumpToCurrent}>Hiện tại</button></div>
+        <div className="mobile-route-head"><h2>{scheduleHeading}</h2><button type="button" onClick={jumpToCurrent}>{jumpLabel}</button></div>
         <ol>
           {itinerary.map((item, index) => {
-            const isFocused = item.id === state.current.id;
+            const isFocused = item.id === state.anchor.id;
             const isDone = index < state.index || state.mode === "after";
+            const isTerminus = isAfter && isFocused;
             return (
-              <li className={`mobile-route-stop${isFocused ? " is-active" : ""}${isDone ? " is-done" : ""}`} key={item.id}>
+              <li className={`mobile-route-stop${isFocused && !isAfter ? " is-active" : ""}${isDone ? " is-done" : ""}${isTerminus ? " is-terminus" : ""}`} key={item.id}>
                 <a className="mobile-stop-label" href={`#${item.id}`}>
                   <time>{item.start}</time><i aria-hidden="true" />
                   <span><strong>{item.title}</strong><small>{item.type}</small></span>
@@ -451,14 +490,14 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                 {isFocused && (
                   <section className="mobile-active-foldout">
                     <div className="mobile-foldout-status"><span>{kicker}</span><strong>{status}</strong></div>
-                    <div className="mobile-foldout-title"><TypeIcon type={item.type} /><h1>{title}</h1></div>
+                    <div className="mobile-foldout-title">{isAfter ? <ActionIcon name="check" /> : <TypeIcon type={item.type} />}<h1>{title}</h1></div>
                     <p className="mobile-foldout-range">{range}</p>
-                    <div className="mobile-foldout-countdown"><span>{countdownLabel}</span><strong>{countdown.value}</strong><small>{countdown.unit}</small></div>
+                    {!isAfter && <div className="mobile-foldout-countdown"><span>{countdownLabel}</span><strong>{countdown.value}</strong><small>{countdown.unit}</small></div>}
                     <p className="mobile-foldout-detail">{detail}</p>
-                    {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
+                    {!isAfter && item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                     <div className="station-actions">
-                      <button type="button" onClick={() => openSuggestion(item.id, item.title)}>{viewer ? "Góp ý tại ga này" : "Đăng nhập để góp ý"}</button>
-                      <span>{(suggestionsByActivity.get(item.id) || []).length} ghi chú</span>
+                      <button type="button" onClick={() => openSuggestion(stationSuggestionActivityId, stationSuggestionTarget)}>{viewer ? stationSuggestionLabel : "Đăng nhập để góp ý"}</button>
+                      <span>{(suggestionsByActivity.get(stationSuggestionKey) || []).length} ghi chú</span>
                     </div>
                     {state.next && (
                       <a className="mobile-next-fascia" href={`#${state.next.id}`}>
@@ -473,15 +512,15 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
         </ol>
       </section>
 
-      <button className="mobile-live-dock" type="button" onClick={jumpToCurrent}>
+      {!isAfter && <button className="mobile-live-dock" type="button" onClick={jumpToCurrent}>
         <span><small>{status}</small><strong>{state.current.title}</strong></span>
         {state.next && <span><small>Tiếp theo · {state.next.start}</small><strong>{state.next.title}</strong></span>}
         <ActionIcon name="right" />
-      </button>
+      </button>}
 
       <div className="section-heading">
         <h2>Toàn bộ lịch trình</h2>
-        <button className="jump-button" type="button" onClick={jumpToCurrent}>Về hiện tại <ActionIcon name="down" /></button>
+        <button className="jump-button" type="button" onClick={jumpToCurrent}>{isAfter ? "Về điểm cuối" : "Về hiện tại"} <ActionIcon name="down" /></button>
       </div>
 
       <section className="timeline" aria-label="Lịch trình chi tiết">
@@ -536,44 +575,175 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
           catch (error) { setSuggestionError(error.message); }
         }} />
       )}
+      <p className="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
+      {deletionCandidate && (
+        <ConfirmDialog
+          title="Xoá vĩnh viễn nội dung này?"
+          description={`Nội dung của ${deletionCandidate.author.name} sẽ biến mất và không thể khôi phục.`}
+          preview={deletionCandidate.body}
+          confirmLabel="Xoá vĩnh viễn"
+          pendingLabel="Đang xoá…"
+          pending={suggestionAction.id === deletionCandidate.id}
+          error={deletionError}
+          onCancel={() => { setDeletionCandidate(null); setDeletionError(""); }}
+          onConfirm={confirmDeleteContribution}
+        />
+      )}
       {invitationOpen && <InvitationDialog open onClose={() => { setInvitationOpen(false); setGmailReturn(false); }} viewer={viewer} trip={data.trip} itinerary={data.itinerary} gmailReturn={gmailReturn} />}
     </main>
   );
 }
 
-function SuggestionList({ suggestions, action, onDelete, onToggleResolved, anchorItems = true }) {
+function SuggestionList({ suggestions, action, onDelete, onToggleResolved, onToggleVisibility, anchorItems = true }) {
+  const hiddenSuggestions = suggestions.filter((suggestion) => suggestion.hidden);
+  const visibleSuggestions = suggestions.filter((suggestion) => !suggestion.hidden);
+  const [showHidden, setShowHidden] = useState(false);
+  const hiddenToggleRef = useRef(null);
+
+  useEffect(() => {
+    if (!hiddenSuggestions.length) return undefined;
+    const revealHiddenTarget = (event) => {
+      const url = new URL(event?.detail?.targetUrl || window.location.href, window.location.origin);
+      const match = url.hash.match(/^#contribution-(\d+)$/);
+      if (match && hiddenSuggestions.some((suggestion) => suggestion.id === match[1])) setShowHidden(true);
+    };
+    const initialReveal = window.setTimeout(revealHiddenTarget, 0);
+    window.addEventListener("hashchange", revealHiddenTarget);
+    window.addEventListener(NOTIFICATION_NAVIGATION_EVENT, revealHiddenTarget);
+    return () => {
+      window.clearTimeout(initialReveal);
+      window.removeEventListener("hashchange", revealHiddenTarget);
+      window.removeEventListener(NOTIFICATION_NAVIGATION_EVENT, revealHiddenTarget);
+    };
+  }, [hiddenSuggestions]);
+
   if (!suggestions.length) return null;
+
+  const toggleVisibility = async (suggestion) => {
+    const changed = await onToggleVisibility(suggestion);
+    if (!changed) return;
+    if (!suggestion.hidden) setShowHidden(false);
+    window.requestAnimationFrame(() => {
+      if (suggestion.hidden && hiddenSuggestions.length === 1) {
+        document.getElementById(`contribution-${suggestion.id}`)?.focus();
+      } else {
+        hiddenToggleRef.current?.focus();
+      }
+    });
+  };
+
   return (
     <div className="suggestion-list">
-      {suggestions.map((suggestion) => (
-        <article
-          className={`suggestion-note ${suggestion.kind}`}
-          id={anchorItems ? `contribution-${suggestion.id}` : undefined}
-          tabIndex={anchorItems ? -1 : undefined}
-          key={suggestion.id}
-        >
-          <div className="suggestion-note-head">
-            <div className="suggestion-note-meta">
-              <strong>{suggestion.author.name}</strong>
-              <span>{suggestion.kind === "comment" ? "Bình luận" : "Đề xuất"}</span>
-              {suggestion.status !== "open" && <span className={`suggestion-status ${suggestion.status}`}>{statusLabel(suggestion.status)}</span>}
-            </div>
-            {(suggestion.canManage || suggestion.canDelete) && (
-              <div className="suggestion-note-actions">
-                {suggestion.canManage && (
-                  <button type="button" onClick={() => onToggleResolved(suggestion)} disabled={action.id === suggestion.id}>
-                    {suggestion.status === "resolved" ? "Mở lại" : "Đã xử lý"}
-                  </button>
-                )}
-                {suggestion.canDelete && <button type="button" className="danger" onClick={() => onDelete(suggestion)} disabled={action.id === suggestion.id}>Xoá</button>}
-              </div>
-            )}
-          </div>
-          <p>{suggestion.body}</p>
-          {action.id === suggestion.id && action.error && <p className="suggestion-action-error" role="alert">{action.error}</p>}
-        </article>
+      {visibleSuggestions.map((suggestion) => (
+        <SuggestionNote suggestion={suggestion} action={action} onDelete={onDelete} onToggleResolved={onToggleResolved} onToggleVisibility={toggleVisibility} anchorItems={anchorItems} key={suggestion.id} />
       ))}
+      {hiddenSuggestions.length > 0 && (
+        <div className="hidden-suggestion-drawer">
+          <button
+            type="button"
+            className="hidden-suggestion-toggle"
+            aria-expanded={showHidden}
+            onClick={() => setShowHidden((current) => !current)}
+            ref={hiddenToggleRef}
+          >
+            <span>{hiddenSuggestions.length} nội dung đã ẩn</span>
+            <span>{showHidden ? "Thu gọn" : "Xem"}</span>
+          </button>
+          {showHidden && (
+            <div className="hidden-suggestion-list">
+              {hiddenSuggestions.map((suggestion) => (
+                <SuggestionNote suggestion={suggestion} action={action} onDelete={onDelete} onToggleResolved={onToggleResolved} onToggleVisibility={toggleVisibility} anchorItems={anchorItems} key={suggestion.id} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function SuggestionNote({ suggestion, action, onDelete, onToggleResolved, onToggleVisibility, anchorItems }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const menuButtonRef = useRef(null);
+  const busy = action.id === suggestion.id;
+  const contributionLabel = suggestion.kind === "comment" ? "bình luận" : "đề xuất";
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const closeMenu = (event) => {
+      if (!menuRef.current?.contains(event.target)) setMenuOpen(false);
+    };
+    const closeFromEscape = (event) => {
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      menuButtonRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", closeFromEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenu);
+      document.removeEventListener("keydown", closeFromEscape);
+    };
+  }, [menuOpen]);
+
+  return (
+    <article
+      className={`suggestion-note ${suggestion.kind}${suggestion.hidden ? " is-hidden" : ""}`}
+      id={anchorItems ? `contribution-${suggestion.id}` : undefined}
+      tabIndex={anchorItems ? -1 : undefined}
+    >
+      <div className="suggestion-note-head">
+        <div className="suggestion-note-meta">
+          <strong>{suggestion.author.name}</strong>
+          <span>{suggestion.kind === "comment" ? "Bình luận" : "Đề xuất"}</span>
+          {suggestion.status !== "open" && <span className={`suggestion-status ${suggestion.status}`}>{statusLabel(suggestion.status)}</span>}
+          {suggestion.hidden && <span className="suggestion-status hidden">Đã ẩn</span>}
+        </div>
+      </div>
+      <p>{suggestion.body}</p>
+      {(suggestion.canManage || suggestion.canChangeVisibility || suggestion.canDelete) && (
+        <div className="suggestion-note-actions" role="group" aria-label={`Thao tác với ${contributionLabel} của ${suggestion.author.name}`}>
+          {suggestion.canManage && (
+            <button
+              type="button"
+              className={`suggestion-resolve-action${suggestion.status === "resolved" ? " is-complete" : ""}`}
+              onClick={() => onToggleResolved(suggestion)}
+              disabled={busy}
+            >
+              <ActionIcon name="check" />
+              {suggestion.status === "resolved" ? "Mở lại" : "Đã xử lý"}
+            </button>
+          )}
+          {suggestion.canChangeVisibility && (
+            <button className="suggestion-visibility-action" type="button" onClick={() => onToggleVisibility(suggestion)} disabled={busy}>
+              <ActionIcon name={suggestion.hidden ? "eye" : "eye-off"} />
+              {suggestion.hidden ? "Hiện lại" : "Ẩn"}
+            </button>
+          )}
+          {suggestion.canDelete && (
+            <div className="suggestion-more" ref={menuRef}>
+              <button
+                type="button"
+                className="suggestion-more-trigger"
+                aria-label={`Thêm thao tác với ${contributionLabel} của ${suggestion.author.name}`}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                title="Thêm thao tác"
+                onClick={() => setMenuOpen((current) => !current)}
+                disabled={busy}
+                ref={menuButtonRef}
+              >
+                <ActionIcon name="more" />
+              </button>
+              {menuOpen && <div className="suggestion-more-menu" role="menu"><button type="button" className="danger" role="menuitem" onClick={() => onDelete(suggestion)}>Xoá vĩnh viễn</button></div>}
+            </div>
+          )}
+        </div>
+      )}
+      {busy && !action.error && <p className="suggestion-action-state" role="status">Đang cập nhật…</p>}
+      {action.id === suggestion.id && action.error && <p className="suggestion-action-error" role="alert">{action.error}. Hãy thử lại.</p>}
+    </article>
   );
 }
 

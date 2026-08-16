@@ -72,9 +72,14 @@ await sql`CREATE TABLE IF NOT EXISTS suggestions (
   author_email TEXT NOT NULL,
   author_name TEXT NOT NULL,
   author_image TEXT,
+  hidden_at TIMESTAMPTZ,
+  hidden_by_email TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`;
+
+await sql`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMPTZ`;
+await sql`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS hidden_by_email TEXT`;
 
 await sql`CREATE INDEX IF NOT EXISTS suggestions_trip_created_idx
   ON suggestions (trip_id, created_at DESC)`;
@@ -82,14 +87,24 @@ await sql`CREATE INDEX IF NOT EXISTS suggestions_trip_created_idx
 await sql`CREATE INDEX IF NOT EXISTS suggestions_activity_idx
   ON suggestions (activity_id)`;
 
+await sql`CREATE INDEX IF NOT EXISTS suggestions_trip_visibility_idx
+  ON suggestions (trip_id, hidden_at, created_at DESC)`;
+
 await sql`CREATE TABLE IF NOT EXISTS users (
   name TEXT NOT NULL,
   email TEXT PRIMARY KEY,
+  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'admin')),
   first_login TIMESTAMPTZ NOT NULL,
   last_login TIMESTAMPTZ NOT NULL,
   last_active_at TIMESTAMPTZ NOT NULL
 )`;
 
+await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'member'`;
+await sql`UPDATE users SET role = 'member' WHERE role IS NULL`;
+await sql`ALTER TABLE users ALTER COLUMN role SET DEFAULT 'member'`;
+await sql`ALTER TABLE users ALTER COLUMN role SET NOT NULL`;
+await sql`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check`;
+await sql`ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('member', 'admin'))`;
 await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ`;
 await sql`UPDATE users SET last_active_at = last_login WHERE last_active_at IS NULL`;
 await sql`ALTER TABLE users ALTER COLUMN last_active_at SET NOT NULL`;
@@ -218,13 +233,22 @@ await sql`CREATE TABLE IF NOT EXISTS notifications (
   recipient_email TEXT NOT NULL REFERENCES users(email) ON UPDATE CASCADE ON DELETE CASCADE,
   trip_id BIGINT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
   suggestion_id BIGINT NOT NULL REFERENCES suggestions(id) ON DELETE CASCADE,
-  event_type TEXT NOT NULL CHECK (event_type IN ('contribution_created', 'contribution_status_changed')),
+  event_type TEXT NOT NULL CHECK (event_type IN ('contribution_created', 'contribution_status_changed', 'contribution_visibility_changed')),
   actor_name TEXT NOT NULL,
   actor_image TEXT,
   status_value TEXT CHECK (status_value IS NULL OR status_value IN ('open', 'accepted', 'resolved', 'rejected')),
+  visibility_value TEXT CHECK (visibility_value IS NULL OR visibility_value IN ('hidden', 'visible')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   read_at TIMESTAMPTZ
 )`;
+
+await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS visibility_value TEXT`;
+await sql`ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_event_type_check`;
+await sql`ALTER TABLE notifications ADD CONSTRAINT notifications_event_type_check
+  CHECK (event_type IN ('contribution_created', 'contribution_status_changed', 'contribution_visibility_changed'))`;
+await sql`ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_visibility_value_check`;
+await sql`ALTER TABLE notifications ADD CONSTRAINT notifications_visibility_value_check
+  CHECK (visibility_value IS NULL OR visibility_value IN ('hidden', 'visible'))`;
 
 await sql`CREATE INDEX IF NOT EXISTS notifications_recipient_created_idx
   ON notifications (recipient_email, created_at DESC, id DESC)`;

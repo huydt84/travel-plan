@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "../../../../../lib/api-response";
-import { requireOwner } from "../../../../../lib/auth";
+import { requireAdmin } from "../../../../../lib/auth";
 import { createScheduleItem } from "../../../../../lib/itinerary-repository";
 import { expireTravelPlansCache, getCachedItinerary } from "../../../../../lib/trip-cache";
 import { parseScheduleInput, readJsonBody } from "../../../../../lib/validation";
@@ -17,7 +17,7 @@ export async function GET(_request, context) {
 }
 
 export async function POST(request, context) {
-  const unauthorized = await requireOwner();
+  const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
   const { slug } = await context.params;
   try {

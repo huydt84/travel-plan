@@ -64,7 +64,7 @@ export default function ViewerMenu({ viewer }) {
             <strong>{label}</strong>
             {!localDev && viewer.email && viewer.email !== label && <span>{viewer.email}</span>}
           </div>
-          {viewer.isOwner && (
+          {viewer.isAdmin && (
             <Link className={manageClassName} href={ADMIN_ROUTES.trips} onClick={() => setOpen(false)}>
               Quản lý
             </Link>

@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canDeleteSuggestion, canManageSuggestion, canSetSuggestionStatus } from "../lib/suggestion-policy.mjs";
+import {
+  canChangeSuggestionVisibility,
+  canDeleteSuggestion,
+  canManageSuggestion,
+  canSetSuggestionStatus,
+} from "../lib/suggestion-policy.mjs";
 
 const owner = { email: "owner@example.com", isOwner: true };
 const author = { email: "friend@example.com", isOwner: false };
+const admin = { email: "admin@example.com", isOwner: false, isAdmin: true };
 const comment = { kind: "comment", author_email: "FRIEND@example.com" };
 const suggestion = { kind: "suggestion", author_email: "friend@example.com" };
 
@@ -33,4 +39,14 @@ test("comment authors can resolve or reopen but cannot moderate other statuses",
   assert.equal(canSetSuggestionStatus(author, comment, "open"), true);
   assert.equal(canSetSuggestionStatus(author, comment, "accepted"), false);
   assert.equal(canSetSuggestionStatus(author, comment, "rejected"), false);
+});
+
+test("authors can change visibility of their own contributions while admins can change any", () => {
+  assert.equal(canChangeSuggestionVisibility(author, comment), true);
+  assert.equal(canChangeSuggestionVisibility(author, suggestion), true);
+  assert.equal(canChangeSuggestionVisibility({ email: "other@example.com" }, comment), false);
+  assert.equal(canChangeSuggestionVisibility(admin, comment), true);
+  assert.equal(canChangeSuggestionVisibility(admin, suggestion), true);
+  assert.equal(canDeleteSuggestion(admin, suggestion), true);
+  assert.equal(canSetSuggestionStatus(admin, suggestion, "rejected"), true);
 });

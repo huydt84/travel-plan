@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiError } from "../../../../../../lib/api-response";
-import { requireOwner } from "../../../../../../lib/auth";
+import { requireAdmin } from "../../../../../../lib/auth";
 import { deleteScheduleItem, getScheduleItem, updateScheduleItem } from "../../../../../../lib/itinerary-repository";
 import { expireTravelPlansCache } from "../../../../../../lib/trip-cache";
 import { parseScheduleInput, readJsonBody, ValidationError } from "../../../../../../lib/validation";
@@ -20,7 +20,7 @@ export async function GET(_request, context) {
 }
 
 export async function PATCH(request, context) {
-  const unauthorized = await requireOwner();
+  const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
   const { slug, activityId } = await context.params;
   try {
@@ -32,7 +32,7 @@ export async function PATCH(request, context) {
 }
 
 export async function DELETE(request, context) {
-  const unauthorized = await requireOwner();
+  const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
   const { slug, activityId } = await context.params;
   try {

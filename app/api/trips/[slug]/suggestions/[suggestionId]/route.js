@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { apiError } from "../../../../../../lib/api-response";
 import { requireAuthenticated } from "../../../../../../lib/auth";
-import { deleteSuggestion, updateSuggestionStatus } from "../../../../../../lib/suggestion-repository";
-import { parseSuggestionStatus, readJsonBody, ValidationError } from "../../../../../../lib/validation";
+import {
+  deleteSuggestion,
+  updateSuggestionStatus,
+  updateSuggestionVisibility,
+} from "../../../../../../lib/suggestion-repository";
+import { parseSuggestionMutation, readJsonBody, ValidationError } from "../../../../../../lib/validation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,8 +21,11 @@ export async function PATCH(request, context) {
   if (response) return response;
   const { slug, suggestionId } = await context.params;
   try {
-    const { status } = parseSuggestionStatus(await readJsonBody(request));
-    return NextResponse.json(await updateSuggestionStatus(slug, idFrom(suggestionId), status, viewer));
+    const mutation = parseSuggestionMutation(await readJsonBody(request));
+    const updated = Object.prototype.hasOwnProperty.call(mutation, "status")
+      ? await updateSuggestionStatus(slug, idFrom(suggestionId), mutation.status, viewer)
+      : await updateSuggestionVisibility(slug, idFrom(suggestionId), mutation.hidden, viewer);
+    return NextResponse.json(updated);
   } catch (error) {
     return apiError(error);
   }

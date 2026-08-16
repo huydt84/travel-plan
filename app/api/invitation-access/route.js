@@ -40,6 +40,7 @@ export async function GET(request) {
     return NextResponse.json({
       authState: "authenticated",
       isOwner: Boolean(viewer.isOwner),
+      isAdmin: Boolean(viewer.isAdmin),
       permission: permission || { status: "not_requested" },
       gmailAuthorized: Boolean(mailState.authorized && mailState.email === viewer.email),
       quota,

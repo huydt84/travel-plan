@@ -6,6 +6,8 @@ import {
   backfillExistingContributorLogins,
   listUserActivity,
   normalizeLoginIdentity,
+  resolveStoredUserRole,
+  updateStoredUserRole,
   upsertUserActivity,
   upsertUserLogin,
 } from "../lib/user-login-store.mjs";
@@ -36,6 +38,7 @@ test("upserts only the latest login while preserving the first login", async () 
   const { calls, sql } = sqlMock([{
     name: "Hoang Ngoc",
     email: "friend@example.com",
+    role: "member",
     first_login: loginTime,
     last_login: loginTime,
     last_active_at: loginTime,
@@ -47,6 +50,7 @@ test("upserts only the latest login while preserving the first login", async () 
   }, loginTime), {
     name: "Hoang Ngoc",
     email: "friend@example.com",
+    role: "member",
     first_login: loginTime.toISOString(),
     last_login: loginTime.toISOString(),
     last_active_at: loginTime.toISOString(),
@@ -135,6 +139,8 @@ test("serializes and sorts activity timestamps for the admin client", async () =
   const { sql } = sqlMock([{
     name: "Owner",
     email: "owner@example.com",
+    role: "member",
+    role: "member",
     first_login: "2026-08-10T01:00:00.000Z",
     last_login: new Date("2026-08-11T02:00:00.000Z"),
     last_active_at: new Date("2026-08-15T00:00:00.000Z"),
@@ -143,8 +149,38 @@ test("serializes and sorts activity timestamps for the admin client", async () =
   assert.deepEqual(await listUserActivity(sql), [{
     name: "Owner",
     email: "owner@example.com",
+    role: "member",
     first_login: "2026-08-10T01:00:00.000Z",
     last_login: "2026-08-11T02:00:00.000Z",
     last_active_at: "2026-08-15T00:00:00.000Z",
   }]);
+});
+
+test("resolves, updates, and protects stored roles", async () => {
+  const roleLookup = sqlMock([{ role: "admin" }]);
+  assert.equal(await resolveStoredUserRole(roleLookup.sql, " ADMIN@example.com "), "admin");
+  assert.deepEqual(roleLookup.calls[0].values, ["admin@example.com"]);
+
+  const changedAt = "2026-08-16T01:00:00.000Z";
+  const roleUpdate = sqlMock([{
+    name: "Friend",
+    email: "friend@example.com",
+    role: "admin",
+    first_login: changedAt,
+    last_login: changedAt,
+    last_active_at: changedAt,
+  }]);
+  const updated = await updateStoredUserRole(roleUpdate.sql, {
+    email: "friend@example.com",
+    role: "admin",
+    ownerEmail: "owner@example.com",
+  });
+  assert.equal(updated.role, "admin");
+  assert.match(roleUpdate.calls[0].text, /UPDATE users/);
+
+  await assert.rejects(() => updateStoredUserRole(roleUpdate.sql, {
+    email: "OWNER@example.com",
+    role: "member",
+    ownerEmail: "owner@example.com",
+  }), (error) => error.code === "USER_ROLE_OWNER_IMMUTABLE");
 });

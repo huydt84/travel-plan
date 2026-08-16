@@ -27,6 +27,12 @@ const relativeTime = (value) => {
 };
 
 const notificationCopy = (notification) => {
+  if (notification.type === "contribution_visibility_changed") {
+    return {
+      title: notification.contribution.hidden ? "Nội dung của bạn đã được ẩn" : "Nội dung của bạn đã được hiện lại",
+      detail: `${notification.actor.name} đã đổi mức hiển thị nội dung của bạn.`,
+    };
+  }
   if (notification.type === "contribution_status_changed") {
     return {
       title: `Góp ý của bạn: ${statusLabels[notification.contribution.status] || "Đã cập nhật"}`,
