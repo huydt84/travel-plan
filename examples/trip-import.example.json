@@ -24,12 +24,64 @@
       "refs": [1]
     },
     {
+      "key": "lunch",
       "start": "12:00",
       "end": "13:00",
       "type": "Lunch",
       "icon": "🍜",
       "title": "Ăn trưa",
       "detail": "Nghỉ và ăn gần ga.",
+      "refs": [],
+      "branchGroup": {
+        "key": "afternoon-weather",
+        "title": "Phương án buổi chiều",
+        "defaultBranchKey": "dry",
+        "branches": [
+          {
+            "key": "dry",
+            "label": "Không mưa",
+            "condition": "Khi thời tiết khô ráo",
+            "schedule": [
+              {
+                "key": "riverside-walk",
+                "start": "13:15",
+                "end": "14:45",
+                "type": "Walk",
+                "icon": "🚶",
+                "title": "Đi bộ ven sông",
+                "detail": "Theo tuyến ngoài trời đến điểm hội nhập.",
+                "refs": []
+              }
+            ]
+          },
+          {
+            "key": "rain",
+            "label": "Có mưa",
+            "condition": "Khi trời mưa hoặc gió mạnh",
+            "schedule": [
+              {
+                "key": "indoor-museum",
+                "start": "13:15",
+                "end": "14:45",
+                "type": "Visit",
+                "icon": "🏛️",
+                "title": "Tham quan bảo tàng",
+                "detail": "Phương án trong nhà trước khi trở lại tuyến chính.",
+                "refs": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "key": "rejoin-cafe",
+      "start": "15:00",
+      "end": "16:00",
+      "type": "Cafe",
+      "icon": "☕",
+      "title": "Hội nhập tại quán cà phê",
+      "detail": "Cả nhóm gặp lại tại tuyến chính.",
       "refs": []
     }
   ]

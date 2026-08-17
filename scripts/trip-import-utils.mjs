@@ -64,31 +64,93 @@ export function normalizeTripImport(raw) {
     };
   });
 
-  const rawSchedule = raw.schedule ?? raw.itinerary;
-  if (!Array.isArray(rawSchedule) || !rawSchedule.length) fail("schedule must be a non-empty array");
-  const schedule = assignItemKeys(rawSchedule.map((value, index) => {
-    const item = object(value, `schedule[${index}]`);
-    const start = text(item.start, `schedule[${index}].start`, 5);
-    const end = text(item.end, `schedule[${index}].end`, 5);
-    if (!timePattern.test(start) || !timePattern.test(end)) fail(`schedule[${index}] times must use HH:MM`);
-    if (end <= start) fail(`schedule[${index}].end must be later than start`);
+  const parseActivity = (value, field, { allowBranch = true } = {}) => {
+    const item = object(value, field);
+    if (!allowBranch && item.branchGroup != null) fail(`${field}.branchGroup cannot be nested`);
+    const start = text(item.start, `${field}.start`, 5);
+    const end = text(item.end, `${field}.end`, 5);
+    if (!timePattern.test(start) || !timePattern.test(end)) fail(`${field} times must use HH:MM`);
+    if (end <= start) fail(`${field}.end must be later than start`);
     const refs = item.refs == null ? [] : item.refs;
-    if (!Array.isArray(refs) || refs.some((ref) => !Number.isInteger(ref) || !sourceNumbers.has(ref))) fail(`schedule[${index}].refs must only contain source numbers declared in sources`);
+    if (!Array.isArray(refs) || refs.some((ref) => !Number.isInteger(ref) || !sourceNumbers.has(ref))) fail(`${field}.refs must only contain source numbers declared in sources`);
     return {
-      key: item.key ? text(item.key, `schedule[${index}].key`, 120) : null,
+      key: item.key ? text(item.key, `${field}.key`, 120) : null,
       start,
       end,
-      displayEnd: item.displayEnd == null ? null : text(item.displayEnd, `schedule[${index}].displayEnd`, 20),
-      type: text(item.type, `schedule[${index}].type`, 40),
-      icon: text(item.icon, `schedule[${index}].icon`, 16),
-      title: text(item.title, `schedule[${index}].title`, 240),
-      detail: text(item.detail, `schedule[${index}].detail`, 2000),
+      displayEnd: item.displayEnd == null ? null : text(item.displayEnd, `${field}.displayEnd`, 20),
+      type: text(item.type, `${field}.type`, 40),
+      icon: text(item.icon, `${field}.icon`, 16),
+      title: text(item.title, `${field}.title`, 240),
+      detail: text(item.detail, `${field}.detail`, 2000),
       refs: [...new Set(refs)],
+      branchGroup: allowBranch && item.branchGroup ? parseBranchGroup(item.branchGroup, `${field}.branchGroup`) : null,
     };
-  }));
+  };
 
-  for (let index = 1; index < schedule.length; index += 1) {
-    if (schedule[index].start < schedule[index - 1].start) fail("schedule must be ordered by start time");
+  const parseBranchGroup = (value, field) => {
+    const group = object(value, field);
+    if (!Array.isArray(group.branches) || group.branches.length < 2) fail(`${field}.branches must contain at least two branches`);
+    const branches = group.branches.map((value, branchIndex) => {
+      const branchField = `${field}.branches[${branchIndex}]`;
+      const branch = object(value, branchField);
+      const rawBranchSchedule = branch.schedule ?? [];
+      if (!Array.isArray(rawBranchSchedule)) fail(`${branchField}.schedule must be an array`);
+      const branchSchedule = rawBranchSchedule.map((item, itemIndex) => parseActivity(item, `${branchField}.schedule[${itemIndex}]`, { allowBranch: false }));
+      for (let index = 1; index < branchSchedule.length; index += 1) {
+        if (branchSchedule[index].start < branchSchedule[index - 1].end) fail(`${branchField}.schedule must be ordered without overlaps`);
+      }
+      return {
+        key: branch.key ? text(branch.key, `${branchField}.key`, 120) : slugify(text(branch.label, `${branchField}.label`, 80)),
+        label: text(branch.label, `${branchField}.label`, 80),
+        condition: text(branch.condition, `${branchField}.condition`, 240),
+        schedule: branchSchedule,
+      };
+    });
+    if (new Set(branches.map((branch) => branch.key)).size !== branches.length) fail(`${field}.branches keys must be unique`);
+    const defaultBranchKey = text(group.defaultBranchKey, `${field}.defaultBranchKey`, 120);
+    if (!branches.some((branch) => branch.key === defaultBranchKey)) fail(`${field}.defaultBranchKey must match a branch key`);
+    return {
+      key: group.key ? text(group.key, `${field}.key`, 120) : slugify(text(group.title, `${field}.title`, 160)),
+      title: text(group.title, `${field}.title`, 160),
+      defaultBranchKey,
+      branches,
+    };
+  };
+
+  const rawSchedule = raw.schedule ?? raw.itinerary;
+  if (!Array.isArray(rawSchedule) || !rawSchedule.length) fail("schedule must be a non-empty array");
+  const schedule = rawSchedule.map((value, index) => parseActivity(value, `schedule[${index}]`));
+
+  const seenItemKeys = new Map();
+  const withStableKey = (item) => {
+    const base = item.key ? slugify(item.key) : slugify(item.title);
+    const occurrence = (seenItemKeys.get(base) || 0) + 1;
+    seenItemKeys.set(base, occurrence);
+    const keyed = { ...item, key: occurrence === 1 ? base : `${base}-${occurrence}` };
+    if (!keyed.branchGroup) return keyed;
+    return {
+      ...keyed,
+      branchGroup: {
+        ...keyed.branchGroup,
+        branches: keyed.branchGroup.branches.map((branch) => ({
+          ...branch,
+          schedule: branch.schedule.map(withStableKey),
+        })),
+      },
+    };
+  };
+  const keyedSchedule = schedule.map(withStableKey);
+
+  for (let index = 1; index < keyedSchedule.length; index += 1) {
+    if (keyedSchedule[index].start < keyedSchedule[index - 1].start) fail("schedule must be ordered by start time");
   }
-  return { trip, sources, schedule };
+  for (const [index, item] of keyedSchedule.entries()) {
+    if (!item.branchGroup) continue;
+    const rejoin = keyedSchedule[index + 1] || null;
+    for (const branch of item.branchGroup.branches) {
+      if (branch.schedule[0] && branch.schedule[0].start < item.end) fail(`branch ${branch.key} starts before its anchor ends`);
+      if (rejoin && branch.schedule.at(-1)?.end > rejoin.start) fail(`branch ${branch.key} ends after its rejoin activity starts`);
+    }
+  }
+  return { trip, sources, schedule: keyedSchedule };
 }

@@ -1,0 +1,285 @@
+import { expect, gotoHealthy, test } from "./fixtures.mjs";
+
+test("admin creates a branch point and public tracker switches the shared route", async ({ page, request }) => {
+  const initialResponse = await request.get("/api/itinerary");
+  expect(initialResponse.ok()).toBeTruthy();
+  const initial = await initialResponse.json();
+  const occupiedAnchors = new Set((initial.branchGroups || []).map((group) => group.anchorActivityId));
+  const anchorIndex = initial.backbone.findIndex((item, index, backbone) => (
+    !occupiedAnchors.has(item.id)
+    && backbone[index + 1]
+    && backbone[index + 2]
+    && !occupiedAnchors.has(backbone[index + 1].id)
+    && backbone[index + 1].start >= item.end
+    && backbone[index + 1].end <= backbone[index + 2].start
+  ));
+  expect(anchorIndex).toBeGreaterThanOrEqual(0);
+  const anchor = initial.backbone[anchorIndex];
+  const segment = initial.backbone[anchorIndex + 1];
+  const stamp = Date.now();
+  const title = `Điểm rẽ E2E ${stamp}`;
+  let createdGroup;
+
+  try {
+    const createResponse = await request.post(`/api/trips/${initial.trip.slug}/branches`, {
+      data: {
+        anchorActivityId: anchor.id,
+        segmentActivityIds: [segment.id],
+        title,
+        defaultBranch: { key: `original-${stamp}`, label: "Tuyến gốc E2E", condition: "Điều kiện bình thường" },
+        alternateBranch: { key: `skip-${stamp}`, label: "Bỏ qua E2E", condition: "Khi cần rút ngắn" },
+      },
+    });
+    expect(createResponse.status()).toBe(201);
+    const created = await createResponse.json();
+    createdGroup = created.branchGroups.find((group) => group.title === title);
+    expect(createdGroup).toBeTruthy();
+
+    await page.setViewportSize({ width: 320, height: 760 });
+    await gotoHealthy(page, `/?trip=${initial.trip.slug}`);
+    const publicGroup = page.getByRole("region", { name: title });
+    const junction = publicGroup.getByRole("button", { name: new RegExp(title) });
+    await expect(junction).toBeVisible();
+    await junction.click();
+    await expect(publicGroup.getByText("Bỏ qua E2E", { exact: true })).toBeVisible();
+    const publicActivation = publicGroup.getByRole("button", { name: "Dùng phương án này", exact: true });
+    const publicActivationBox = await publicActivation.boundingBox();
+    expect(publicActivationBox.height).toBeGreaterThanOrEqual(44);
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await publicActivation.click();
+    await expect(junction).toContainText("Đang dùng: Bỏ qua E2E");
+
+    await gotoHealthy(page, "/admin/trips");
+    const adminGroup = page.getByRole("region", { name: title });
+    await expect(adminGroup.getByRole("heading", { name: title })).toBeVisible();
+    await expect(adminGroup).toContainText("Đang dùng: Bỏ qua E2E");
+
+    const adminActivation = adminGroup.getByRole("button", { name: "Dùng phương án này", exact: true });
+    let dismissedMessage = "";
+    page.once("dialog", async (dialog) => {
+      dismissedMessage = dialog.message();
+      await dialog.dismiss();
+    });
+    await adminActivation.click();
+    expect(dismissedMessage).toContain("Chuyến đi đã bắt đầu");
+    await expect(adminGroup).toContainText("Đang dùng: Bỏ qua E2E");
+
+    await page.setViewportSize({ width: 320, height: 760 });
+    const adminActivationBox = await adminActivation.boundingBox();
+    expect(adminActivationBox.height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+
+    page.once("dialog", (dialog) => dialog.accept());
+    await adminActivation.click();
+    await expect(adminGroup).toContainText("Đang dùng: Tuyến gốc E2E");
+  } finally {
+    if (createdGroup) {
+      const defaultBranch = createdGroup.branches.find((branch) => branch.isDefault);
+      const cleanup = await request.delete(`/api/trips/${initial.trip.slug}/branches/${createdGroup.id}`, {
+        data: { keepBranchId: defaultBranch.id },
+      });
+      expect(cleanup.ok()).toBeTruthy();
+    }
+  }
+});
+
+test("branch creation controls stay within a 320px admin viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await gotoHealthy(page, "/admin/trips");
+  await page.getByRole("button", { name: "Tạo điểm rẽ sau mục này", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: /Tạo điểm rẽ sau/ })).toBeVisible();
+  const width = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }));
+  expect(width.document).toBe(width.viewport);
+});
+
+for (const viewport of [
+  { name: "phone", width: 320, height: 760 },
+  { name: "macbook", width: 1440, height: 900 },
+  { name: "dell", width: 1920, height: 1080 },
+]) {
+  test(`${viewport.name} branch creation actions clear the preceding separator`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await gotoHealthy(page, "/admin/trips");
+
+    const gaps = await page.evaluate(() => [...document.querySelectorAll(".admin-branch-entry")].map((entry) => {
+      const button = entry.querySelector("button");
+      const precedingActivity = entry.previousElementSibling;
+      return Math.round(button.getBoundingClientRect().top - precedingActivity.getBoundingClientRect().bottom);
+    }));
+
+    expect(gaps.length).toBeGreaterThan(0);
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(8);
+  });
+}
+
+for (const viewport of [
+  { name: "phone", width: 320, height: 760 },
+  { name: "macbook", width: 1440, height: 900 },
+  { name: "dell", width: 1920, height: 1080 },
+]) {
+  test(`${viewport.name} activity editor uses guided controls and the available space`, async ({ page }) => {
+    await page.addInitScript(() => {
+      window.__scheduleTimePickerCalls = 0;
+      HTMLInputElement.prototype.showPicker = function showPicker() {
+        window.__scheduleTimePickerCalls += 1;
+      };
+    });
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await gotoHealthy(page, "/admin/trips");
+    await page.getByRole("button", { name: /Thêm hoạt động vào/ }).first().click();
+
+    const editor = page.locator(".schedule-inline-editor");
+    await expect(editor).toBeVisible();
+    const typeSelect = editor.getByLabel("Loại");
+    const iconSelect = editor.getByLabel("Icon");
+    await expect(typeSelect).toHaveJSProperty("tagName", "SELECT");
+    await expect(iconSelect).toHaveJSProperty("tagName", "SELECT");
+    await typeSelect.selectOption("Walk");
+    await expect(iconSelect).toHaveValue("🚶");
+    await typeSelect.selectOption("Visit");
+    await expect(iconSelect).toHaveValue("📍");
+    await editor.getByLabel("Bắt đầu").click({ position: { x: 12, y: 12 } });
+    await expect.poll(() => page.evaluate(() => window.__scheduleTimePickerCalls)).toBe(1);
+
+    const geometry = await editor.evaluate((form) => {
+      const group = form.closest(".admin-branch-group");
+      const formRect = form.getBoundingClientRect();
+      const groupRect = group.getBoundingClientRect();
+      const controls = [...form.querySelectorAll(".schedule-form-grid > label")].map((label) => {
+        const control = label.querySelector("input, select, textarea");
+        const rect = control.getBoundingClientRect();
+        return { label: label.childNodes[0]?.textContent?.trim(), top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left };
+      });
+      const overlaps = controls.flatMap((control, index) => controls.slice(index + 1)
+        .filter((other) => control.left < other.right && control.right > other.left && control.top < other.bottom && control.bottom > other.top)
+        .map((other) => `${control.label}/${other.label}`));
+      return {
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+        formWidth: Math.round(formRect.width),
+        formHeight: Math.round(formRect.height),
+        groupWidth: Math.round(groupRect.width),
+        columns: getComputedStyle(form).gridTemplateColumns.split(" ").filter(Boolean).length,
+        selectFontSize: Number.parseFloat(getComputedStyle(form.querySelector("select")).fontSize),
+        overlaps,
+      };
+    });
+
+    expect(geometry.documentWidth).toBe(geometry.viewportWidth);
+    expect(geometry.overlaps).toEqual([]);
+    if (viewport.name !== "phone") {
+      expect(geometry.formWidth).toBeGreaterThanOrEqual(Math.round(geometry.groupWidth * 0.85));
+      expect(geometry.formHeight).toBeLessThan(760);
+      expect(geometry.columns).toBeGreaterThanOrEqual(2);
+    } else {
+      expect(geometry.formWidth).toBeGreaterThanOrEqual(Math.round(geometry.groupWidth * 0.85));
+      expect(geometry.selectFontSize).toBeGreaterThanOrEqual(16);
+    }
+
+    await editor.getByRole("button", { name: "Hủy", exact: true }).first().click();
+    await page.getByRole("button", { name: "Thêm hoạt động", exact: true }).click();
+    const backboneEditor = page.locator(".schedule-create-editor");
+    await expect(backboneEditor).toBeVisible();
+    await expect(backboneEditor.getByLabel("Loại")).toHaveJSProperty("tagName", "SELECT");
+    await expect(backboneEditor.getByLabel("Icon")).toHaveJSProperty("tagName", "SELECT");
+    const backboneGeometry = await backboneEditor.evaluate((form) => ({
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+      height: Math.round(form.getBoundingClientRect().height),
+      columns: getComputedStyle(form).gridTemplateColumns.split(" ").filter(Boolean).length,
+    }));
+    expect(backboneGeometry.documentWidth).toBe(backboneGeometry.viewportWidth);
+    if (viewport.name !== "phone") {
+      expect(backboneGeometry.height).toBeLessThan(760);
+      expect(backboneGeometry.columns).toBeGreaterThanOrEqual(2);
+    }
+  });
+}
+
+for (const viewport of [
+  { name: "macbook", width: 1440, height: 900 },
+  { name: "dell", width: 1920, height: 1080 },
+]) {
+  test(`${viewport.name} branching keeps a continuous rail and compact parallel alternatives`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await gotoHealthy(page, "/");
+
+    const junction = page.locator(".branch-junction").first();
+    await expect(junction).toBeVisible();
+    const summary = junction.locator(".branch-junction-summary");
+    if (await summary.getAttribute("aria-expanded") !== "true") await summary.click();
+
+    const layout = await page.evaluate(() => {
+      const segments = [...document.querySelectorAll(".timeline-segment")];
+      const railDisplays = segments.map((segment) => getComputedStyle(segment.querySelector(".timeline-rail"), "::after").display);
+      const platforms = document.querySelector(".branch-platforms");
+      const platformStyle = getComputedStyle(platforms);
+      const simpleItem = [...document.querySelectorAll(".timeline-item")].find((item) => !item.querySelector(".citations"));
+      return {
+        nonFinalRails: railDisplays.slice(0, -1),
+        finalRail: railDisplays.at(-1),
+        platformDisplay: platformStyle.display,
+        platformColumns: platformStyle.gridTemplateColumns.split(" ").filter(Boolean).length,
+        simpleItemHeight: Math.round(simpleItem.getBoundingClientRect().height),
+        suggestionHeight: Math.round(simpleItem.querySelector(".suggestion-trigger").getBoundingClientRect().height),
+        branchButtonHeight: Math.round(platforms.querySelector(".branch-select-button").getBoundingClientRect().height),
+      };
+    });
+
+    expect(layout.nonFinalRails).not.toContain("none");
+    expect(layout.finalRail).toBe("none");
+    expect(layout.platformDisplay).toBe("grid");
+    expect(layout.platformColumns).toBeGreaterThanOrEqual(2);
+    expect(layout.simpleItemHeight).toBeLessThan(190);
+    expect(layout.suggestionHeight).toBeLessThan(44);
+    expect(layout.branchButtonHeight).toBeLessThan(44);
+
+    await gotoHealthy(page, "/admin/trips");
+    const adminLayout = await page.evaluate(() => {
+      const group = document.querySelector(".admin-branch-group");
+      const options = group.querySelector(".admin-branch-options");
+      const style = getComputedStyle(options);
+      const activityHeights = [...group.querySelectorAll(".admin-branch-activities .admin-schedule-item")]
+        .map((item) => Math.round(item.getBoundingClientRect().height));
+      const optionHeadHeights = [...group.querySelectorAll(".admin-branch-option-head")]
+        .map((head) => Math.round(head.getBoundingClientRect().height));
+      return {
+        display: style.display,
+        columns: style.gridTemplateColumns.split(" ").filter((column) => column !== "0px").length,
+        maxActivityHeight: Math.max(0, ...activityHeights),
+        maxOptionHeadHeight: Math.max(0, ...optionHeadHeights),
+      };
+    });
+    expect(adminLayout.display).toBe("grid");
+    expect(adminLayout.columns).toBeGreaterThanOrEqual(2);
+    expect(adminLayout.maxActivityHeight).toBeLessThan(180);
+    expect(adminLayout.maxOptionHeadHeight).toBeLessThan(150);
+  });
+}
+
+test("mobile branch accordion spans the route and reconnects on the rail axis", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await gotoHealthy(page, "/");
+
+  const geometry = await page.evaluate(() => {
+    const group = document.querySelector(".branch-junction");
+    const anchor = group.closest(".timeline-segment").querySelector(".timeline-rail");
+    const groupRect = group.getBoundingClientRect();
+    const railRect = anchor.getBoundingClientRect();
+    const connector = getComputedStyle(group, "::before");
+    const pixels = (value) => Number(value.replace("px", ""));
+    return {
+      groupWidth: Math.round(groupRect.width),
+      railAxis: railRect.left + railRect.width / 2,
+      connectorStart: groupRect.left + pixels(connector.left),
+      connectorEnd: groupRect.left + pixels(connector.left) + pixels(connector.width),
+      documentWidth: document.documentElement.scrollWidth,
+    };
+  });
+
+  expect(geometry.groupWidth).toBeGreaterThanOrEqual(280);
+  expect(geometry.railAxis).toBeGreaterThanOrEqual(geometry.connectorStart);
+  expect(geometry.railAxis).toBeLessThanOrEqual(geometry.connectorEnd);
+  expect(geometry.documentWidth).toBe(320);
+});

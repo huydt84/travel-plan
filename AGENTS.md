@@ -38,6 +38,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - When deviating from an established practice, identify the concrete project constraint, compare the lifecycle costs, and leave the reasoning discoverable in the relevant code or documentation.
 - Match verification to the failure mode. Build and unit checks do not substitute for real-browser end-to-end coverage of browser runtime, hydration, navigation, and user-visible integration failures.
 
+## Responsive UI verification
+
+- Every UI change or visual bug fix must be checked in a real browser at all three canonical viewports: phone `320x760`, MacBook `1440x900`, and Dell `1920x1080`.
+- Audit every public and admin surface affected by shared styles, not only the component that changed. The baseline matrix is the public tracker, invitation dialog, admin trips, invitation permissions, invitation history, and admin users, plus any edited interaction state such as an expanded branch or editor.
+- After a visual fix, rerun `tests/e2e/responsive-audit.spec.mjs` and the relevant feature E2E test. Add a geometry or behavior assertion for the exact reported symptom so the regression can fail deterministically.
+- Perform a batched screenshot pass across the complete matrix, fix the findings together, then run one confirmation pass. Do not treat unit tests, builds, DOM presence, or a single viewport as visual sign-off.
+
 ## Vercel deployment
 
 Use this runbook for a production deploy from Codex desktop.

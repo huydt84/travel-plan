@@ -12,6 +12,53 @@ import ConfirmDialog from "./ConfirmDialog";
 const emptyTrip = { slug: "", title: "", date: "", timezone: "Asia/Tokyo", location: "" };
 const emptySchedule = { start: "", end: "", displayEnd: "", type: "Visit", icon: "📍", title: "", detail: "", refs: [] };
 const emptySource = { title: "", url: "" };
+const JST_OFFSET = "+09:00";
+const ACTIVITY_TYPES = [
+  { value: "Transit", label: "Di chuyển", icon: "🚆" },
+  { value: "Walk", label: "Đi bộ", icon: "🚶" },
+  { value: "Visit", label: "Tham quan", icon: "📍" },
+  { value: "Film", label: "Quay phim / chụp ảnh", icon: "🎬📷" },
+  { value: "Buffer", label: "Thời gian đệm", icon: "🧊" },
+  { value: "Rest", label: "Nghỉ", icon: "☕" },
+  { value: "Cafe", label: "Quán cà phê", icon: "☕" },
+  { value: "Lunch", label: "Ăn trưa", icon: "🍜" },
+  { value: "Dinner", label: "Ăn tối", icon: "🍽️" },
+  { value: "Indoor", label: "Trong nhà", icon: "🏠" },
+];
+const ACTIVITY_ICONS = [
+  { value: "🚆", label: "Tàu / di chuyển" },
+  { value: "🚃", label: "Tàu điện / Enoden" },
+  { value: "🚶", label: "Đi bộ" },
+  { value: "📍", label: "Địa điểm" },
+  { value: "🎬📷", label: "Quay phim / chụp ảnh" },
+  { value: "🧊", label: "Thời gian đệm" },
+  { value: "☕", label: "Nghỉ / cà phê" },
+  { value: "🍜", label: "Món ăn" },
+  { value: "🍽️", label: "Bữa ăn" },
+  { value: "🏠", label: "Trong nhà" },
+  { value: "⛩️", label: "Đền / chùa" },
+  { value: "🏛️", label: "Điểm tham quan" },
+];
+
+const includeCurrentOption = (options, value, label = value) => (
+  value && !options.some((option) => option.value === value)
+    ? [{ value, label: `${label} · đang dùng` }, ...options]
+    : options
+);
+
+const openTimePicker = (event) => {
+  try {
+    event.currentTarget.showPicker?.();
+  } catch {
+    // Browsers without a programmable native picker still keep the normal time input behavior.
+  }
+};
+
+const hasTripStarted = (plan) => {
+  const firstActivity = plan?.itinerary?.[0];
+  if (!plan?.trip?.date || !firstActivity?.start) return false;
+  return Date.now() >= new Date(`${plan.trip.date}T${firstActivity.start}:00${JST_OFFSET}`).getTime();
+};
 
 const api = async (path, options = {}) => {
   const response = await fetch(path, {
@@ -81,6 +128,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
   const [busy, setBusy] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [scheduleError, setScheduleError] = useState("");
+  const [branchCreatorAnchorId, setBranchCreatorAnchorId] = useState(null);
   const [discardPrompt, setDiscardPrompt] = useState(null);
   const [suggestionFilter, setSuggestionFilter] = useState("visible");
   const [suggestionToDelete, setSuggestionToDelete] = useState(null);
@@ -251,6 +299,69 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
     }
   };
 
+  const applyBranchMutation = async (path, options, message) => {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const nextPlan = await api(path, options);
+      setPlan(nextPlan);
+      await loadTrips(selectedSlug);
+      setNotice(message);
+      return nextPlan;
+    } catch (requestError) {
+      setError(requestError.message);
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const createBranchGroupForPlan = async (values) => {
+    const nextPlan = await applyBranchMutation(
+      `/api/trips/${encodeURIComponent(selectedSlug)}/branches`,
+      { method: "POST", body: JSON.stringify(values) },
+      "Đã tạo điểm rẽ và chuyển đoạn lịch sang phương án mặc định.",
+    );
+    if (nextPlan) setBranchCreatorAnchorId(null);
+  };
+
+  const activateBranchForPlan = (groupId, branchId) => {
+    const branch = plan?.branchGroups
+      ?.find((group) => group.id === groupId)
+      ?.branches.find((option) => option.id === branchId);
+    if (branch && hasTripStarted(plan) && !window.confirm(`Chuyến đi đã bắt đầu. Đổi sang “${branch.label}” có thể làm thay đổi hoạt động hiện tại và tiếp theo. Tiếp tục?`)) {
+      return Promise.resolve(null);
+    }
+    return applyBranchMutation(
+      `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}/selection`,
+      { method: "PUT", body: JSON.stringify({ branchId }) },
+      "Đã đổi phương án đang dùng cho cả nhóm.",
+    );
+  };
+
+  const addBranchOptionForPlan = (groupId, values) => applyBranchMutation(
+    `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}`,
+    { method: "POST", body: JSON.stringify(values) },
+    "Đã thêm phương án dự phòng.",
+  );
+
+  const updateBranchOptionForPlan = (groupId, branchId, values) => applyBranchMutation(
+    `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}/${branchId}`,
+    { method: "PATCH", body: JSON.stringify(values) },
+    "Đã lưu thông tin phương án.",
+  );
+
+  const deleteBranchOptionForPlan = (groupId, branchId) => applyBranchMutation(
+    `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}/${branchId}`,
+    { method: "DELETE" },
+    "Đã xoá phương án dự phòng.",
+  );
+
+  const unwrapBranchGroupForPlan = (groupId, keepBranchId) => applyBranchMutation(
+    `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}`,
+    { method: "DELETE", body: JSON.stringify({ keepBranchId }) },
+    "Đã gỡ điểm rẽ và giữ phương án đã chọn trên tuyến chính.",
+  );
+
   const createSourceForPlan = async (values) => {
     const source = await api(`/api/trips/${encodeURIComponent(selectedSlug)}/sources`, {
       method: "POST",
@@ -376,7 +487,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
                 </div>
               </section>
 
-              <div className="admin-section-head schedule-heading"><div><h2>{plan.itinerary.length} hoạt động</h2></div><button className="admin-primary" disabled={busy} aria-expanded={scheduleEditor?.key === "new"} aria-controls="schedule-editor-new" onClick={(event) => activateScheduleEditor(emptySchedule, event.currentTarget)}>Thêm hoạt động</button></div>
+              <div className="admin-section-head schedule-heading"><div><h2>{plan.itinerary.length} hoạt động đang dùng</h2><p>{plan.branchGroups?.length || 0} điểm rẽ</p></div><button className="admin-primary" disabled={busy} aria-expanded={scheduleEditor?.key === "new"} aria-controls="schedule-editor-new" onClick={(event) => activateScheduleEditor(emptySchedule, event.currentTarget)}>Thêm hoạt động</button></div>
               {scheduleEditor?.key === "new" && (
                 <ScheduleForm
                   key="new"
@@ -392,32 +503,52 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
                 />
               )}
               <div className="admin-schedule-list">
-                {plan.itinerary.map((item) => {
-                  const editorId = `schedule-editor-${item.id}`;
-                  const isEditing = scheduleEditor?.key === String(item.id);
+                {(plan.backbone || plan.itinerary).map((item, itemIndex, backbone) => {
+                  const group = plan.branchGroups?.find((candidate) => candidate.anchorActivityId === item.id);
                   return (
-                    <article className={`admin-schedule-item${isEditing ? " is-editing" : ""}`} key={item.id}>
-                      <div className="admin-schedule-time"><strong>{item.start}</strong><span>{item.displayEnd || item.end}</span></div>
-                      <div className="admin-schedule-copy"><span><TypeIcon type={item.type} /> {item.type}</span><h3>{item.title}</h3><p>{item.detail}</p></div>
-                      <div className="admin-row-actions">
-                        <button className="admin-ghost" disabled={busy} aria-expanded={isEditing} aria-controls={editorId} onClick={(event) => activateScheduleEditor(item, event.currentTarget)}>{isEditing ? "Đang sửa" : "Sửa"}</button>
-                        <button className="admin-danger" disabled={busy} onClick={() => removeSchedule(item.id)}>Xoá</button>
-                      </div>
-                      {isEditing && (
-                        <ScheduleForm
-                          key={scheduleEditor.key}
-                          editor={scheduleEditor}
+                    <div className="admin-route-segment" key={item.id}>
+                      <ScheduleRow
+                        item={item}
+                        busy={busy}
+                        scheduleEditor={scheduleEditor}
+                        scheduleError={scheduleError}
+                        sources={plan.sources}
+                        onActivateEditor={activateScheduleEditor}
+                        onEditorChange={(values) => setScheduleEditor((current) => current ? { ...current, values } : current)}
+                        onCreateSource={createSourceForPlan}
+                        onSave={saveSchedule}
+                        onCancel={closeScheduleEditor}
+                        onRemove={removeSchedule}
+                      />
+                      {!group && itemIndex < backbone.length - 1 && (
+                        <div className="admin-branch-entry">
+                          <button className="admin-ghost" type="button" disabled={busy} aria-expanded={branchCreatorAnchorId === item.id} onClick={() => setBranchCreatorAnchorId((current) => current === item.id ? null : item.id)}>Tạo điểm rẽ sau mục này</button>
+                        </div>
+                      )}
+                      {branchCreatorAnchorId === item.id && (
+                        <BranchCreateForm anchor={item} following={backbone.slice(itemIndex + 1)} busy={busy} onCancel={() => setBranchCreatorAnchorId(null)} onSave={createBranchGroupForPlan} />
+                      )}
+                      {group && (
+                        <BranchGroupAdmin
+                          group={group}
                           busy={busy}
-                          error={scheduleError}
+                          scheduleEditor={scheduleEditor}
+                          scheduleError={scheduleError}
                           sources={plan.sources}
-                          placement="inline"
-                          onChange={(values) => setScheduleEditor((current) => current ? { ...current, values } : current)}
+                          onActivate={activateBranchForPlan}
+                          onAddOption={addBranchOptionForPlan}
+                          onUpdateOption={updateBranchOptionForPlan}
+                          onDeleteOption={deleteBranchOptionForPlan}
+                          onUnwrap={unwrapBranchGroupForPlan}
+                          onActivateEditor={activateScheduleEditor}
+                          onEditorChange={(values) => setScheduleEditor((current) => current ? { ...current, values } : current)}
                           onCreateSource={createSourceForPlan}
-                          onSave={saveSchedule}
-                          onCancel={closeScheduleEditor}
+                          onSaveSchedule={saveSchedule}
+                          onCancelSchedule={closeScheduleEditor}
+                          onRemoveSchedule={removeSchedule}
                         />
                       )}
-                    </article>
+                    </div>
                   );
                 })}
               </div>
@@ -431,7 +562,10 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
               </div>
               <div className="admin-suggestion-list">
                 {suggestions.filter((suggestion) => suggestionFilter === "hidden" ? suggestion.hidden : !suggestion.hidden).map((suggestion) => {
-                  const activity = plan.itinerary.find((item) => item.id === suggestion.activityId);
+                  const activity = [
+                    ...(plan.backbone || plan.itinerary),
+                    ...(plan.branchGroups || []).flatMap((group) => group.branches.flatMap((branch) => branch.itinerary)),
+                  ].find((item) => item.id === suggestion.activityId);
                   return (
                     <article className={`admin-suggestion-item${suggestion.hidden ? " is-hidden" : ""}`} key={suggestion.id}>
                       <div className="admin-suggestion-meta">
@@ -514,6 +648,161 @@ function AdminSuggestionMenu({ suggestion, busy, onDelete }) {
   );
 }
 
+function ScheduleRow({ item, busy, scheduleEditor, scheduleError, sources, onActivateEditor, onEditorChange, onCreateSource, onSave, onCancel, onRemove }) {
+  const editorId = `schedule-editor-${item.id}`;
+  const isEditing = scheduleEditor?.key === String(item.id);
+  return (
+    <article className={`admin-schedule-item${isEditing ? " is-editing" : ""}`}>
+      <div className="admin-schedule-time"><strong>{item.start}</strong><span>{item.displayEnd || item.end}</span></div>
+      <div className="admin-schedule-copy"><span><TypeIcon type={item.type} /> {item.type}</span><h3>{item.title}</h3><p>{item.detail}</p></div>
+      <div className="admin-row-actions">
+        <button className="admin-ghost" disabled={busy} aria-expanded={isEditing} aria-controls={editorId} onClick={(event) => onActivateEditor(item, event.currentTarget)}>{isEditing ? "Đang sửa" : "Sửa"}</button>
+        <button className="admin-danger" disabled={busy} onClick={() => onRemove(item.id)}>Xoá</button>
+      </div>
+      {isEditing && (
+        <ScheduleForm
+          key={scheduleEditor.key}
+          editor={scheduleEditor}
+          busy={busy}
+          error={scheduleError}
+          sources={sources}
+          placement="inline"
+          onChange={onEditorChange}
+          onCreateSource={onCreateSource}
+          onSave={onSave}
+          onCancel={onCancel}
+        />
+      )}
+    </article>
+  );
+}
+
+function BranchCreateForm({ anchor, following, busy, onCancel, onSave }) {
+  const [segmentCount, setSegmentCount] = useState(1);
+  const [values, setValues] = useState({
+    title: "Phương án dự phòng",
+    defaultLabel: "Kế hoạch hiện tại",
+    defaultCondition: "Khi điều kiện bình thường",
+    alternateLabel: "Phương án thay thế",
+    alternateCondition: "Khi cần đổi kế hoạch",
+  });
+  const field = (name) => ({ value: values[name], onChange: (event) => setValues((current) => ({ ...current, [name]: event.target.value })) });
+  const submit = (event) => {
+    event.preventDefault();
+    onSave({
+      anchorActivityId: anchor.id,
+      segmentActivityIds: following.slice(0, segmentCount).map((item) => item.id),
+      title: values.title,
+      defaultBranch: { label: values.defaultLabel, condition: values.defaultCondition },
+      alternateBranch: { label: values.alternateLabel, condition: values.alternateCondition },
+    });
+  };
+  return (
+    <form className="admin-editor branch-create-editor" onSubmit={submit}>
+      <div className="admin-section-head"><div><h2>Tạo điểm rẽ sau “{anchor.title}”</h2><p>Đoạn hiện có sẽ trở thành phương án mặc định.</p></div><button className="admin-ghost" type="button" onClick={onCancel}>Hủy</button></div>
+      <div className="form-grid">
+        <label className="wide">Tên điểm rẽ<input {...field("title")} required /></label>
+        <label className="wide">Hội nhập lại
+          <select value={segmentCount} onChange={(event) => setSegmentCount(Number(event.target.value))}>
+            {following.map((item, index) => <option value={index + 1} key={item.id}>{index + 1 < following.length ? `Trước ${following[index + 1].start} · ${following[index + 1].title}` : "Cuối chuyến"}</option>)}
+          </select>
+        </label>
+        <label>Tên phương án mặc định<input {...field("defaultLabel")} required /></label>
+        <label>Điều kiện<input {...field("defaultCondition")} required /></label>
+        <label>Tên phương án dự phòng<input {...field("alternateLabel")} required /></label>
+        <label>Điều kiện<input {...field("alternateCondition")} required /></label>
+      </div>
+      <div className="schedule-editor-actions"><button className="admin-ghost" type="button" onClick={onCancel}>Hủy</button><button className="admin-primary" disabled={busy}>{busy ? "Đang tạo…" : `Chuyển ${segmentCount} hoạt động thành điểm rẽ`}</button></div>
+    </form>
+  );
+}
+
+function BranchGroupAdmin({ group, busy, scheduleEditor, scheduleError, sources, onActivate, onAddOption, onUpdateOption, onDeleteOption, onUnwrap, onActivateEditor, onEditorChange, onCreateSource, onSaveSchedule, onCancelSchedule, onRemoveSchedule }) {
+  const [adding, setAdding] = useState(false);
+  const [newBranch, setNewBranch] = useState({ label: "", condition: "" });
+  const [keepBranchId, setKeepBranchId] = useState(group.selectedBranchId);
+  const selected = group.branches.find((branch) => branch.id === group.selectedBranchId) || group.branches[0];
+  const unwrap = () => {
+    if (!window.confirm(`Gỡ điểm rẽ và giữ “${group.branches.find((branch) => branch.id === keepBranchId)?.label}” trên tuyến chính? Các activity ở phương án khác sẽ bị xoá.`)) return;
+    onUnwrap(group.id, keepBranchId);
+  };
+  return (
+    <section className="admin-branch-group" aria-labelledby={`branch-group-${group.id}`}>
+      <div className="admin-branch-head">
+        <div><span>Điểm rẽ · {group.branches.length} phương án</span><h3 id={`branch-group-${group.id}`}>{group.title}</h3><p>Đang dùng: <strong>{selected.label}</strong> · {selected.condition}</p></div>
+        <button className="admin-ghost" type="button" onClick={() => setAdding((current) => !current)} disabled={busy}>{adding ? "Hủy thêm" : "Thêm phương án"}</button>
+      </div>
+      {adding && (
+        <form className="branch-option-add" onSubmit={(event) => { event.preventDefault(); onAddOption(group.id, newBranch).then((plan) => { if (plan) { setAdding(false); setNewBranch({ label: "", condition: "" }); } }); }}>
+          <label>Tên phương án<input value={newBranch.label} onChange={(event) => setNewBranch({ ...newBranch, label: event.target.value })} required /></label>
+          <label>Điều kiện<input value={newBranch.condition} onChange={(event) => setNewBranch({ ...newBranch, condition: event.target.value })} required /></label>
+          <button className="admin-primary" disabled={busy}>Thêm phương án</button>
+        </form>
+      )}
+      <div className="admin-branch-options">
+        {group.branches.map((branch) => (
+          <BranchOptionAdmin
+            key={branch.id}
+            group={group}
+            branch={branch}
+            selected={branch.id === group.selectedBranchId}
+            busy={busy}
+            scheduleEditor={scheduleEditor}
+            scheduleError={scheduleError}
+            sources={sources}
+            onActivate={onActivate}
+            onUpdate={onUpdateOption}
+            onDelete={onDeleteOption}
+            onActivateEditor={onActivateEditor}
+            onEditorChange={onEditorChange}
+            onCreateSource={onCreateSource}
+            onSaveSchedule={onSaveSchedule}
+            onCancelSchedule={onCancelSchedule}
+            onRemoveSchedule={onRemoveSchedule}
+          />
+        ))}
+      </div>
+      <div className="admin-branch-unwrap"><label>Giữ lại khi gỡ<select value={keepBranchId} onChange={(event) => setKeepBranchId(event.target.value)}>{group.branches.map((branch) => <option value={branch.id} key={branch.id}>{branch.label}</option>)}</select></label><button className="admin-danger" type="button" onClick={unwrap} disabled={busy}>Gỡ điểm rẽ</button></div>
+    </section>
+  );
+}
+
+function BranchOptionAdmin({ group, branch, selected, busy, scheduleEditor, scheduleError, sources, onActivate, onUpdate, onDelete, onActivateEditor, onEditorChange, onCreateSource, onSaveSchedule, onCancelSchedule, onRemoveSchedule }) {
+  const [editing, setEditing] = useState(false);
+  const [values, setValues] = useState({ label: branch.label, condition: branch.condition });
+  const newEditorKey = `new-branch-${branch.id}`;
+  return (
+    <article className={`admin-branch-option${selected ? " is-selected" : ""}`}>
+      <div className="admin-branch-option-head">
+        <div><span>{selected ? "Đang dùng" : "Dự phòng"}{branch.isDefault ? " · Mặc định" : ""}</span><h4>{branch.label}</h4><p>{branch.condition}</p></div>
+        <div className="admin-row-actions">
+          {!selected && <button className="admin-primary small" type="button" onClick={() => onActivate(group.id, branch.id)} disabled={busy}>Dùng phương án này</button>}
+          <button className="admin-ghost" type="button" onClick={() => setEditing((current) => !current)} disabled={busy}>Sửa nhãn</button>
+          {!selected && !branch.isDefault && group.branches.length > 2 && <button className="admin-danger" type="button" onClick={() => { if (window.confirm(`Xoá phương án “${branch.label}”?`)) onDelete(group.id, branch.id); }} disabled={busy}>Xoá</button>}
+        </div>
+      </div>
+      {editing && (
+        <form className="branch-option-edit" onSubmit={(event) => { event.preventDefault(); onUpdate(group.id, branch.id, values).then((plan) => { if (plan) setEditing(false); }); }}>
+          <label>Tên<input value={values.label} onChange={(event) => setValues({ ...values, label: event.target.value })} required /></label>
+          <label>Điều kiện<input value={values.condition} onChange={(event) => setValues({ ...values, condition: event.target.value })} required /></label>
+          <button className="admin-primary" disabled={busy}>Lưu nhãn</button>
+        </form>
+      )}
+      <div className="admin-branch-activities">
+        {branch.itinerary.map((item) => (
+          <ScheduleRow key={item.id} item={item} busy={busy} scheduleEditor={scheduleEditor} scheduleError={scheduleError} sources={sources} onActivateEditor={onActivateEditor} onEditorChange={onEditorChange} onCreateSource={onCreateSource} onSave={onSaveSchedule} onCancel={onCancelSchedule} onRemove={onRemoveSchedule} />
+        ))}
+        {!branch.itinerary.length && <p className="admin-empty">Nhánh rỗng: nhóm sẽ đi thẳng tới mốc hội nhập.</p>}
+      </div>
+      {scheduleEditor?.key === newEditorKey ? (
+        <ScheduleForm key={newEditorKey} editor={scheduleEditor} busy={busy} error={scheduleError} sources={sources} placement="inline" onChange={onEditorChange} onCreateSource={onCreateSource} onSave={onSaveSchedule} onCancel={onCancelSchedule} />
+      ) : (
+        <button className="admin-ghost branch-add-activity" type="button" onClick={(event) => onActivateEditor({ ...emptySchedule, branchId: branch.id, editorKey: newEditorKey }, event.currentTarget)} disabled={busy}>Thêm hoạt động vào “{branch.label}”</button>
+      )}
+    </article>
+  );
+}
+
 function PlanSkeleton() {
   return (
     <div className="admin-plan-skeleton" aria-live="polite" aria-label="Đang tải trip plan">
@@ -538,6 +827,18 @@ function TripForm({ editor, busy, onSave, onCancel }) {
 function ScheduleForm({ editor, busy, error, sources, placement, onChange, onCreateSource, onSave, onCancel }) {
   const values = editor.values;
   const field = (name) => ({ value: values[name] ?? "", onChange: (event) => onChange({ ...values, [name]: event.target.value }) });
+  const typeOptions = includeCurrentOption(ACTIVITY_TYPES, values.type);
+  const iconOptions = includeCurrentOption(ACTIVITY_ICONS, values.icon, values.icon);
+  const changeType = (event) => {
+    const nextType = event.target.value;
+    const currentDefaultIcon = ACTIVITY_TYPES.find((option) => option.value === values.type)?.icon;
+    const nextDefaultIcon = ACTIVITY_TYPES.find((option) => option.value === nextType)?.icon;
+    onChange({
+      ...values,
+      type: nextType,
+      icon: !values.icon || values.icon === currentDefaultIcon ? nextDefaultIcon : values.icon,
+    });
+  };
   return (
     <form id={`schedule-editor-${editor.key}`} className={`admin-editor admin-form schedule-editor ${placement === "inline" ? "schedule-inline-editor" : "schedule-create-editor"}`} onSubmit={(event) => { event.preventDefault(); onSave(values, values.id); }}>
       <div className="admin-section-head schedule-editor-head">
@@ -545,13 +846,21 @@ function ScheduleForm({ editor, busy, error, sources, placement, onChange, onCre
         <button type="button" className="admin-ghost" onClick={onCancel} disabled={busy}>Hủy</button>
       </div>
       <div className="form-grid schedule-form-grid">
-        <label>Bắt đầu<input type="time" {...field("start")} required /></label>
-        <label>Kết thúc<input type="time" {...field("end")} required /></label>
-        <label>Hiển thị kết thúc<input {...field("displayEnd")} placeholder="Tuỳ chọn, ví dụ +" /></label>
-        <label>Loại<input {...field("type")} required /></label>
-        <label>Icon<input {...field("icon")} required /></label>
-        <label className="wide">Tiêu đề<input {...field("title")} required /></label>
-        <label className="wide">Chi tiết<textarea {...field("detail")} rows="4" required /></label>
+        <label className="schedule-field schedule-time-field">Bắt đầu<input type="time" {...field("start")} onClick={openTimePicker} required /></label>
+        <label className="schedule-field schedule-time-field">Kết thúc<input type="time" {...field("end")} onClick={openTimePicker} required /></label>
+        <label className="schedule-field schedule-display-field">Hiển thị kết thúc<input {...field("displayEnd")} placeholder="Tuỳ chọn, ví dụ +" /></label>
+        <label className="schedule-field schedule-type-field">Loại
+          <select value={values.type || ""} onChange={changeType} required>
+            {typeOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+        <label className="schedule-field schedule-icon-field">Icon
+          <select {...field("icon")} required>
+            {iconOptions.map((option) => <option value={option.value} key={option.value}>{option.value} · {option.label}</option>)}
+          </select>
+        </label>
+        <label className="wide schedule-field schedule-title-field">Tiêu đề<input {...field("title")} required /></label>
+        <label className="wide schedule-field schedule-detail-field">Chi tiết<textarea {...field("detail")} rows="3" required /></label>
       </div>
       <SourcePicker
         sources={sources}

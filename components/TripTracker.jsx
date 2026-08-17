@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { formatScheduleHeading, formatTripTitle } from "../lib/trip-date-label.mjs";
@@ -40,24 +40,28 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
   const [deletionCandidate, setDeletionCandidate] = useState(null);
   const [deletionError, setDeletionError] = useState("");
   const [announcement, setAnnouncement] = useState("");
+  const [branchAction, setBranchAction] = useState({ id: null, error: "" });
   const [invitationOpen, setInvitationOpen] = useState(initialInvitationOpen);
   const [gmailReturn, setGmailReturn] = useState(initialGmailReturn);
   const routeListRef = useRef(null);
   const activeStopRef = useRef(null);
   const stationStageRef = useRef(null);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
-    fetch(`/api/itinerary?slug=${encodeURIComponent(initialData.trip.slug)}`)
+  const refreshItinerary = useCallback(() => fetch(`/api/itinerary?slug=${encodeURIComponent(initialData.trip.slug)}`)
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("API request failed")))
       .then(setData)
-      .catch(() => {});
+      .catch(() => {}), [initialData.trip.slug]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    const poll = window.setInterval(() => { if (document.visibilityState === "visible") refreshItinerary(); }, 30_000);
+    refreshItinerary();
     fetch(`/api/trips/${encodeURIComponent(initialData.trip.slug)}/suggestions`)
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("Suggestion request failed")))
       .then((result) => setSuggestions(result.suggestions))
       .catch(() => {});
-    return () => window.clearInterval(timer);
-  }, [initialData.trip.slug]);
+    return () => { window.clearInterval(timer); window.clearInterval(poll); };
+  }, [initialData.trip.slug, refreshItinerary]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -362,6 +366,28 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     onToggleVisibility: updateContributionVisibility,
   };
 
+  const selectPublicBranch = async (group, branch) => {
+    const tripStarted = now >= itinerary[0].startAt;
+    if (tripStarted && !window.confirm(`Chuyến đi đã bắt đầu. Đổi sang “${branch.label}” có thể làm thay đổi hoạt động hiện tại và tiếp theo. Tiếp tục?`)) return;
+    setBranchAction({ id: branch.id, error: "" });
+    try {
+      const response = await fetch(`/api/trips/${encodeURIComponent(data.trip.slug)}/branches/${group.id}/selection`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ branchId: branch.id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Không đổi được phương án");
+      setData(result);
+      setBranchAction({ id: null, error: "" });
+      setAnnouncement(`Đã dùng phương án ${branch.label} cho cả nhóm.`);
+    } catch (error) {
+      setBranchAction({ id: branch.id, error: `${error.message}. Hãy thử lại.` });
+    }
+  };
+
+  const branchGroupsByAnchor = new Map((data.branchGroups || []).map((group) => [group.anchorActivityId, group]));
+
   return (
     <main className="shell" data-trip-mode={state.mode}>
       <header className="trip-bar" id="top">
@@ -414,12 +440,13 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
               const isFocused = item.id === state.anchor.id;
               const isDone = index < state.index || state.mode === "after";
               const isTerminus = isAfter && isFocused;
+              const branchGroup = branchGroupsByAnchor.get(item.id);
               return (
                 <li className={`${isFocused && !isAfter ? "is-active" : ""}${isDone ? " is-done" : ""}${isTerminus ? " is-terminus" : ""}`} ref={isFocused ? activeStopRef : null} key={item.id}>
                   <a href={`#${item.id}`}>
                     <time>{item.start}</time>
                     <span className="route-node" aria-hidden="true" />
-                    <span className="route-stop-copy"><strong>{item.title}</strong><small>{item.type}</small></span>
+                    <span className="route-stop-copy"><strong>{item.title}</strong><small>{item.branchLabel ? `${item.type} · ${item.branchLabel}` : item.type}{branchGroup ? ` · ${branchGroup.branches.length} phương án` : ""}</small></span>
                   </a>
                 </li>
               );
@@ -461,7 +488,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
               <span>Tiếp theo</span>
               <TypeIcon type={state.next.type} />
               <strong>{state.next.title}</strong>
-              <small>{state.next.start} · {state.next.type}</small>
+              <small>{state.next.start} · {state.next.branchLabel || state.next.type}</small>
               <ActionIcon name="right" />
             </a>
           )}
@@ -485,7 +512,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
               <li className={`mobile-route-stop${isFocused && !isAfter ? " is-active" : ""}${isDone ? " is-done" : ""}${isTerminus ? " is-terminus" : ""}`} key={item.id}>
                 <a className="mobile-stop-label" href={`#${item.id}`}>
                   <time>{item.start}</time><i aria-hidden="true" />
-                  <span><strong>{item.title}</strong><small>{item.type}</small></span>
+                  <span><strong>{item.title}</strong><small>{item.branchLabel ? `${item.type} · ${item.branchLabel}` : item.type}</small></span>
                 </a>
                 {isFocused && (
                   <section className="mobile-active-foldout">
@@ -501,7 +528,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                     </div>
                     {state.next && (
                       <a className="mobile-next-fascia" href={`#${state.next.id}`}>
-                        <span>Tiếp theo · {state.next.start}</span><strong>{state.next.title}</strong><ActionIcon name="right" />
+                        <span>Tiếp theo · {state.next.start}{state.next.branchLabel ? ` · ${state.next.branchLabel}` : ""}</span><strong>{state.next.title}</strong><ActionIcon name="right" />
                       </a>
                     )}
                   </section>
@@ -527,23 +554,27 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
         {itinerary.map((item, index) => {
           const isCurrent = state.mode === "active" && index === state.index;
           const isDone = index < state.index || state.mode === "after";
+          const branchGroup = branchGroupsByAnchor.get(item.id);
           return (
-            <article className={`timeline-item${isCurrent ? " is-current" : ""}${isDone ? " is-done" : ""}`} id={item.id} key={item.id}>
-              <div className="timeline-time"><strong>{item.start}</strong><span>{item.displayEnd || item.end}</span></div>
-              <div className="timeline-rail"><span className="timeline-dot" aria-hidden="true" /></div>
-              <div className="timeline-card">
-                <div className="timeline-card-head">
-                  <span className="type-label"><TypeIcon type={item.type} />{item.type}</span>
-                  <span className="done-label">Đã qua</span>
+            <div className="timeline-segment" key={item.id}>
+              <article className={`timeline-item${isCurrent ? " is-current" : ""}${isDone ? " is-done" : ""}`} id={item.id}>
+                <div className="timeline-time"><strong>{item.start}</strong><span>{item.displayEnd || item.end}</span></div>
+                <div className="timeline-rail"><span className="timeline-dot" aria-hidden="true" /></div>
+                <div className="timeline-card">
+                  <div className="timeline-card-head">
+                    <span className="type-label"><TypeIcon type={item.type} />{item.type}{item.branchLabel ? ` · ${item.branchLabel}` : ""}</span>
+                    <span className="done-label">Đã qua</span>
+                  </div>
+                  <h3>{item.title}</h3><p>{item.detail}</p>
+                  {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
+                  <SuggestionList suggestions={suggestionsByActivity.get(item.id) || []} {...suggestionListProps} />
+                  <button className="suggestion-trigger" type="button" onClick={() => openSuggestion(item.id, item.title)}>
+                    {viewer ? "Góp ý cho mục này" : "Đăng nhập để góp ý"}
+                  </button>
                 </div>
-                <h3>{item.title}</h3><p>{item.detail}</p>
-                {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
-                <SuggestionList suggestions={suggestionsByActivity.get(item.id) || []} {...suggestionListProps} />
-                <button className="suggestion-trigger" type="button" onClick={() => openSuggestion(item.id, item.title)}>
-                  {viewer ? "Góp ý cho mục này" : "Đăng nhập để góp ý"}
-                </button>
-              </div>
-            </article>
+              </article>
+              {branchGroup && <BranchJunction group={branchGroup} viewer={viewer} sourceMap={sourceMap} suggestionsByActivity={suggestionsByActivity} suggestionListProps={suggestionListProps} branchAction={branchAction} onSelect={selectPublicBranch} onSuggest={openSuggestion} />}
+            </div>
           );
         })}
       </section>
@@ -591,6 +622,88 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       )}
       {invitationOpen && <InvitationDialog open onClose={() => { setInvitationOpen(false); setGmailReturn(false); }} viewer={viewer} trip={data.trip} itinerary={data.itinerary} gmailReturn={gmailReturn} />}
     </main>
+  );
+}
+
+function BranchJunction({ group, viewer, sourceMap, suggestionsByActivity, suggestionListProps, branchAction, onSelect, onSuggest }) {
+  const selected = group.branches.find((branch) => branch.id === group.selectedBranchId) || group.branches[0];
+  const [expanded, setExpanded] = useState(false);
+  const [openBranchIds, setOpenBranchIds] = useState(() => new Set());
+
+  useEffect(() => {
+    const revealBranchTarget = () => {
+      const match = window.location.hash.match(/^#contribution-(\d+)$/);
+      if (!match) return;
+      for (const branch of group.branches) {
+        if (branch.id === group.selectedBranchId) continue;
+        const containsTarget = branch.itinerary.some((item) => (suggestionsByActivity.get(item.id) || []).some((suggestion) => suggestion.id === match[1]));
+        if (containsTarget) {
+          setExpanded(true);
+          setOpenBranchIds((current) => new Set([...current, branch.id]));
+        }
+      }
+    };
+    revealBranchTarget();
+    window.addEventListener("hashchange", revealBranchTarget);
+    window.addEventListener(NOTIFICATION_NAVIGATION_EVENT, revealBranchTarget);
+    return () => {
+      window.removeEventListener("hashchange", revealBranchTarget);
+      window.removeEventListener(NOTIFICATION_NAVIGATION_EVENT, revealBranchTarget);
+    };
+  }, [group.branches, group.selectedBranchId, suggestionsByActivity]);
+
+  const toggleBranch = (branchId) => setOpenBranchIds((current) => {
+    const next = new Set(current);
+    if (next.has(branchId)) next.delete(branchId); else next.add(branchId);
+    return next;
+  });
+
+  return (
+    <section className="branch-junction" aria-labelledby={`public-branch-${group.id}`}>
+      <button className="branch-junction-summary" type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>
+        <span className="branch-switch-mark" aria-hidden="true" />
+        <span><small>Điểm rẽ · {group.branches.length} phương án</small><strong id={`public-branch-${group.id}`}>{group.title}</strong><em>Đang dùng: {selected.label}</em></span>
+        <span className={expanded ? "is-open" : ""}><ActionIcon name="down" /></span>
+      </button>
+      {expanded && (
+        <div className="branch-platforms">
+          {group.branches.map((branch) => {
+            const isSelected = branch.id === selected.id;
+            const open = openBranchIds.has(branch.id);
+            return (
+              <article className={`branch-platform${isSelected ? " is-selected" : ""}`} key={branch.id}>
+                <div className="branch-platform-head">
+                  <button type="button" aria-expanded={isSelected || open} onClick={() => { if (!isSelected) toggleBranch(branch.id); }}>
+                    <span>{isSelected ? "Đang dùng" : "Dự phòng"}{branch.isDefault ? " · Mặc định" : ""}</span>
+                    <strong>{branch.label}</strong>
+                    <small>{branch.condition}</small>
+                  </button>
+                  {viewer?.isAdmin && !isSelected && <button className="branch-select-button" type="button" disabled={branchAction.id === branch.id} onClick={() => onSelect(group, branch)}>{branchAction.id === branch.id ? "Đang đổi…" : "Dùng phương án này"}</button>}
+                </div>
+                {branchAction.id === branch.id && branchAction.error && <p className="branch-action-error" role="alert">{branchAction.error}</p>}
+                {isSelected && <p className="branch-active-note">Các hoạt động của phương án này đang nằm trên tuyến chính phía dưới.</p>}
+                {!isSelected && open && (
+                  <div className="branch-mini-route">
+                    {branch.itinerary.map((item) => (
+                      <article className="branch-mini-stop" id={item.id} key={item.id}>
+                        <time>{item.start}<span>{item.displayEnd || item.end}</span></time>
+                        <i aria-hidden="true" />
+                        <div><span className="type-label"><TypeIcon type={item.type} />{item.type}</span><h4>{item.title}</h4><p>{item.detail}</p>
+                          {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
+                          <SuggestionList suggestions={suggestionsByActivity.get(item.id) || []} {...suggestionListProps} />
+                          <button className="suggestion-trigger" type="button" onClick={() => onSuggest(item.id, item.title)}>{viewer ? "Góp ý cho mục này" : "Đăng nhập để góp ý"}</button>
+                        </div>
+                      </article>
+                    ))}
+                    {!branch.itinerary.length && <p className="branch-empty">Không có hoạt động — đi thẳng tới mốc hội nhập.</p>}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 

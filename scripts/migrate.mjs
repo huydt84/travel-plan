@@ -62,6 +62,65 @@ await sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS item_key TEXT`;
 await sql`CREATE UNIQUE INDEX IF NOT EXISTS activities_trip_item_key_idx
   ON activities (trip_id, item_key)`;
 
+await sql`ALTER TABLE activities ADD CONSTRAINT activities_id_trip_unique UNIQUE (id, trip_id)`
+  .catch((error) => { if (error.code !== "42710" && error.code !== "42P07") throw error; });
+
+await sql`CREATE TABLE IF NOT EXISTS schedule_branch_groups (
+  id BIGSERIAL PRIMARY KEY,
+  trip_id BIGINT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  item_key TEXT NOT NULL,
+  anchor_activity_id BIGINT NOT NULL,
+  title TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (trip_id, item_key),
+  UNIQUE (trip_id, anchor_activity_id),
+  UNIQUE (id, trip_id),
+  FOREIGN KEY (anchor_activity_id, trip_id) REFERENCES activities(id, trip_id) ON DELETE RESTRICT
+)`;
+
+await sql`CREATE TABLE IF NOT EXISTS schedule_branches (
+  id BIGSERIAL PRIMARY KEY,
+  trip_id BIGINT NOT NULL,
+  group_id BIGINT NOT NULL,
+  item_key TEXT NOT NULL,
+  label TEXT NOT NULL,
+  condition_text TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (group_id, item_key),
+  UNIQUE (group_id, sort_order),
+  UNIQUE (id, trip_id),
+  UNIQUE (id, group_id, trip_id),
+  FOREIGN KEY (group_id, trip_id) REFERENCES schedule_branch_groups(id, trip_id) ON DELETE CASCADE
+)`;
+
+await sql`CREATE UNIQUE INDEX IF NOT EXISTS schedule_branches_one_default_idx
+  ON schedule_branches (group_id) WHERE is_default`;
+
+await sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS branch_id BIGINT`;
+await sql`ALTER TABLE activities ADD CONSTRAINT activities_branch_trip_fkey
+  FOREIGN KEY (branch_id, trip_id) REFERENCES schedule_branches(id, trip_id) ON DELETE CASCADE`
+  .catch((error) => { if (error.code !== "42710") throw error; });
+
+await sql`CREATE TABLE IF NOT EXISTS schedule_branch_selections (
+  group_id BIGINT PRIMARY KEY,
+  trip_id BIGINT NOT NULL,
+  branch_id BIGINT NOT NULL,
+  selected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  selected_by_email TEXT NOT NULL,
+  FOREIGN KEY (group_id, trip_id) REFERENCES schedule_branch_groups(id, trip_id) ON DELETE CASCADE,
+  FOREIGN KEY (branch_id, group_id, trip_id) REFERENCES schedule_branches(id, group_id, trip_id) ON DELETE RESTRICT
+)`;
+
+await sql`ALTER TABLE activities DROP CONSTRAINT IF EXISTS activities_trip_id_sort_order_key`;
+await sql`CREATE UNIQUE INDEX IF NOT EXISTS activities_backbone_sort_order_idx
+  ON activities (trip_id, sort_order) WHERE branch_id IS NULL`;
+await sql`CREATE UNIQUE INDEX IF NOT EXISTS activities_branch_sort_order_idx
+  ON activities (branch_id, sort_order) WHERE branch_id IS NOT NULL`;
+
 await sql`CREATE TABLE IF NOT EXISTS suggestions (
   id BIGSERIAL PRIMARY KEY,
   trip_id BIGINT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
