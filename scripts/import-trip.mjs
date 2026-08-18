@@ -17,10 +17,13 @@ const localAdmin = resolveLocalAdminMode();
 const filePath = resolve(fileArg);
 const payload = normalizeTripImport(JSON.parse(await readFile(filePath, "utf8")));
 const sql = createSqlAdapter(resolveDatabaseConfig());
-const importGroups = payload.schedule.filter((item) => item.branchGroup).map((item) => ({
-  ...item.branchGroup,
-  anchorKey: item.key,
-}));
+const importGroups = [
+  ...(payload.startBranchGroup ? [{ ...payload.startBranchGroup, anchorKey: null }] : []),
+  ...payload.schedule.filter((item) => item.branchGroup).map((item) => ({
+    ...item.branchGroup,
+    anchorKey: item.key,
+  })),
+];
 const importActivities = payload.schedule.flatMap((item) => [
   { ...item, branchGroup: undefined, branchGroupKey: null, branchKey: null },
   ...(item.branchGroup?.branches.flatMap((branch) => branch.schedule.map((branchItem) => ({
@@ -28,7 +31,11 @@ const importActivities = payload.schedule.flatMap((item) => [
     branchGroupKey: item.branchGroup.key,
     branchKey: branch.key,
   }))) || []),
-]);
+]).concat(payload.startBranchGroup?.branches.flatMap((branch) => branch.schedule.map((branchItem) => ({
+  ...branchItem,
+  branchGroupKey: payload.startBranchGroup.key,
+  branchKey: branch.key,
+}))) || []);
 const existing = await sql`
   SELECT
     t.slug,
@@ -164,17 +171,30 @@ await sql.transaction((tx) => {
   }
 
   for (const group of importGroups) {
-    queries.push(tx`
-      INSERT INTO schedule_branch_groups (trip_id, item_key, anchor_activity_id, title)
-      SELECT trip_row.id, ${group.key}, activity.id, ${group.title}
-      FROM trips trip_row
-      JOIN activities activity ON activity.trip_id = trip_row.id AND activity.item_key = ${group.anchorKey}
-      WHERE trip_row.slug = ${trip.slug}
-      ON CONFLICT (trip_id, item_key) DO UPDATE SET
-        anchor_activity_id = EXCLUDED.anchor_activity_id,
-        title = EXCLUDED.title,
-        updated_at = NOW()
-    `);
+    if (group.anchorKey == null) {
+      queries.push(tx`
+        INSERT INTO schedule_branch_groups (trip_id, item_key, anchor_activity_id, title)
+        SELECT trip_row.id, ${group.key}, NULL, ${group.title}
+        FROM trips trip_row
+        WHERE trip_row.slug = ${trip.slug}
+        ON CONFLICT (trip_id, item_key) DO UPDATE SET
+          anchor_activity_id = NULL,
+          title = EXCLUDED.title,
+          updated_at = NOW()
+      `);
+    } else {
+      queries.push(tx`
+        INSERT INTO schedule_branch_groups (trip_id, item_key, anchor_activity_id, title)
+        SELECT trip_row.id, ${group.key}, activity.id, ${group.title}
+        FROM trips trip_row
+        JOIN activities activity ON activity.trip_id = trip_row.id AND activity.item_key = ${group.anchorKey}
+        WHERE trip_row.slug = ${trip.slug}
+        ON CONFLICT (trip_id, item_key) DO UPDATE SET
+          anchor_activity_id = EXCLUDED.anchor_activity_id,
+          title = EXCLUDED.title,
+          updated_at = NOW()
+      `);
+    }
     queries.push(tx`
       UPDATE schedule_branches branch
       SET is_default = FALSE

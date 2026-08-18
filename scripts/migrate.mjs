@@ -79,6 +79,10 @@ await sql`CREATE TABLE IF NOT EXISTS schedule_branch_groups (
   FOREIGN KEY (anchor_activity_id, trip_id) REFERENCES activities(id, trip_id) ON DELETE RESTRICT
 )`;
 
+await sql`ALTER TABLE schedule_branch_groups ALTER COLUMN anchor_activity_id DROP NOT NULL`;
+await sql`CREATE UNIQUE INDEX IF NOT EXISTS schedule_branch_groups_trip_start_idx
+  ON schedule_branch_groups (trip_id) WHERE anchor_activity_id IS NULL`;
+
 await sql`CREATE TABLE IF NOT EXISTS schedule_branches (
   id BIGSERIAL PRIMARY KEY,
   trip_id BIGINT NOT NULL,

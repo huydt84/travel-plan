@@ -386,7 +386,10 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     }
   };
 
-  const branchGroupsByAnchor = new Map((data.branchGroups || []).map((group) => [group.anchorActivityId, group]));
+  const startBranchGroup = (data.branchGroups || []).find((group) => group.anchorActivityId == null) || null;
+  const branchGroupsByAnchor = new Map((data.branchGroups || [])
+    .filter((group) => group.anchorActivityId != null)
+    .map((group) => [group.anchorActivityId, group]));
 
   return (
     <main className="shell" data-trip-mode={state.mode}>
@@ -551,6 +554,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       </div>
 
       <section className="timeline" aria-label="Lịch trình chi tiết">
+        {startBranchGroup && <div className="trip-start-junction"><BranchJunction group={startBranchGroup} startsTrip viewer={viewer} sourceMap={sourceMap} suggestionsByActivity={suggestionsByActivity} suggestionListProps={suggestionListProps} branchAction={branchAction} onSelect={selectPublicBranch} onSuggest={openSuggestion} /></div>}
         {itinerary.map((item, index) => {
           const isCurrent = state.mode === "active" && index === state.index;
           const isDone = index < state.index || state.mode === "after";
@@ -625,7 +629,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
   );
 }
 
-function BranchJunction({ group, viewer, sourceMap, suggestionsByActivity, suggestionListProps, branchAction, onSelect, onSuggest }) {
+function BranchJunction({ group, startsTrip = false, viewer, sourceMap, suggestionsByActivity, suggestionListProps, branchAction, onSelect, onSuggest }) {
   const selected = group.branches.find((branch) => branch.id === group.selectedBranchId) || group.branches[0];
   const [expanded, setExpanded] = useState(false);
   const [openBranchIds, setOpenBranchIds] = useState(() => new Set());
@@ -659,10 +663,10 @@ function BranchJunction({ group, viewer, sourceMap, suggestionsByActivity, sugge
   });
 
   return (
-    <section className="branch-junction" aria-labelledby={`public-branch-${group.id}`}>
+    <section className={`branch-junction${startsTrip ? " is-trip-start" : ""}`} aria-labelledby={`public-branch-${group.id}`}>
       <button className="branch-junction-summary" type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>
         <span className="branch-switch-mark" aria-hidden="true" />
-        <span><small>Điểm rẽ · {group.branches.length} phương án</small><strong id={`public-branch-${group.id}`}>{group.title}</strong><em>Đang dùng: {selected.label}</em></span>
+        <span><small>{startsTrip ? "Điểm rẽ đầu chuyến" : "Điểm rẽ"} · {group.branches.length} phương án</small><strong id={`public-branch-${group.id}`}>{group.title}</strong><em>Đang dùng: {selected.label}</em></span>
         <span className={expanded ? "is-open" : ""}><ActionIcon name="down" /></span>
       </button>
       {expanded && (

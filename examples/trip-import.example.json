@@ -13,16 +13,48 @@
       "url": "https://example.com/place"
     }
   ],
+  "startBranchGroup": {
+    "key": "morning-weather",
+    "title": "Phương án từ đầu chuyến",
+    "defaultBranchKey": "dry-start",
+    "branches": [
+      {
+        "key": "dry-start",
+        "label": "Không mưa",
+        "condition": "Khi thời tiết khô ráo",
+        "schedule": [
+          {
+            "key": "morning-park",
+            "start": "09:00",
+            "end": "11:30",
+            "type": "Walk",
+            "icon": "🚶",
+            "title": "Đi bộ trong công viên",
+            "detail": "Bắt đầu ngoài trời trước khi hội nhập vào lịch chung.",
+            "refs": [1]
+          }
+        ]
+      },
+      {
+        "key": "rain-start",
+        "label": "Có mưa",
+        "condition": "Khi trời mưa từ đầu ngày",
+        "schedule": [
+          {
+            "key": "morning-museum",
+            "start": "09:00",
+            "end": "11:30",
+            "type": "Indoor",
+            "icon": "🏛️",
+            "title": "Tham quan bảo tàng",
+            "detail": "Thay toàn bộ hoạt động đầu tiên bằng một điểm trong nhà.",
+            "refs": [1]
+          }
+        ]
+      }
+    ]
+  },
   "schedule": [
-    {
-      "start": "09:00",
-      "end": "11:30",
-      "type": "Visit",
-      "icon": "⛩️",
-      "title": "Sample place",
-      "detail": "Tham quan điểm chính theo lịch trình mẫu.",
-      "refs": [1]
-    },
     {
       "key": "lunch",
       "start": "12:00",

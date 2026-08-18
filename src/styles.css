@@ -268,6 +268,10 @@ button, select { cursor: pointer; }
 .timeline-segment { position: relative; }
 .branch-junction { position: relative; margin: 2px 0 26px 100px; border: 2px solid var(--navy); background: var(--paper-bright); clip-path: polygon(0 12px, 12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%); }
 .branch-junction::before { content: ""; position: absolute; top: -28px; left: -34px; width: 34px; height: 46px; border-bottom: 6px solid var(--green); border-left: 6px solid var(--green); transform: skewY(-30deg); transform-origin: bottom left; }
+.trip-start-junction { position: relative; margin-bottom: 30px; }
+.trip-start-junction::after { content: ""; position: absolute; top: 100%; left: 81px; width: 6px; height: 64px; background: var(--green); }
+.trip-start-junction .branch-junction.is-trip-start { margin-top: 0; margin-bottom: 0; }
+.branch-junction.is-trip-start::before { display: none; }
 .branch-junction-summary { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; border: 0; color: var(--navy); background: var(--yellow-soft); text-align: left; }
 .branch-junction-summary > span:nth-child(2) { display: grid; gap: 3px; }
 .branch-junction-summary small, .branch-platform-head span { color: var(--navy-soft); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -714,6 +718,7 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
 .admin-source-item .action-icon { width: 17px; height: 17px; }
 .source-form { margin: 0; border-top: 0; }
 .schedule-heading { margin: 34px 0 0; }
+.schedule-heading-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .schedule-create-editor { margin: 0 0 18px; }
 .admin-schedule-list { position: relative; }
 .admin-schedule-list::before { content: ""; position: absolute; top: 0; bottom: 0; left: 72px; width: 6px; background: var(--green); }
@@ -734,6 +739,10 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
 .branch-create-editor { margin-left: 90px; border-color: var(--navy); background: var(--yellow-soft); }
 .admin-branch-group { position: relative; margin: 4px 0 28px 90px; border: 2px solid var(--navy); background: var(--paper-bright); clip-path: polygon(0 12px, 12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%); }
 .admin-branch-group::before { content: ""; position: absolute; top: -26px; left: -20px; width: 20px; height: 48px; border-bottom: 6px solid var(--green); border-left: 6px solid var(--green); transform: skewY(-28deg); }
+.admin-trip-start-junction { position: relative; margin-bottom: 32px; }
+.admin-trip-start-junction::after { content: ""; position: absolute; top: 100%; left: 72px; width: 6px; height: 32px; background: var(--green); }
+.admin-trip-start-junction .admin-branch-group.is-trip-start { margin-top: 10px; margin-bottom: 0; }
+.admin-branch-group.is-trip-start::before { display: none; }
 .admin-branch-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 18px; background: var(--yellow-soft); }
 .admin-branch-head span, .admin-branch-option-head span { color: var(--green-dark); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .admin-branch-head h3 { margin: 4px 0; overflow-wrap: anywhere; font: 600 26px/1 var(--display); }
@@ -973,6 +982,7 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
   .timeline-item { grid-template-columns: 50px 27px minmax(0, 1fr); }
   .branch-junction { margin: 0 0 24px; }
   .branch-junction::before { top: -28px; left: 61px; width: 18px; height: 28px; transform: none; }
+  .trip-start-junction::after { left: 61px; }
   .branch-junction-summary { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; padding: 12px 10px; }
   .branch-junction-summary strong { font-size: 19px; }
   .branch-platforms { display: block; padding: 8px; }
@@ -1105,6 +1115,7 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
   .admin-branch-entry { margin-left: 72px; }
   .branch-create-editor, .admin-branch-group { margin-left: 0; }
   .admin-branch-group::before { top: -26px; left: 57px; width: 20px; height: 26px; transform: none; }
+  .admin-trip-start-junction::after { left: 57px; }
   .admin-branch-head { align-items: flex-start; flex-direction: column; }
   .admin-branch-options { display: block; }
   .admin-branch-option + .admin-branch-option { margin-top: 12px; }
@@ -1145,7 +1156,8 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
   .discard-dialog-actions { display: grid; }
   .discard-dialog-actions .admin-primary, .discard-dialog-actions .admin-danger { width: 100%; }
   .schedule-heading { align-items: flex-end; }
-  .schedule-heading .admin-primary { max-width: 120px; }
+  .schedule-heading-actions { display: grid; width: min(100%, 160px); }
+  .schedule-heading-actions > button { width: 100%; min-height: 44px; }
 }
 
 @media (max-width: 380px) {

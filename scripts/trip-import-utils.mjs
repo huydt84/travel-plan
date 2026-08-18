@@ -119,6 +119,7 @@ export function normalizeTripImport(raw) {
 
   const rawSchedule = raw.schedule ?? raw.itinerary;
   if (!Array.isArray(rawSchedule) || !rawSchedule.length) fail("schedule must be a non-empty array");
+  const startBranchGroup = raw.startBranchGroup == null ? null : parseBranchGroup(raw.startBranchGroup, "startBranchGroup");
   const schedule = rawSchedule.map((value, index) => parseActivity(value, `schedule[${index}]`));
 
   const seenItemKeys = new Map();
@@ -139,6 +140,13 @@ export function normalizeTripImport(raw) {
       },
     };
   };
+  const keyedStartBranchGroup = startBranchGroup ? {
+    ...startBranchGroup,
+    branches: startBranchGroup.branches.map((branch) => ({
+      ...branch,
+      schedule: branch.schedule.map(withStableKey),
+    })),
+  } : null;
   const keyedSchedule = schedule.map(withStableKey);
 
   for (let index = 1; index < keyedSchedule.length; index += 1) {
@@ -152,5 +160,11 @@ export function normalizeTripImport(raw) {
       if (rejoin && branch.schedule.at(-1)?.end > rejoin.start) fail(`branch ${branch.key} ends after its rejoin activity starts`);
     }
   }
-  return { trip, sources, schedule: keyedSchedule };
+  if (keyedStartBranchGroup) {
+    const firstSharedActivity = keyedSchedule[0];
+    for (const branch of keyedStartBranchGroup.branches) {
+      if (branch.schedule.at(-1)?.end > firstSharedActivity.start) fail(`start branch ${branch.key} ends after its first shared activity starts`);
+    }
+  }
+  return { trip, sources, schedule: keyedSchedule, startBranchGroup: keyedStartBranchGroup };
 }

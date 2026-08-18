@@ -57,9 +57,15 @@ for (const viewport of viewports) {
             return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
           };
           const controls = [...document.querySelectorAll("button, select, input, textarea")].filter(visible);
-          const clipped = [...document.querySelectorAll("h1, h2, h3, h4, button, select, input, textarea")]
+          const clippedText = [...document.querySelectorAll("h1, h2, h3, h4, button, select")]
             .filter(visible)
             .filter((element) => element.scrollWidth > element.clientWidth + 1)
+            .map((element) => (element.getAttribute("aria-label") || element.textContent || element.tagName).trim().slice(0, 60));
+          const clippedControls = controls
+            .filter((element) => {
+              const rect = element.getBoundingClientRect();
+              return rect.left < -1 || rect.right > window.innerWidth + 1;
+            })
             .map((element) => (element.getAttribute("aria-label") || element.textContent || element.tagName).trim().slice(0, 60));
           const smallTargets = touch ? controls
             .map((element) => {
@@ -74,7 +80,7 @@ for (const viewport of viewports) {
           return {
             documentWidth: document.documentElement.scrollWidth,
             viewportWidth: window.innerWidth,
-            clipped,
+            clipped: [...clippedText, ...clippedControls],
             smallTargets,
           };
         }, { touch: viewport.touch });

@@ -1,27 +1,29 @@
 import { expect, gotoHealthy, test } from "./fixtures.mjs";
 
 test("admin creates a branch point and public tracker switches the shared route", async ({ page, request }) => {
-  const initialResponse = await request.get("/api/itinerary");
-  expect(initialResponse.ok()).toBeTruthy();
-  const initial = await initialResponse.json();
-  const occupiedAnchors = new Set((initial.branchGroups || []).map((group) => group.anchorActivityId));
-  const anchorIndex = initial.backbone.findIndex((item, index, backbone) => (
-    !occupiedAnchors.has(item.id)
-    && backbone[index + 1]
-    && backbone[index + 2]
-    && !occupiedAnchors.has(backbone[index + 1].id)
-    && backbone[index + 1].start >= item.end
-    && backbone[index + 1].end <= backbone[index + 2].start
-  ));
-  expect(anchorIndex).toBeGreaterThanOrEqual(0);
-  const anchor = initial.backbone[anchorIndex];
-  const segment = initial.backbone[anchorIndex + 1];
   const stamp = Date.now();
+  const slug = `branch-e2e-${stamp}`;
+  const tripTitle = `Branch E2E ${stamp}`;
   const title = `Điểm rẽ E2E ${stamp}`;
-  let createdGroup;
 
   try {
-    const createResponse = await request.post(`/api/trips/${initial.trip.slug}/branches`, {
+    const tripResponse = await request.post("/api/trips", { data: { slug, title: tripTitle, date: "2020-01-03", timezone: "Asia/Tokyo", location: "Tokyo" } });
+    expect(tripResponse.status()).toBe(201);
+    for (const activity of [
+      { start: "09:00", end: "09:30", type: "Meet", icon: "📍", title: "Tập trung", detail: "Mốc chung", refs: [] },
+      { start: "09:45", end: "10:30", type: "Walk", icon: "🚶", title: "Đoạn có thể thay", detail: "Tuyến mặc định", refs: [] },
+      { start: "11:00", end: "11:30", type: "Cafe", icon: "☕", title: "Mốc hội nhập", detail: "Mốc chung", refs: [] },
+    ]) {
+      const scheduleResponse = await request.post(`/api/trips/${slug}/schedule`, { data: activity });
+      expect(scheduleResponse.status()).toBe(201);
+    }
+    const initialResponse = await request.get(`/api/trips/${slug}`);
+    expect(initialResponse.ok()).toBeTruthy();
+    const initial = await initialResponse.json();
+    const anchor = initial.backbone[0];
+    const segment = initial.backbone[1];
+
+    const createResponse = await request.post(`/api/trips/${slug}/branches`, {
       data: {
         anchorActivityId: anchor.id,
         segmentActivityIds: [segment.id],
@@ -32,11 +34,11 @@ test("admin creates a branch point and public tracker switches the shared route"
     });
     expect(createResponse.status()).toBe(201);
     const created = await createResponse.json();
-    createdGroup = created.branchGroups.find((group) => group.title === title);
+    const createdGroup = created.branchGroups.find((group) => group.title === title);
     expect(createdGroup).toBeTruthy();
 
     await page.setViewportSize({ width: 320, height: 760 });
-    await gotoHealthy(page, `/?trip=${initial.trip.slug}`);
+    await gotoHealthy(page, `/?trip=${slug}`);
     const publicGroup = page.getByRole("region", { name: title });
     const junction = publicGroup.getByRole("button", { name: new RegExp(title) });
     await expect(junction).toBeVisible();
@@ -51,6 +53,7 @@ test("admin creates a branch point and public tracker switches the shared route"
     await expect(junction).toContainText("Đang dùng: Bỏ qua E2E");
 
     await gotoHealthy(page, "/admin/trips");
+    await page.getByRole("button", { name: new RegExp(`^${tripTitle}`) }).click();
     const adminGroup = page.getByRole("region", { name: title });
     await expect(adminGroup.getByRole("heading", { name: title })).toBeVisible();
     await expect(adminGroup).toContainText("Đang dùng: Bỏ qua E2E");
@@ -74,13 +77,75 @@ test("admin creates a branch point and public tracker switches the shared route"
     await adminActivation.click();
     await expect(adminGroup).toContainText("Đang dùng: Tuyến gốc E2E");
   } finally {
-    if (createdGroup) {
-      const defaultBranch = createdGroup.branches.find((branch) => branch.isDefault);
-      const cleanup = await request.delete(`/api/trips/${initial.trip.slug}/branches/${createdGroup.id}`, {
-        data: { keepBranchId: defaultBranch.id },
-      });
-      expect(cleanup.ok()).toBeTruthy();
+    const cleanup = await request.delete(`/api/trips/${slug}`);
+    expect([204, 404]).toContain(cleanup.status());
+  }
+});
+
+test("admin can branch from the start so the first activity is not forced", async ({ page, request }) => {
+  const stamp = Date.now();
+  const slug = `start-branch-e2e-${stamp}`;
+  const tripTitle = `Start branch E2E ${stamp}`;
+  const title = `Điểm rẽ đầu chuyến ${stamp}`;
+  let initial;
+
+  try {
+    const tripResponse = await request.post("/api/trips", { data: { slug, title: tripTitle, date: "2031-01-01", timezone: "Asia/Tokyo", location: "Tokyo" } });
+    expect(tripResponse.status()).toBe(201);
+    for (const activity of [
+      { start: "09:00", end: "10:00", type: "Walk", icon: "🚶", title: "Công viên buổi sáng", detail: "Tuyến ngoài trời", refs: [] },
+      { start: "10:30", end: "11:30", type: "Cafe", icon: "☕", title: "Mốc hội nhập", detail: "Hoạt động chung", refs: [] },
+      { start: "12:00", end: "13:00", type: "Lunch", icon: "🍜", title: "Ăn trưa", detail: "Hoạt động chung", refs: [] },
+    ]) {
+      const scheduleResponse = await request.post(`/api/trips/${slug}/schedule`, { data: activity });
+      expect(scheduleResponse.status()).toBe(201);
     }
+    const initialResponse = await request.get(`/api/trips/${slug}`);
+    expect(initialResponse.ok()).toBeTruthy();
+    initial = await initialResponse.json();
+    const originalFirstId = initial.backbone[0].id;
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoHealthy(page, "/admin/trips");
+    await page.getByRole("button", { name: new RegExp(`^${tripTitle}`) }).click();
+    await page.getByRole("button", { name: "Tạo điểm rẽ từ đầu", exact: true }).click();
+    const creator = page.locator(".branch-create-editor.is-trip-start");
+    await expect(creator.getByRole("heading", { name: "Tạo điểm rẽ từ đầu chuyến" })).toBeVisible();
+    await creator.getByLabel("Tên điểm rẽ").fill(title);
+    await creator.getByLabel("Tên phương án mặc định").fill("Sáng khô ráo");
+    await creator.getByLabel("Điều kiện", { exact: true }).nth(0).fill("Không mưa từ lúc khởi hành");
+    await creator.getByLabel("Tên phương án dự phòng").fill("Sáng có mưa");
+    await creator.getByLabel("Điều kiện", { exact: true }).nth(1).fill("Mưa từ lúc khởi hành");
+    await creator.getByRole("button", { name: "Chuyển 1 hoạt động đầu tiên thành điểm rẽ", exact: true }).click();
+
+    const adminGroup = page.getByRole("region", { name: title });
+    await expect(adminGroup).toBeVisible();
+    await expect(adminGroup).toContainText("Điểm rẽ đầu chuyến");
+
+    const createdResponse = await request.get(`/api/trips/${slug}`);
+    expect(createdResponse.ok()).toBeTruthy();
+    const created = await createdResponse.json();
+    const createdGroup = created.branchGroups.find((group) => group.title === title);
+    expect(createdGroup.anchorActivityId).toBeNull();
+    expect(created.itinerary[0].id).toBe(originalFirstId);
+    expect(created.backbone[0].id).not.toBe(originalFirstId);
+
+    await gotoHealthy(page, `/?trip=${slug}`);
+    const geometry = await page.evaluate(() => {
+      const junction = document.querySelector(".branch-junction.is-trip-start");
+      const firstActivity = document.querySelector(".timeline-segment");
+      return {
+        junctionTop: Math.round(junction.getBoundingClientRect().top),
+        firstActivityTop: Math.round(firstActivity.getBoundingClientRect().top),
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+      };
+    });
+    expect(geometry.junctionTop).toBeLessThan(geometry.firstActivityTop);
+    expect(geometry.documentWidth).toBe(geometry.viewportWidth);
+  } finally {
+    const cleanup = await request.delete(`/api/trips/${slug}`);
+    expect([204, 404]).toContain(cleanup.status());
   }
 });
 

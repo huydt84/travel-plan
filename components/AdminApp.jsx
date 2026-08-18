@@ -13,6 +13,7 @@ const emptyTrip = { slug: "", title: "", date: "", timezone: "Asia/Tokyo", locat
 const emptySchedule = { start: "", end: "", displayEnd: "", type: "Visit", icon: "📍", title: "", detail: "", refs: [] };
 const emptySource = { title: "", url: "" };
 const JST_OFFSET = "+09:00";
+const TRIP_START_BRANCH_ANCHOR = "trip-start";
 const ACTIVITY_TYPES = [
   { value: "Transit", label: "Di chuyển", icon: "🚆" },
   { value: "Walk", label: "Đi bộ", icon: "🚶" },
@@ -425,6 +426,12 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
   };
 
   const logout = () => signOut({ redirectTo: "/" });
+  const startBranchGroup = plan?.branchGroups?.find((group) => group.anchorActivityId == null) || null;
+  const backbone = plan?.backbone || plan?.itinerary || [];
+  const occupiedBranchAnchors = new Set((plan?.branchGroups || []).map((group) => group.anchorActivityId).filter(Boolean));
+  const firstOccupiedBackboneIndex = backbone.findIndex((activity) => occupiedBranchAnchors.has(activity.id));
+  const startBranchBoundary = firstOccupiedBackboneIndex >= 0 ? firstOccupiedBackboneIndex : backbone.length - 1;
+  const startBranchFollowing = backbone.slice(0, startBranchBoundary + 1);
 
   return (
     <main className="admin-shell">
@@ -487,7 +494,13 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
                 </div>
               </section>
 
-              <div className="admin-section-head schedule-heading"><div><h2>{plan.itinerary.length} hoạt động đang dùng</h2><p>{plan.branchGroups?.length || 0} điểm rẽ</p></div><button className="admin-primary" disabled={busy} aria-expanded={scheduleEditor?.key === "new"} aria-controls="schedule-editor-new" onClick={(event) => activateScheduleEditor(emptySchedule, event.currentTarget)}>Thêm hoạt động</button></div>
+              <div className="admin-section-head schedule-heading">
+                <div><h2>{plan.itinerary.length} hoạt động đang dùng</h2><p>{plan.branchGroups?.length || 0} điểm rẽ</p></div>
+                <div className="schedule-heading-actions">
+                  {!startBranchGroup && startBranchFollowing.length > 1 && <button className="admin-ghost" type="button" disabled={busy} aria-expanded={branchCreatorAnchorId === TRIP_START_BRANCH_ANCHOR} onClick={() => setBranchCreatorAnchorId((current) => current === TRIP_START_BRANCH_ANCHOR ? null : TRIP_START_BRANCH_ANCHOR)}>Tạo điểm rẽ từ đầu</button>}
+                  <button className="admin-primary" disabled={busy} aria-expanded={scheduleEditor?.key === "new"} aria-controls="schedule-editor-new" onClick={(event) => activateScheduleEditor(emptySchedule, event.currentTarget)}>Thêm hoạt động</button>
+                </div>
+              </div>
               {scheduleEditor?.key === "new" && (
                 <ScheduleForm
                   key="new"
@@ -502,8 +515,34 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
                   onCancel={closeScheduleEditor}
                 />
               )}
+              {branchCreatorAnchorId === TRIP_START_BRANCH_ANCHOR && (
+                <BranchCreateForm anchor={null} following={startBranchFollowing} busy={busy} onCancel={() => setBranchCreatorAnchorId(null)} onSave={createBranchGroupForPlan} />
+              )}
+              {startBranchGroup && (
+                <div className="admin-trip-start-junction">
+                  <BranchGroupAdmin
+                    group={startBranchGroup}
+                    startsTrip
+                    busy={busy}
+                    scheduleEditor={scheduleEditor}
+                    scheduleError={scheduleError}
+                    sources={plan.sources}
+                    onActivate={activateBranchForPlan}
+                    onAddOption={addBranchOptionForPlan}
+                    onUpdateOption={updateBranchOptionForPlan}
+                    onDeleteOption={deleteBranchOptionForPlan}
+                    onUnwrap={unwrapBranchGroupForPlan}
+                    onActivateEditor={activateScheduleEditor}
+                    onEditorChange={(values) => setScheduleEditor((current) => current ? { ...current, values } : current)}
+                    onCreateSource={createSourceForPlan}
+                    onSaveSchedule={saveSchedule}
+                    onCancelSchedule={closeScheduleEditor}
+                    onRemoveSchedule={removeSchedule}
+                  />
+                </div>
+              )}
               <div className="admin-schedule-list">
-                {(plan.backbone || plan.itinerary).map((item, itemIndex, backbone) => {
+                {backbone.map((item, itemIndex, backboneItems) => {
                   const group = plan.branchGroups?.find((candidate) => candidate.anchorActivityId === item.id);
                   return (
                     <div className="admin-route-segment" key={item.id}>
@@ -520,13 +559,13 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
                         onCancel={closeScheduleEditor}
                         onRemove={removeSchedule}
                       />
-                      {!group && itemIndex < backbone.length - 1 && (
+                      {!group && itemIndex < backboneItems.length - 1 && (
                         <div className="admin-branch-entry">
                           <button className="admin-ghost" type="button" disabled={busy} aria-expanded={branchCreatorAnchorId === item.id} onClick={() => setBranchCreatorAnchorId((current) => current === item.id ? null : item.id)}>Tạo điểm rẽ sau mục này</button>
                         </div>
                       )}
                       {branchCreatorAnchorId === item.id && (
-                        <BranchCreateForm anchor={item} following={backbone.slice(itemIndex + 1)} busy={busy} onCancel={() => setBranchCreatorAnchorId(null)} onSave={createBranchGroupForPlan} />
+                        <BranchCreateForm anchor={item} following={backboneItems.slice(itemIndex + 1)} busy={busy} onCancel={() => setBranchCreatorAnchorId(null)} onSave={createBranchGroupForPlan} />
                       )}
                       {group && (
                         <BranchGroupAdmin
@@ -678,6 +717,8 @@ function ScheduleRow({ item, busy, scheduleEditor, scheduleError, sources, onAct
 }
 
 function BranchCreateForm({ anchor, following, busy, onCancel, onSave }) {
+  const startsTrip = anchor == null;
+  const selectableActivities = startsTrip ? following.slice(0, -1) : following;
   const [segmentCount, setSegmentCount] = useState(1);
   const [values, setValues] = useState({
     title: "Phương án dự phòng",
@@ -690,7 +731,7 @@ function BranchCreateForm({ anchor, following, busy, onCancel, onSave }) {
   const submit = (event) => {
     event.preventDefault();
     onSave({
-      anchorActivityId: anchor.id,
+      anchorActivityId: anchor?.id ?? null,
       segmentActivityIds: following.slice(0, segmentCount).map((item) => item.id),
       title: values.title,
       defaultBranch: { label: values.defaultLabel, condition: values.defaultCondition },
@@ -698,13 +739,13 @@ function BranchCreateForm({ anchor, following, busy, onCancel, onSave }) {
     });
   };
   return (
-    <form className="admin-editor branch-create-editor" onSubmit={submit}>
-      <div className="admin-section-head"><div><h2>Tạo điểm rẽ sau “{anchor.title}”</h2><p>Đoạn hiện có sẽ trở thành phương án mặc định.</p></div><button className="admin-ghost" type="button" onClick={onCancel}>Hủy</button></div>
+    <form className={`admin-editor branch-create-editor${startsTrip ? " is-trip-start" : ""}`} onSubmit={submit}>
+      <div className="admin-section-head"><div><h2>{startsTrip ? "Tạo điểm rẽ từ đầu chuyến" : `Tạo điểm rẽ sau “${anchor.title}”`}</h2><p>{startsTrip ? "Các hoạt động đầu tiên sẽ trở thành phương án mặc định; mọi tuyến hội nhập lại trước một hoạt động chung." : "Đoạn hiện có sẽ trở thành phương án mặc định."}</p></div><button className="admin-ghost" type="button" onClick={onCancel}>Hủy</button></div>
       <div className="form-grid">
         <label className="wide">Tên điểm rẽ<input {...field("title")} required /></label>
         <label className="wide">Hội nhập lại
           <select value={segmentCount} onChange={(event) => setSegmentCount(Number(event.target.value))}>
-            {following.map((item, index) => <option value={index + 1} key={item.id}>{index + 1 < following.length ? `Trước ${following[index + 1].start} · ${following[index + 1].title}` : "Cuối chuyến"}</option>)}
+            {selectableActivities.map((item, index) => <option value={index + 1} key={item.id}>{index + 1 < following.length ? `Trước ${following[index + 1].start} · ${following[index + 1].title}` : "Cuối chuyến"}</option>)}
           </select>
         </label>
         <label>Tên phương án mặc định<input {...field("defaultLabel")} required /></label>
@@ -712,12 +753,12 @@ function BranchCreateForm({ anchor, following, busy, onCancel, onSave }) {
         <label>Tên phương án dự phòng<input {...field("alternateLabel")} required /></label>
         <label>Điều kiện<input {...field("alternateCondition")} required /></label>
       </div>
-      <div className="schedule-editor-actions"><button className="admin-ghost" type="button" onClick={onCancel}>Hủy</button><button className="admin-primary" disabled={busy}>{busy ? "Đang tạo…" : `Chuyển ${segmentCount} hoạt động thành điểm rẽ`}</button></div>
+      <div className="schedule-editor-actions"><button className="admin-ghost" type="button" onClick={onCancel}>Hủy</button><button className="admin-primary" disabled={busy}>{busy ? "Đang tạo…" : `Chuyển ${segmentCount} hoạt động ${startsTrip ? "đầu tiên " : ""}thành điểm rẽ`}</button></div>
     </form>
   );
 }
 
-function BranchGroupAdmin({ group, busy, scheduleEditor, scheduleError, sources, onActivate, onAddOption, onUpdateOption, onDeleteOption, onUnwrap, onActivateEditor, onEditorChange, onCreateSource, onSaveSchedule, onCancelSchedule, onRemoveSchedule }) {
+function BranchGroupAdmin({ group, startsTrip = false, busy, scheduleEditor, scheduleError, sources, onActivate, onAddOption, onUpdateOption, onDeleteOption, onUnwrap, onActivateEditor, onEditorChange, onCreateSource, onSaveSchedule, onCancelSchedule, onRemoveSchedule }) {
   const [adding, setAdding] = useState(false);
   const [newBranch, setNewBranch] = useState({ label: "", condition: "" });
   const [keepBranchId, setKeepBranchId] = useState(group.selectedBranchId);
@@ -727,9 +768,9 @@ function BranchGroupAdmin({ group, busy, scheduleEditor, scheduleError, sources,
     onUnwrap(group.id, keepBranchId);
   };
   return (
-    <section className="admin-branch-group" aria-labelledby={`branch-group-${group.id}`}>
+    <section className={`admin-branch-group${startsTrip ? " is-trip-start" : ""}`} aria-labelledby={`branch-group-${group.id}`}>
       <div className="admin-branch-head">
-        <div><span>Điểm rẽ · {group.branches.length} phương án</span><h3 id={`branch-group-${group.id}`}>{group.title}</h3><p>Đang dùng: <strong>{selected.label}</strong> · {selected.condition}</p></div>
+        <div><span>{startsTrip ? "Điểm rẽ đầu chuyến" : "Điểm rẽ"} · {group.branches.length} phương án</span><h3 id={`branch-group-${group.id}`}>{group.title}</h3><p>Đang dùng: <strong>{selected.label}</strong> · {selected.condition}</p></div>
         <button className="admin-ghost" type="button" onClick={() => setAdding((current) => !current)} disabled={busy}>{adding ? "Hủy thêm" : "Thêm phương án"}</button>
       </div>
       {adding && (
