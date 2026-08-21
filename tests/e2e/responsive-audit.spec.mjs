@@ -38,6 +38,11 @@ const surfaces = [
     path: "/admin/users",
     ready: (page) => page.getByRole("heading", { level: 2, name: "Hoạt động người dùng" }),
   },
+  {
+    name: "agentic assistant",
+    path: "/v1",
+    ready: (page) => page.getByRole("heading", { level: 2, name: "Hỏi, nghiên cứu, rồi quyết định" }),
+  },
 ];
 
 for (const viewport of viewports) {
@@ -49,12 +54,14 @@ for (const viewport of viewports) {
         await gotoHealthy(page, surface.path);
         await surface.setup?.(page);
         await expect(surface.ready(page)).toBeVisible();
+        await page.waitForTimeout(250);
 
         const audit = await page.evaluate(({ touch }) => {
           const visible = (element) => {
             const rect = element.getBoundingClientRect();
             const style = getComputedStyle(element);
-            return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+            const rendered = typeof element.checkVisibility !== "function" || element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
+            return rendered && rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
           };
           const controls = [...document.querySelectorAll("button, select, input, textarea")].filter(visible);
           const clippedText = [...document.querySelectorAll("h1, h2, h3, h4, button, select")]

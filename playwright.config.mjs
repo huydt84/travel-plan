@@ -45,6 +45,8 @@ export default defineConfig({
       stderr: "pipe",
       env: {
         LOCAL_ADMIN_BYPASS: "true",
+        AGENTIC_V1_ENABLED: "true",
+        APP_URL: baseURL,
         NEXT_DIST_DIR: ".next-playwright",
         NEXT_TELEMETRY_DISABLED: "1",
         FORCE_COLOR: "",
