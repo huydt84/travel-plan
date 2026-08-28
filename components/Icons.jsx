@@ -5,6 +5,7 @@ export function TypeIcon({ type = "Visit" }) {
   if (key.includes("film") || key.includes("photo")) return <svg className="type-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="14" height="11" rx="2" /><path d="m17 11 4-2v7l-4-2M7 7l2-3h4l2 3" /><circle cx="10" cy="12.5" r="2.5" /></svg>;
   if (key.includes("rest")) return <svg className="type-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h11v7a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V8Z" /><path d="M16 10h2a2 2 0 0 1 0 4h-2M7 4v2m4-2v2m4-2v2" /></svg>;
   if (key.includes("dinner")) return <svg className="type-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v8m-3-8v5a3 3 0 0 0 6 0V3M7 11v10M16 3v18m0-18c3 2 4 5 4 8h-4" /></svg>;
+  if (key.includes("picnic") || key.includes("camp")) return <svg className="type-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 8-16 8 16H4Z" /><path d="m8 20 4-8 4 8M5 20h14" /></svg>;
   if (key.includes("buffer")) return <svg className="type-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12M6 21h12M8 3v4l4 5-4 5v4m8-18v4l-4 5 4 5v4" /></svg>;
   return <svg className="type-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>;
 }

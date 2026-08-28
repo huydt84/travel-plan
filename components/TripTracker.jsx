@@ -473,7 +473,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                 <i className="countdown-progress" style={{ "--progress": Math.min(1, progress) }} aria-hidden="true" />
               </div>}
             </div>
-            <p className="now-detail">{detail}</p>
+            {detail && <p className="now-detail">{detail}</p>}
             {!isAfter && state.current.refs.length > 0 && (
               <div className="citations">{state.current.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>
             )}
@@ -523,7 +523,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                     <div className="mobile-foldout-title">{isAfter ? <ActionIcon name="check" /> : <TypeIcon type={item.type} />}<h1>{title}</h1></div>
                     <p className="mobile-foldout-range">{range}</p>
                     {!isAfter && <div className="mobile-foldout-countdown"><span>{countdownLabel}</span><strong>{countdown.value}</strong><small>{countdown.unit}</small></div>}
-                    <p className="mobile-foldout-detail">{detail}</p>
+                    {detail && <p className="mobile-foldout-detail">{detail}</p>}
                     {!isAfter && item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                     <div className="station-actions">
                       <button type="button" onClick={() => openSuggestion(stationSuggestionActivityId, stationSuggestionTarget)}>{viewer ? stationSuggestionLabel : "Đăng nhập để góp ý"}</button>
@@ -569,7 +569,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                     <span className="type-label"><TypeIcon type={item.type} />{item.type}{item.branchLabel ? ` · ${item.branchLabel}` : ""}</span>
                     <span className="done-label">Đã qua</span>
                   </div>
-                  <h3>{item.title}</h3><p>{item.detail}</p>
+                  <h3>{item.title}</h3>{item.detail && <p>{item.detail}</p>}
                   {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                   <SuggestionList suggestions={suggestionsByActivity.get(item.id) || []} {...suggestionListProps} />
                   <button className="suggestion-trigger" type="button" onClick={() => openSuggestion(item.id, item.title)}>
@@ -692,7 +692,7 @@ function BranchJunction({ group, startsTrip = false, viewer, sourceMap, suggesti
                       <article className="branch-mini-stop" id={item.id} key={item.id}>
                         <time>{item.start}<span>{item.displayEnd || item.end}</span></time>
                         <i aria-hidden="true" />
-                        <div><span className="type-label"><TypeIcon type={item.type} />{item.type}</span><h4>{item.title}</h4><p>{item.detail}</p>
+                        <div><span className="type-label"><TypeIcon type={item.type} />{item.type}</span><h4>{item.title}</h4>{item.detail && <p>{item.detail}</p>}
                           {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                           <SuggestionList suggestions={suggestionsByActivity.get(item.id) || []} {...suggestionListProps} />
                           <button className="suggestion-trigger" type="button" onClick={() => onSuggest(item.id, item.title)}>{viewer ? "Góp ý cho mục này" : "Đăng nhập để góp ý"}</button>

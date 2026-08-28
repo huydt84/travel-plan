@@ -24,6 +24,7 @@ const ACTIVITY_TYPES = [
   { value: "Cafe", label: "Quán cà phê", icon: "☕" },
   { value: "Lunch", label: "Ăn trưa", icon: "🍜" },
   { value: "Dinner", label: "Ăn tối", icon: "🍽️" },
+  { value: "Picnic", label: "Picnic / Cắm trại", icon: "🧺" },
   { value: "Indoor", label: "Trong nhà", icon: "🏠" },
 ];
 const ACTIVITY_ICONS = [
@@ -36,6 +37,7 @@ const ACTIVITY_ICONS = [
   { value: "☕", label: "Nghỉ / cà phê" },
   { value: "🍜", label: "Món ăn" },
   { value: "🍽️", label: "Bữa ăn" },
+  { value: "🧺", label: "Picnic / cắm trại" },
   { value: "🏠", label: "Trong nhà" },
   { value: "⛩️", label: "Đền / chùa" },
   { value: "🏛️", label: "Điểm tham quan" },
@@ -60,6 +62,11 @@ const hasTripStarted = (plan) => {
   if (!plan?.trip?.date || !firstActivity?.start) return false;
   return Date.now() >= new Date(`${plan.trip.date}T${firstActivity.start}:00${JST_OFFSET}`).getTime();
 };
+
+const sourceUsageCount = (plan, sourceNumber) => [
+  ...(plan?.backbone || plan?.itinerary || []),
+  ...(plan?.branchGroups || []).flatMap((group) => group.branches.flatMap((branch) => branch.itinerary)),
+].filter((item) => item.refs?.includes(sourceNumber)).length;
 
 const api = async (path, options = {}) => {
   const response = await fetch(path, {
@@ -122,7 +129,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
   const [plan, setPlan] = useState(initialPlan);
   const [tripEditor, setTripEditor] = useState(null);
   const [scheduleEditor, setScheduleEditor] = useState(null);
-  const [sourceEditor, setSourceEditor] = useState(false);
+  const [sourceEditor, setSourceEditor] = useState(null);
   const [suggestions, setSuggestions] = useState(initialSuggestions);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -234,7 +241,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
       scheduleReturnFocusRef.current = trigger;
       setTripEditor(null);
       setScheduleEditor(null);
-      setSourceEditor(false);
+      setSourceEditor(null);
       setSelectedSlug(slug);
       setError("");
       setNotice("");
@@ -372,11 +379,39 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
     return source;
   };
 
-  const saveSource = async (values) => {
-    const source = await createSourceForPlan(values);
-    setSourceEditor(false);
-    setNotice(`Đã thêm nguồn ${source.number}: ${source.title}`);
+  const saveSource = async (values, sourceNumber = null) => {
+    const source = sourceNumber == null
+      ? await createSourceForPlan(values)
+      : await api(`/api/trips/${encodeURIComponent(selectedSlug)}/sources/${sourceNumber}`, {
+        method: "PATCH",
+        body: JSON.stringify(values),
+      });
+    if (sourceNumber != null) {
+      setPlan((current) => current ? {
+        ...current,
+        sources: current.sources.map((item) => item.number === source.number ? source : item),
+      } : current);
+    }
+    setSourceEditor(null);
+    setNotice(sourceNumber == null ? `Đã thêm nguồn ${source.number}: ${source.title}` : `Đã lưu nguồn ${source.number}: ${source.title}`);
     return source;
+  };
+
+  const removeSourceForPlan = (source) => {
+    const usageCount = sourceUsageCount(plan, source.number);
+    const usageMessage = usageCount ? ` Nguồn đang được gắn với ${usageCount} hoạt động và các liên kết đó cũng sẽ được gỡ.` : "";
+    if (!window.confirm(`Xoá nguồn ${source.number} “${source.title}”?${usageMessage}`)) return;
+    run(async () => {
+      await api(`/api/trips/${encodeURIComponent(selectedSlug)}/sources/${source.number}`, { method: "DELETE" });
+      setSourceEditor(null);
+      setScheduleEditor((current) => current ? {
+        ...current,
+        initial: { ...current.initial, refs: current.initial.refs.filter((ref) => ref !== source.number) },
+        values: { ...current.values, refs: current.values.refs.filter((ref) => ref !== source.number) },
+      } : current);
+      await refreshPlan(selectedSlug);
+      setNotice(`Đã xoá nguồn ${source.number}: ${source.title}`);
+    });
   };
 
   const removeSchedule = (activityId) => {
@@ -454,7 +489,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
           <div className="trip-list">
             {trips.map((trip) => (
               <button className={`trip-list-item${selectedSlug === trip.slug ? " active" : ""}`} onClick={(event) => selectTrip(trip.slug, event.currentTarget)} disabled={loadingPlan} key={trip.slug}>
-                <strong>{trip.title}</strong><span>{trip.date} · {trip.scheduleCount} mục</span>
+                <strong>{trip.title}</strong><code>{trip.slug}</code><span>{trip.date} · {trip.scheduleCount} mục</span>
               </button>
             ))}
             {!trips.length && <p className="admin-empty">Chưa có trip.</p>}
@@ -467,7 +502,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
           {!tripEditor && !loadingPlan && plan && (
             <>
               <div className="plan-summary">
-                <div><h2>{plan.trip.title}</h2><p>{plan.trip.date} · {plan.trip.location} · {plan.trip.timezone}</p></div>
+                <div><h2>{plan.trip.title}</h2><code className="plan-slug">{plan.trip.slug}</code><p>{plan.trip.date} · {plan.trip.location} · {plan.trip.timezone}</p></div>
                 <div className="admin-actions">
                   <button className="admin-ghost" onClick={() => guardScheduleDraft(() => { setScheduleEditor(null); setTripEditor({ values: plan.trip, originalSlug: plan.trip.slug }); }, `Bạn có thay đổi chưa lưu trong “${scheduleEditor?.values.title || "hoạt động hiện tại"}”.`)}>Sửa trip</button>
                   <button className="admin-danger" onClick={() => removeTrip(plan.trip.slug)}>Xoá</button>
@@ -477,18 +512,24 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
               <section className="admin-sources" aria-labelledby="admin-sources-title">
                 <div className="admin-section-head source-heading">
                   <div><h2 id="admin-sources-title">{plan.sources.length} nguồn địa điểm</h2></div>
-                  <button className="admin-primary" type="button" onClick={() => setSourceEditor((current) => !current)} aria-expanded={sourceEditor}>
-                    {sourceEditor ? "Hủy thêm" : "Thêm nguồn"}
+                  <button className="admin-primary" type="button" onClick={() => setSourceEditor((current) => current ? null : { source: null })} aria-expanded={Boolean(sourceEditor)}>
+                    {sourceEditor ? "Đóng trình sửa" : "Thêm nguồn"}
                   </button>
                 </div>
-                {sourceEditor && <SourceForm onSave={saveSource} onCancel={() => setSourceEditor(false)} />}
+                {sourceEditor && <SourceForm key={sourceEditor.source?.number || "new"} source={sourceEditor.source} onSave={(values) => saveSource(values, sourceEditor.source?.number)} onCancel={() => setSourceEditor(null)} />}
                 <div className="admin-source-list">
                   {plan.sources.map((source) => (
-                    <a className="admin-source-item" href={source.url} target="_blank" rel="noreferrer" key={source.number}>
+                    <article className={`admin-source-item${sourceEditor?.source?.number === source.number ? " is-editing" : ""}`} key={source.number}>
                       <span className="admin-source-number">{String(source.number).padStart(2, "0")}</span>
-                      <span className="admin-source-copy"><strong>{source.title}</strong><small>{source.host}</small></span>
-                      <ActionIcon name="external" />
-                    </a>
+                      <a className="admin-source-link" href={source.url} target="_blank" rel="noreferrer">
+                        <span className="admin-source-copy"><strong>{source.title}</strong><small>{source.host}</small></span>
+                        <ActionIcon name="external" />
+                      </a>
+                      <span className="admin-source-actions">
+                        <button className="admin-ghost" type="button" onClick={() => setSourceEditor({ source })} disabled={busy}>Sửa</button>
+                        <button className="admin-danger" type="button" onClick={() => removeSourceForPlan(source)} disabled={busy}>Xoá</button>
+                      </span>
+                    </article>
                   ))}
                   {!plan.sources.length && <p className="admin-empty">Chưa có nguồn. Thêm nguồn đầu tiên để gắn vào hoạt động.</p>}
                 </div>
@@ -693,7 +734,7 @@ function ScheduleRow({ item, busy, scheduleEditor, scheduleError, sources, onAct
   return (
     <article className={`admin-schedule-item${isEditing ? " is-editing" : ""}`}>
       <div className="admin-schedule-time"><strong>{item.start}</strong><span>{item.displayEnd || item.end}</span></div>
-      <div className="admin-schedule-copy"><span><TypeIcon type={item.type} /> {item.type}</span><h3>{item.title}</h3><p>{item.detail}</p></div>
+      <div className="admin-schedule-copy"><span><TypeIcon type={item.type} /> {item.type}</span><h3>{item.title}</h3>{item.detail && <p>{item.detail}</p>}</div>
       <div className="admin-row-actions">
         <button className="admin-ghost" disabled={busy} aria-expanded={isEditing} aria-controls={editorId} onClick={(event) => onActivateEditor(item, event.currentTarget)}>{isEditing ? "Đang sửa" : "Sửa"}</button>
         <button className="admin-danger" disabled={busy} onClick={() => onRemove(item.id)}>Xoá</button>
@@ -901,7 +942,7 @@ function ScheduleForm({ editor, busy, error, sources, placement, onChange, onCre
           </select>
         </label>
         <label className="wide schedule-field schedule-title-field">Tiêu đề<input {...field("title")} required /></label>
-        <label className="wide schedule-field schedule-detail-field">Chi tiết<textarea {...field("detail")} rows="3" required /></label>
+        <label className="wide schedule-field schedule-detail-field"><span>Chi tiết <small className="field-optional">Không bắt buộc</small></span><textarea {...field("detail")} rows="3" /></label>
       </div>
       <SourcePicker
         sources={sources}
@@ -965,8 +1006,8 @@ function SourcePicker({ sources, selectedRefs, onChange, onCreateSource }) {
   );
 }
 
-function SourceForm({ compact = false, onSave, onCancel }) {
-  const [values, setValues] = useState(emptySource);
+function SourceForm({ compact = false, source = null, onSave, onCancel }) {
+  const [values, setValues] = useState(source ? { title: source.title, url: source.url } : emptySource);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fieldsRef = useRef(null);
@@ -1004,10 +1045,10 @@ function SourceForm({ compact = false, onSave, onCancel }) {
   }
   return (
     <form className="admin-editor admin-form source-form" onSubmit={submitSource}>
-      <div className="admin-section-head"><h2>Nguồn mới</h2><button type="button" className="admin-ghost" onClick={onCancel}>Hủy</button></div>
+      <div className="admin-section-head"><h2>{source ? `Sửa nguồn ${source.number}` : "Nguồn mới"}</h2><button type="button" className="admin-ghost" onClick={onCancel}>Hủy</button></div>
       {fields}
       {error && <p className="form-error" role="alert">{error}</p>}
-      <button className="admin-primary" disabled={busy}>{busy ? "Đang thêm…" : "Thêm nguồn"}</button>
+      <button className="admin-primary" disabled={busy}>{busy ? "Đang lưu…" : source ? "Lưu nguồn" : "Thêm nguồn"}</button>
     </form>
   );
 }
