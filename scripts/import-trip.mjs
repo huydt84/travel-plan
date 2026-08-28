@@ -41,7 +41,9 @@ const existing = await sql`
     t.slug,
     a.id,
     a.item_key,
+    TO_CHAR(a.start_date, 'YYYY-MM-DD') AS start_date,
     TO_CHAR(a.start_time, 'HH24:MI') AS start,
+    TO_CHAR(a.end_date, 'YYYY-MM-DD') AS end_date,
     TO_CHAR(a.end_time, 'HH24:MI') AS end,
     a.type,
     a.title,
@@ -71,7 +73,9 @@ const removedGroups = [...existingGroupKeys].filter((key) => !incomingGroupKeys.
 
 const existingItems = existing.filter((row) => row.id).map((row) => ({
   key: row.item_key || `unkeyed-${row.id}`,
+  startDate: row.start_date,
   start: row.start,
+  endDate: row.end_date,
   end: row.end,
   type: row.type,
   title: row.title,
@@ -88,7 +92,7 @@ const removed = existingItems.filter((item) => !after.has(item.key));
 const updated = importActivities.filter((item) => {
   const old = before.get(item.key);
   if (!old) return false;
-  return ["start", "end", "type", "title", "detail", "icon", "displayEnd", "branchGroupKey", "branchKey"].some((field) => (old[field] ?? null) !== (item[field] ?? null));
+  return ["startDate", "start", "endDate", "end", "type", "title", "detail", "icon", "displayEnd", "branchGroupKey", "branchKey"].some((field) => (old[field] ?? null) !== (item[field] ?? null));
 });
 
 const affectedSuggestions = removed.length ? await sql`
@@ -100,14 +104,18 @@ const affectedSuggestions = removed.length ? await sql`
 ` : [{ count: 0 }];
 
 console.log(`${apply ? "APPLY" : "PREVIEW"}: ${payload.trip.title} (${payload.trip.slug})`);
-console.log(`Trip: ${existing.length ? "update" : "create"}`);
+console.log(`Trip: ${existing.length ? "update" : "create"} · ${payload.trip.startDate} → ${payload.trip.endDate}`);
 console.log(`Schedule: ${importActivities.length} total · ${added.length} add · ${updated.length} update · ${removed.length} remove`);
+const dayCounts = importActivities.reduce((counts, item) => counts.set(item.startDate, (counts.get(item.startDate) || 0) + 1), new Map());
+for (const [date, count] of dayCounts) {
+  console.log(`  ${date}: ${count} item(s)`);
+}
 console.log(`Branches: ${importGroups.length} point(s) · ${importGroups.reduce((count, group) => count + group.branches.length, 0)} option(s) · ${addedGroups.length} add · ${removedGroups.length} remove`);
 console.log(`Sources: ${payload.sources.length} total`);
 if (affectedSuggestions[0].count) console.log(`Notes preserved: ${affectedSuggestions[0].count} suggestion(s) will become trip-level notes because their schedule item is removed.`);
-for (const item of added) console.log(`  + ${item.start} ${item.title}`);
-for (const item of updated) console.log(`  ~ ${item.start} ${item.title}`);
-for (const item of removed) console.log(`  - ${item.start} ${item.title}`);
+for (const item of added) console.log(`  + ${item.startDate} ${item.start} ${item.title}`);
+for (const item of updated) console.log(`  ~ ${item.startDate} ${item.start} ${item.title}`);
+for (const item of removed) console.log(`  - ${item.startDate} ${item.start} ${item.title}`);
 
 if (!apply) {
   console.log(`No database changes made. Apply with: npm run trip:import -- ${fileArg} --apply`);
@@ -123,11 +131,12 @@ const sourceNumbers = sources.map((source) => source.number);
 await sql.transaction((tx) => {
   const queries = [
     tx`
-      INSERT INTO trips (slug, title, trip_date, timezone, location)
-      VALUES (${trip.slug}, ${trip.title}, ${trip.date}, ${trip.timezone}, ${trip.location})
+      INSERT INTO trips (slug, title, trip_date, end_date, timezone, location)
+      VALUES (${trip.slug}, ${trip.title}, ${trip.startDate}, ${trip.endDate}, ${trip.timezone}, ${trip.location})
       ON CONFLICT (slug) DO UPDATE SET
         title = EXCLUDED.title,
         trip_date = EXCLUDED.trip_date,
+        end_date = EXCLUDED.end_date,
         timezone = EXCLUDED.timezone,
         location = EXCLUDED.location,
         updated_at = NOW()
@@ -154,13 +163,15 @@ await sql.transaction((tx) => {
 
   for (const [index, item] of schedule.entries()) {
     queries.push(tx`
-      INSERT INTO activities (trip_id, item_key, branch_id, sort_order, start_time, end_time, display_end, type, icon, title, detail)
-      SELECT id, ${item.key}, NULL, ${index}, ${item.start}, ${item.end}, ${item.displayEnd}, ${item.type}, ${item.icon}, ${item.title}, ${item.detail}
+      INSERT INTO activities (trip_id, item_key, branch_id, sort_order, start_date, start_time, end_date, end_time, display_end, type, icon, title, detail)
+      SELECT id, ${item.key}, NULL, ${index}, ${item.startDate}, ${item.start}, ${item.endDate}, ${item.end}, ${item.displayEnd}, ${item.type}, ${item.icon}, ${item.title}, ${item.detail}
       FROM trips WHERE slug = ${trip.slug}
       ON CONFLICT (trip_id, item_key) DO UPDATE SET
         branch_id = NULL,
         sort_order = EXCLUDED.sort_order,
+        start_date = EXCLUDED.start_date,
         start_time = EXCLUDED.start_time,
+        end_date = EXCLUDED.end_date,
         end_time = EXCLUDED.end_time,
         display_end = EXCLUDED.display_end,
         type = EXCLUDED.type,
@@ -250,8 +261,8 @@ await sql.transaction((tx) => {
     for (const branch of group.branches) {
       for (const [index, item] of branch.schedule.entries()) {
         queries.push(tx`
-          INSERT INTO activities (trip_id, item_key, branch_id, sort_order, start_time, end_time, display_end, type, icon, title, detail)
-          SELECT trip_row.id, ${item.key}, branch.id, ${index}, ${item.start}, ${item.end}, ${item.displayEnd}, ${item.type}, ${item.icon}, ${item.title}, ${item.detail}
+          INSERT INTO activities (trip_id, item_key, branch_id, sort_order, start_date, start_time, end_date, end_time, display_end, type, icon, title, detail)
+          SELECT trip_row.id, ${item.key}, branch.id, ${index}, ${item.startDate}, ${item.start}, ${item.endDate}, ${item.end}, ${item.displayEnd}, ${item.type}, ${item.icon}, ${item.title}, ${item.detail}
           FROM trips trip_row
           JOIN schedule_branch_groups branch_group ON branch_group.trip_id = trip_row.id AND branch_group.item_key = ${group.key}
           JOIN schedule_branches branch ON branch.group_id = branch_group.id AND branch.item_key = ${branch.key}
@@ -259,7 +270,9 @@ await sql.transaction((tx) => {
           ON CONFLICT (trip_id, item_key) DO UPDATE SET
             branch_id = EXCLUDED.branch_id,
             sort_order = EXCLUDED.sort_order,
+            start_date = EXCLUDED.start_date,
             start_time = EXCLUDED.start_time,
+            end_date = EXCLUDED.end_date,
             end_time = EXCLUDED.end_time,
             display_end = EXCLUDED.display_end,
             type = EXCLUDED.type,

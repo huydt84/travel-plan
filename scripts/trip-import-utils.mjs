@@ -1,5 +1,6 @@
+import { compareActivityDateTime, isIsoDate, validateActivityInterval } from "../lib/trip-dates.mjs";
+
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 const fail = (message) => { throw new Error(`Invalid import: ${message}`); };
@@ -33,15 +34,19 @@ export function assignItemKeys(items) {
 export function normalizeTripImport(raw) {
   object(raw, "root");
   const rawTrip = object(raw.trip, "trip");
+  const legacyDate = rawTrip.date == null ? null : text(rawTrip.date, "trip.date", 10);
   const trip = {
     slug: text(rawTrip.slug, "trip.slug", 100),
     title: text(rawTrip.title, "trip.title", 160),
-    date: text(rawTrip.date, "trip.date", 10),
+    startDate: rawTrip.startDate ? text(rawTrip.startDate, "trip.startDate", 10) : legacyDate,
+    endDate: rawTrip.endDate ? text(rawTrip.endDate, "trip.endDate", 10) : legacyDate,
     timezone: text(rawTrip.timezone || "Asia/Tokyo", "trip.timezone", 80),
     location: text(rawTrip.location, "trip.location", 160),
   };
   if (!slugPattern.test(trip.slug)) fail("trip.slug must use lowercase letters, numbers and single hyphens");
-  if (!datePattern.test(trip.date) || Number.isNaN(Date.parse(`${trip.date}T00:00:00Z`))) fail("trip.date must use YYYY-MM-DD");
+  if (!isIsoDate(trip.startDate)) fail("trip.startDate must use YYYY-MM-DD");
+  if (!isIsoDate(trip.endDate)) fail("trip.endDate must use YYYY-MM-DD");
+  if (trip.endDate < trip.startDate) fail("trip.endDate must not be before trip.startDate");
   try { new Intl.DateTimeFormat("en", { timeZone: trip.timezone }).format(); }
   catch { fail("trip.timezone must be a valid IANA timezone"); }
 
@@ -70,12 +75,19 @@ export function normalizeTripImport(raw) {
     const start = text(item.start, `${field}.start`, 5);
     const end = text(item.end, `${field}.end`, 5);
     if (!timePattern.test(start) || !timePattern.test(end)) fail(`${field} times must use HH:MM`);
-    if (end <= start) fail(`${field}.end must be later than start`);
+    const singleDayTrip = trip.startDate === trip.endDate;
+    const startDate = item.startDate ? text(item.startDate, `${field}.startDate`, 10) : (singleDayTrip ? trip.startDate : null);
+    const endDate = item.endDate ? text(item.endDate, `${field}.endDate`, 10) : (singleDayTrip ? trip.endDate : null);
+    if (!startDate || !endDate) fail(`${field} must include startDate and endDate for a multi-day trip`);
+    try { validateActivityInterval({ startDate, start, endDate, end }, { trip }); }
+    catch (error) { fail(`${field}: ${error.message}`); }
     const refs = item.refs == null ? [] : item.refs;
     if (!Array.isArray(refs) || refs.some((ref) => !Number.isInteger(ref) || !sourceNumbers.has(ref))) fail(`${field}.refs must only contain source numbers declared in sources`);
     return {
       key: item.key ? text(item.key, `${field}.key`, 120) : null,
+      startDate,
       start,
+      endDate,
       end,
       displayEnd: item.displayEnd == null ? null : text(item.displayEnd, `${field}.displayEnd`, 20),
       type: text(item.type, `${field}.type`, 40),
@@ -97,7 +109,7 @@ export function normalizeTripImport(raw) {
       if (!Array.isArray(rawBranchSchedule)) fail(`${branchField}.schedule must be an array`);
       const branchSchedule = rawBranchSchedule.map((item, itemIndex) => parseActivity(item, `${branchField}.schedule[${itemIndex}]`, { allowBranch: false }));
       for (let index = 1; index < branchSchedule.length; index += 1) {
-        if (branchSchedule[index].start < branchSchedule[index - 1].end) fail(`${branchField}.schedule must be ordered without overlaps`);
+        if (`${branchSchedule[index].startDate}T${branchSchedule[index].start}` < `${branchSchedule[index - 1].endDate}T${branchSchedule[index - 1].end}`) fail(`${branchField}.schedule must be ordered without overlaps`);
       }
       return {
         key: branch.key ? text(branch.key, `${branchField}.key`, 120) : slugify(text(branch.label, `${branchField}.label`, 80)),
@@ -150,20 +162,22 @@ export function normalizeTripImport(raw) {
   const keyedSchedule = schedule.map(withStableKey);
 
   for (let index = 1; index < keyedSchedule.length; index += 1) {
-    if (keyedSchedule[index].start < keyedSchedule[index - 1].start) fail("schedule must be ordered by start time");
+    if (compareActivityDateTime(keyedSchedule[index], keyedSchedule[index - 1]) < 0) fail("schedule must be ordered by start date and time");
   }
   for (const [index, item] of keyedSchedule.entries()) {
     if (!item.branchGroup) continue;
     const rejoin = keyedSchedule[index + 1] || null;
     for (const branch of item.branchGroup.branches) {
-      if (branch.schedule[0] && branch.schedule[0].start < item.end) fail(`branch ${branch.key} starts before its anchor ends`);
-      if (rejoin && branch.schedule.at(-1)?.end > rejoin.start) fail(`branch ${branch.key} ends after its rejoin activity starts`);
+      if (branch.schedule[0] && `${branch.schedule[0].startDate}T${branch.schedule[0].start}` < `${item.endDate}T${item.end}`) fail(`branch ${branch.key} starts before its anchor ends`);
+      const lastBranchItem = branch.schedule.at(-1);
+      if (rejoin && lastBranchItem && `${lastBranchItem.endDate}T${lastBranchItem.end}` > `${rejoin.startDate}T${rejoin.start}`) fail(`branch ${branch.key} ends after its rejoin activity starts`);
     }
   }
   if (keyedStartBranchGroup) {
     const firstSharedActivity = keyedSchedule[0];
     for (const branch of keyedStartBranchGroup.branches) {
-      if (branch.schedule.at(-1)?.end > firstSharedActivity.start) fail(`start branch ${branch.key} ends after its first shared activity starts`);
+      const lastBranchItem = branch.schedule.at(-1);
+      if (lastBranchItem && `${lastBranchItem.endDate}T${lastBranchItem.end}` > `${firstSharedActivity.startDate}T${firstSharedActivity.start}`) fail(`start branch ${branch.key} ends after its first shared activity starts`);
     }
   }
   return { trip, sources, schedule: keyedSchedule, startBranchGroup: keyedStartBranchGroup };

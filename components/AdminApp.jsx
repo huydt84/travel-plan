@@ -8,11 +8,11 @@ import { createScheduleEditor, normalizeScheduleRefs, scheduleEditorIsDirty } fr
 import { ActionIcon, TypeIcon } from "./Icons";
 import AdminNav from "./AdminNav";
 import ConfirmDialog from "./ConfirmDialog";
+import { activityInstants, calendarDayDifference, enumerateTripDays, formatDateLabel, formatTripDateRange } from "../lib/trip-dates.mjs";
 
-const emptyTrip = { slug: "", title: "", date: "", timezone: "Asia/Tokyo", location: "" };
-const emptySchedule = { start: "", end: "", displayEnd: "", type: "Visit", icon: "📍", title: "", detail: "", refs: [] };
+const emptyTrip = { slug: "", title: "", startDate: "", endDate: "", timezone: "Asia/Tokyo", location: "" };
+const emptySchedule = { startDate: "", start: "", endDate: "", end: "", displayEnd: "", type: "Visit", icon: "📍", title: "", detail: "", refs: [] };
 const emptySource = { title: "", url: "" };
-const JST_OFFSET = "+09:00";
 const TRIP_START_BRANCH_ANCHOR = "trip-start";
 const ACTIVITY_TYPES = [
   { value: "Transit", label: "Di chuyển", icon: "🚆" },
@@ -59,8 +59,8 @@ const openTimePicker = (event) => {
 
 const hasTripStarted = (plan) => {
   const firstActivity = plan?.itinerary?.[0];
-  if (!plan?.trip?.date || !firstActivity?.start) return false;
-  return Date.now() >= new Date(`${plan.trip.date}T${firstActivity.start}:00${JST_OFFSET}`).getTime();
+  if (!firstActivity?.startDate || !firstActivity?.start) return false;
+  return Date.now() >= activityInstants(firstActivity, plan.trip.timezone).startAt.getTime();
 };
 
 const sourceUsageCount = (plan, sourceNumber) => [
@@ -489,7 +489,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
           <div className="trip-list">
             {trips.map((trip) => (
               <button className={`trip-list-item${selectedSlug === trip.slug ? " active" : ""}`} onClick={(event) => selectTrip(trip.slug, event.currentTarget)} disabled={loadingPlan} key={trip.slug}>
-                <strong>{trip.title}</strong><code>{trip.slug}</code><span>{trip.date} · {trip.scheduleCount} mục</span>
+                <strong>{trip.title}</strong><code>{trip.slug}</code><span>{trip.startDate}{trip.endDate !== trip.startDate ? ` → ${trip.endDate}` : ""} · {trip.scheduleCount} mục</span>
               </button>
             ))}
             {!trips.length && <p className="admin-empty">Chưa có trip.</p>}
@@ -502,7 +502,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
           {!tripEditor && !loadingPlan && plan && (
             <>
               <div className="plan-summary">
-                <div><h2>{plan.trip.title}</h2><code className="plan-slug">{plan.trip.slug}</code><p>{plan.trip.date} · {plan.trip.location} · {plan.trip.timezone}</p></div>
+                <div><h2>{plan.trip.title}</h2><code className="plan-slug">{plan.trip.slug}</code><p>{formatTripDateRange(plan.trip)} · {plan.trip.location} · {plan.trip.timezone}</p></div>
                 <div className="admin-actions">
                   <button className="admin-ghost" onClick={() => guardScheduleDraft(() => { setScheduleEditor(null); setTripEditor({ values: plan.trip, originalSlug: plan.trip.slug }); }, `Bạn có thay đổi chưa lưu trong “${scheduleEditor?.values.title || "hoạt động hiện tại"}”.`)}>Sửa trip</button>
                   <button className="admin-danger" onClick={() => removeTrip(plan.trip.slug)}>Xoá</button>
@@ -539,8 +539,18 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
                 <div><h2>{plan.itinerary.length} hoạt động đang dùng</h2><p>{plan.branchGroups?.length || 0} điểm rẽ</p></div>
                 <div className="schedule-heading-actions">
                   {!startBranchGroup && startBranchFollowing.length > 1 && <button className="admin-ghost" type="button" disabled={busy} aria-expanded={branchCreatorAnchorId === TRIP_START_BRANCH_ANCHOR} onClick={() => setBranchCreatorAnchorId((current) => current === TRIP_START_BRANCH_ANCHOR ? null : TRIP_START_BRANCH_ANCHOR)}>Tạo điểm rẽ từ đầu</button>}
-                  <button className="admin-primary" disabled={busy} aria-expanded={scheduleEditor?.key === "new"} aria-controls="schedule-editor-new" onClick={(event) => activateScheduleEditor(emptySchedule, event.currentTarget)}>Thêm hoạt động</button>
+                  <button className="admin-primary" disabled={busy} aria-expanded={scheduleEditor?.key === "new"} aria-controls="schedule-editor-new" onClick={(event) => activateScheduleEditor({ ...emptySchedule, startDate: plan.trip.startDate, endDate: plan.trip.startDate }, event.currentTarget)}>Thêm hoạt động</button>
                 </div>
+              </div>
+              <div className="admin-day-rail" aria-label="Các ngày trong chuyến đi">
+                {enumerateTripDays(plan.trip.startDate, plan.trip.endDate).map((date, index) => {
+                  const count = backbone.filter((item) => item.startDate === date).length;
+                  return (
+                    <button type="button" key={date} onClick={(event) => activateScheduleEditor({ ...emptySchedule, startDate: date, endDate: date }, event.currentTarget)} disabled={busy}>
+                      <span>Ngày {index + 1}</span><strong>{formatDateLabel(date, plan.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })}</strong><small>{count ? `${count} hoạt động` : "Thêm hoạt động"}</small>
+                    </button>
+                  );
+                })}
               </div>
               {scheduleEditor?.key === "new" && (
                 <ScheduleForm
@@ -585,8 +595,15 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
               <div className="admin-schedule-list">
                 {backbone.map((item, itemIndex, backboneItems) => {
                   const group = plan.branchGroups?.find((candidate) => candidate.anchorActivityId === item.id);
+                  const beginsDay = itemIndex === 0 || backboneItems[itemIndex - 1].startDate !== item.startDate;
                   return (
                     <div className="admin-route-segment" key={item.id}>
+                      {beginsDay && (
+                        <div className="admin-day-divider">
+                          <div><span>Ngày {calendarDayDifference(plan.trip.startDate, item.startDate) + 1}</span><h3>{formatDateLabel(item.startDate, plan.trip.timezone, { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" })}</h3></div>
+                          <button className="admin-ghost" type="button" disabled={busy} onClick={(event) => activateScheduleEditor({ ...emptySchedule, startDate: item.startDate, endDate: item.startDate }, event.currentTarget)}>Thêm vào ngày này</button>
+                        </div>
+                      )}
                       <ScheduleRow
                         item={item}
                         busy={busy}
@@ -733,7 +750,7 @@ function ScheduleRow({ item, busy, scheduleEditor, scheduleError, sources, onAct
   const isEditing = scheduleEditor?.key === String(item.id);
   return (
     <article className={`admin-schedule-item${isEditing ? " is-editing" : ""}`}>
-      <div className="admin-schedule-time"><strong>{item.start}</strong><span>{item.displayEnd || item.end}</span></div>
+      <div className="admin-schedule-time"><small>{item.startDate}</small><strong>{item.start}</strong><span>{item.displayEnd || item.end}{item.endDate !== item.startDate ? " · +1 ngày" : ""}</span></div>
       <div className="admin-schedule-copy"><span><TypeIcon type={item.type} /> {item.type}</span><h3>{item.title}</h3>{item.detail && <p>{item.detail}</p>}</div>
       <div className="admin-row-actions">
         <button className="admin-ghost" disabled={busy} aria-expanded={isEditing} aria-controls={editorId} onClick={(event) => onActivateEditor(item, event.currentTarget)}>{isEditing ? "Đang sửa" : "Sửa"}</button>
@@ -853,6 +870,7 @@ function BranchOptionAdmin({ group, branch, selected, busy, scheduleEditor, sche
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState({ label: branch.label, condition: branch.condition });
   const newEditorKey = `new-branch-${branch.id}`;
+  const branchDefaultDate = branch.itinerary.at(-1)?.endDate || group.branches.flatMap((option) => option.itinerary)[0]?.startDate || "";
   return (
     <article className={`admin-branch-option${selected ? " is-selected" : ""}`}>
       <div className="admin-branch-option-head">
@@ -879,7 +897,7 @@ function BranchOptionAdmin({ group, branch, selected, busy, scheduleEditor, sche
       {scheduleEditor?.key === newEditorKey ? (
         <ScheduleForm key={newEditorKey} editor={scheduleEditor} busy={busy} error={scheduleError} sources={sources} placement="inline" onChange={onEditorChange} onCreateSource={onCreateSource} onSave={onSaveSchedule} onCancel={onCancelSchedule} />
       ) : (
-        <button className="admin-ghost branch-add-activity" type="button" onClick={(event) => onActivateEditor({ ...emptySchedule, branchId: branch.id, editorKey: newEditorKey }, event.currentTarget)} disabled={busy}>Thêm hoạt động vào “{branch.label}”</button>
+        <button className="admin-ghost branch-add-activity" type="button" onClick={(event) => onActivateEditor({ ...emptySchedule, startDate: branchDefaultDate, endDate: branchDefaultDate, branchId: branch.id, editorKey: newEditorKey }, event.currentTarget)} disabled={busy}>Thêm hoạt động vào “{branch.label}”</button>
       )}
     </article>
   );
@@ -895,12 +913,23 @@ function PlanSkeleton() {
 }
 
 function TripForm({ editor, busy, onSave, onCancel }) {
-  const [values, setValues] = useState(editor.values);
+  const [values, setValues] = useState({ ...editor.values, moveSchedule: Boolean(editor.originalSlug) });
   const field = (name) => ({ value: values[name] || "", onChange: (event) => setValues({ ...values, [name]: event.target.value }) });
+  const datesChanged = Boolean(editor.originalSlug && (values.startDate !== editor.values.startDate || values.endDate !== editor.values.endDate));
+  const canMoveSchedule = datesChanged
+    && values.startDate && values.endDate
+    && calendarDayDifference(editor.values.startDate, editor.values.endDate) === calendarDayDifference(values.startDate, values.endDate);
+  const changeStartDate = (event) => {
+    const startDate = event.target.value;
+    const endDate = !values.endDate || values.endDate === values.startDate ? startDate : values.endDate;
+    setValues({ ...values, startDate, endDate });
+  };
   return (
-    <form className="admin-editor admin-form" onSubmit={(event) => { event.preventDefault(); onSave(values, editor.originalSlug); }}>
+    <form className="admin-editor admin-form" onSubmit={(event) => { event.preventDefault(); onSave({ ...values, moveSchedule: canMoveSchedule && values.moveSchedule }, editor.originalSlug); }}>
       <div className="admin-section-head"><h2>{editor.originalSlug ? "Sửa trip" : "Trip mới"}</h2><button type="button" className="admin-ghost" onClick={onCancel}>Đóng</button></div>
-      <div className="form-grid"><label>Slug<input {...field("slug")} placeholder="tokyo-2026-08-10" required /></label><label>Tên trip<input {...field("title")} required /></label><label>Ngày<input type="date" {...field("date")} required /></label><label>Timezone<input {...field("timezone")} required /></label><label className="wide">Địa điểm<input {...field("location")} required /></label></div>
+      <div className="form-grid"><label>Slug<input {...field("slug")} placeholder="tokyo-2026-08-10" required /></label><label>Tên trip<input {...field("title")} required /></label><label>Ngày bắt đầu<input type="date" value={values.startDate || ""} onChange={changeStartDate} required /></label><label>Ngày kết thúc<input type="date" {...field("endDate")} min={values.startDate || undefined} required /></label><label>Timezone<input {...field("timezone")} required /></label><label className="wide">Địa điểm<input {...field("location")} required /></label></div>
+      {canMoveSchedule && <label className="trip-shift-option"><input type="checkbox" checked={values.moveSchedule} onChange={(event) => setValues({ ...values, moveSchedule: event.target.checked })} /><span><strong>Dời toàn bộ lịch theo khoảng ngày mới</strong><small>Các hoạt động và phương án sẽ giữ nguyên ngày tương đối.</small></span></label>}
+      {datesChanged && !canMoveSchedule && <p className="form-guidance">Thời lượng chuyến đi đã đổi. Hoạt động hiện có giữ nguyên ngày; hệ thống sẽ báo nếu có mục nằm ngoài khoảng mới.</p>}
       <button className="admin-primary" disabled={busy}>{busy ? "Đang lưu…" : "Lưu trip"}</button>
     </form>
   );
@@ -928,7 +957,9 @@ function ScheduleForm({ editor, busy, error, sources, placement, onChange, onCre
         <button type="button" className="admin-ghost" onClick={onCancel} disabled={busy}>Hủy</button>
       </div>
       <div className="form-grid schedule-form-grid">
+        <label className="schedule-field schedule-date-field">Ngày bắt đầu<input type="date" {...field("startDate")} required /></label>
         <label className="schedule-field schedule-time-field">Bắt đầu<input type="time" {...field("start")} onClick={openTimePicker} required /></label>
+        <label className="schedule-field schedule-date-field">Ngày kết thúc<input type="date" {...field("endDate")} min={values.startDate || undefined} required /></label>
         <label className="schedule-field schedule-time-field">Kết thúc<input type="time" {...field("end")} onClick={openTimePicker} required /></label>
         <label className="schedule-field schedule-display-field">Hiển thị kết thúc<input {...field("displayEnd")} placeholder="Tuỳ chọn, ví dụ +" /></label>
         <label className="schedule-field schedule-type-field">Loại
@@ -944,6 +975,7 @@ function ScheduleForm({ editor, busy, error, sources, placement, onChange, onCre
         <label className="wide schedule-field schedule-title-field">Tiêu đề<input {...field("title")} required /></label>
         <label className="wide schedule-field schedule-detail-field"><span>Chi tiết <small className="field-optional">Không bắt buộc</small></span><textarea {...field("detail")} rows="3" /></label>
       </div>
+      {values.startDate && values.endDate && values.endDate !== values.startDate && <p className="overnight-note"><ActionIcon name="moon" /> Hoạt động kết thúc vào ngày hôm sau.</p>}
       <SourcePicker
         sources={sources}
         selectedRefs={values.refs}

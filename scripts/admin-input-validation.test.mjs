@@ -4,7 +4,9 @@ import { parseScheduleInput, parseSourceInput } from "../lib/validation.js";
 
 test("new schedule activities accept an empty optional detail", () => {
   const input = parseScheduleInput({
+    startDate: "2030-01-01",
     start: "09:00",
+    endDate: "2030-01-01",
     end: "10:00",
     displayEnd: null,
     type: "Picnic",

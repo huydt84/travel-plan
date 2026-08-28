@@ -18,13 +18,14 @@ const env = { APP_URL: "https://travel.example/path" };
 const trip = {
   slug: "kasai-evening",
   title: "Kasai Rinkai Park · Sunflower Evening",
-  date: "2026-08-15",
+  startDate: "2026-08-15",
+  endDate: "2026-08-15",
   timezone: "Asia/Tokyo",
   location: "Kasai Rinkai Park",
 };
 const itinerary = [
-  { start: "15:30", end: "16:00", title: "Đi tàu đến Kasai", detail: "Gặp nhau ở ga." },
-  { start: "16:00", end: "17:00", title: "Cánh đồng hoa hướng dương", detail: "Đi dạo và chụp ảnh." },
+  { startDate: "2026-08-15", start: "15:30", endDate: "2026-08-15", end: "16:00", title: "Đi tàu đến Kasai", detail: "Gặp nhau ở ga." },
+  { startDate: "2026-08-15", start: "16:00", endDate: "2026-08-15", end: "17:00", title: "Cánh đồng hoa hướng dương", detail: "Đi dạo và chụp ảnh." },
 ];
 const subject = "Đi Kasai cùng mình thứ Bảy nhé?";
 const message = "Bạn có muốn đi Kasai cùng mình không?\n\n15:30 — Gặp nhau ở ga.\nhttps://travel.example/path?trip=kasai-evening";

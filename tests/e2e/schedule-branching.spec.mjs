@@ -7,12 +7,12 @@ test("admin creates a branch point and public tracker switches the shared route"
   const title = `Điểm rẽ E2E ${stamp}`;
 
   try {
-    const tripResponse = await request.post("/api/trips", { data: { slug, title: tripTitle, date: "2020-01-03", timezone: "Asia/Tokyo", location: "Tokyo" } });
+    const tripResponse = await request.post("/api/trips", { data: { slug, title: tripTitle, startDate: "2020-01-03", endDate: "2020-01-03", timezone: "Asia/Tokyo", location: "Tokyo" } });
     expect(tripResponse.status()).toBe(201);
     for (const activity of [
-      { start: "09:00", end: "09:30", type: "Meet", icon: "📍", title: "Tập trung", detail: "Mốc chung", refs: [] },
-      { start: "09:45", end: "10:30", type: "Walk", icon: "🚶", title: "Đoạn có thể thay", detail: "Tuyến mặc định", refs: [] },
-      { start: "11:00", end: "11:30", type: "Cafe", icon: "☕", title: "Mốc hội nhập", detail: "Mốc chung", refs: [] },
+      { startDate: "2020-01-03", start: "09:00", endDate: "2020-01-03", end: "09:30", type: "Meet", icon: "📍", title: "Tập trung", detail: "Mốc chung", refs: [] },
+      { startDate: "2020-01-03", start: "09:45", endDate: "2020-01-03", end: "10:30", type: "Walk", icon: "🚶", title: "Đoạn có thể thay", detail: "Tuyến mặc định", refs: [] },
+      { startDate: "2020-01-03", start: "11:00", endDate: "2020-01-03", end: "11:30", type: "Cafe", icon: "☕", title: "Mốc hội nhập", detail: "Mốc chung", refs: [] },
     ]) {
       const scheduleResponse = await request.post(`/api/trips/${slug}/schedule`, { data: activity });
       expect(scheduleResponse.status()).toBe(201);
@@ -90,12 +90,12 @@ test("admin can branch from the start so the first activity is not forced", asyn
   let initial;
 
   try {
-    const tripResponse = await request.post("/api/trips", { data: { slug, title: tripTitle, date: "2031-01-01", timezone: "Asia/Tokyo", location: "Tokyo" } });
+    const tripResponse = await request.post("/api/trips", { data: { slug, title: tripTitle, startDate: "2031-01-01", endDate: "2031-01-01", timezone: "Asia/Tokyo", location: "Tokyo" } });
     expect(tripResponse.status()).toBe(201);
     for (const activity of [
-      { start: "09:00", end: "10:00", type: "Walk", icon: "🚶", title: "Công viên buổi sáng", detail: "Tuyến ngoài trời", refs: [] },
-      { start: "10:30", end: "11:30", type: "Cafe", icon: "☕", title: "Mốc hội nhập", detail: "Hoạt động chung", refs: [] },
-      { start: "12:00", end: "13:00", type: "Lunch", icon: "🍜", title: "Ăn trưa", detail: "Hoạt động chung", refs: [] },
+      { startDate: "2031-01-01", start: "09:00", endDate: "2031-01-01", end: "10:00", type: "Walk", icon: "🚶", title: "Công viên buổi sáng", detail: "Tuyến ngoài trời", refs: [] },
+      { startDate: "2031-01-01", start: "10:30", endDate: "2031-01-01", end: "11:30", type: "Cafe", icon: "☕", title: "Mốc hội nhập", detail: "Hoạt động chung", refs: [] },
+      { startDate: "2031-01-01", start: "12:00", endDate: "2031-01-01", end: "13:00", type: "Lunch", icon: "🍜", title: "Ăn trưa", detail: "Hoạt động chung", refs: [] },
     ]) {
       const scheduleResponse = await request.post(`/api/trips/${slug}/schedule`, { data: activity });
       expect(scheduleResponse.status()).toBe(201);
@@ -204,7 +204,7 @@ for (const viewport of [
     await expect(iconSelect).toHaveValue("🚶");
     await typeSelect.selectOption("Visit");
     await expect(iconSelect).toHaveValue("📍");
-    await editor.getByLabel("Bắt đầu").click({ position: { x: 12, y: 12 } });
+    await editor.getByLabel("Bắt đầu", { exact: true }).click({ position: { x: 12, y: 12 } });
     await expect.poll(() => page.evaluate(() => window.__scheduleTimePickerCalls)).toBe(1);
 
     const geometry = await editor.evaluate((form) => {

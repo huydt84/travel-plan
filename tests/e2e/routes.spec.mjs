@@ -105,6 +105,38 @@ test("mobile clock stays in its cell and the focused route connector shares the 
   expect(Math.abs(geometry.connectorCenter - geometry.railCenter)).toBeLessThanOrEqual(0.5);
 });
 
+test("mobile active-station title wraps inside its foldout", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await page.clock.install({ time: new Date("2026-08-09T04:50:00.000Z") });
+  await page.route("**/api/itinerary?slug=*", async (route) => {
+    const response = await route.fetch();
+    const itinerary = await response.json();
+    itinerary.itinerary[0].title = "Nishifunabashi → Toyosu";
+    await route.fulfill({ response, json: itinerary });
+  });
+  await gotoHealthy(page, "/");
+
+  const title = page.locator(".mobile-foldout-title h1");
+  await expect(title).toHaveText("Nishifunabashi → Toyosu");
+
+  const geometry = await title.evaluate((element) => {
+    const row = element.closest(".mobile-foldout-title");
+    const foldout = element.closest(".mobile-active-foldout");
+    const range = document.createRange();
+    range.selectNodeContents(element);
+
+    return {
+      rowClientWidth: row.clientWidth,
+      rowScrollWidth: row.scrollWidth,
+      textRight: range.getBoundingClientRect().right,
+      foldoutRight: foldout.getBoundingClientRect().right,
+    };
+  });
+
+  expect(geometry.rowScrollWidth, "title row must not overflow horizontally").toBeLessThanOrEqual(geometry.rowClientWidth + 1);
+  expect(geometry.textRight, "title glyphs must stay inside the foldout border").toBeLessThanOrEqual(geometry.foldoutRight - 1);
+});
+
 test("laptop timeline has no viewport guide crossing its content", async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
   await gotoHealthy(page, "/");

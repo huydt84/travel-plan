@@ -17,7 +17,7 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
 
     await page.getByRole("button", { name: "Thêm hoạt động", exact: true }).click();
     const activityForm = page.locator(".schedule-create-editor");
-    await activityForm.getByLabel("Bắt đầu").fill("23:50");
+    await activityForm.getByLabel("Bắt đầu", { exact: true }).fill("23:50");
     await activityForm.getByLabel("Kết thúc", { exact: true }).fill("23:55");
     await activityForm.getByLabel("Loại").selectOption("Picnic");
     await expect(activityForm.getByLabel("Icon")).toHaveValue("🧺");

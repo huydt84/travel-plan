@@ -27,6 +27,11 @@ await sql`CREATE TABLE IF NOT EXISTS trips (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`;
+await sql`ALTER TABLE trips ADD COLUMN IF NOT EXISTS end_date DATE`;
+await sql`UPDATE trips SET end_date = trip_date WHERE end_date IS NULL`;
+await sql`ALTER TABLE trips ALTER COLUMN end_date SET NOT NULL`;
+await sql`ALTER TABLE trips DROP CONSTRAINT IF EXISTS trips_date_range_check`;
+await sql`ALTER TABLE trips ADD CONSTRAINT trips_date_range_check CHECK (end_date >= trip_date)`;
 
 await sql`CREATE TABLE IF NOT EXISTS sources (
   id BIGSERIAL PRIMARY KEY,
@@ -51,6 +56,63 @@ await sql`CREATE TABLE IF NOT EXISTS activities (
   detail TEXT NOT NULL,
   UNIQUE (trip_id, sort_order)
 )`;
+await sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS start_date DATE`;
+await sql`ALTER TABLE activities ADD COLUMN IF NOT EXISTS end_date DATE`;
+await sql`
+  UPDATE activities activity
+  SET start_date = trip.trip_date,
+      end_date = trip.trip_date
+  FROM trips trip
+  WHERE activity.trip_id = trip.id
+    AND (activity.start_date IS NULL OR activity.end_date IS NULL)
+`;
+await sql`ALTER TABLE activities ALTER COLUMN start_date SET NOT NULL`;
+await sql`ALTER TABLE activities ALTER COLUMN end_date SET NOT NULL`;
+await sql`ALTER TABLE activities DROP CONSTRAINT IF EXISTS activities_date_interval_check`;
+await sql`ALTER TABLE activities ADD CONSTRAINT activities_date_interval_check CHECK (
+  end_date >= start_date
+  AND end_date <= start_date + 1
+  AND (end_date > start_date OR end_time > start_time)
+)`;
+
+await sql`CREATE OR REPLACE FUNCTION validate_trip_activity_date_range()
+RETURNS TRIGGER AS $$
+DECLARE
+  invalid_count INTEGER;
+BEGIN
+  IF TG_TABLE_NAME = 'trips' THEN
+    SELECT COUNT(*)::INTEGER INTO invalid_count
+    FROM activities
+    WHERE trip_id = NEW.id
+      AND (start_date < NEW.trip_date OR end_date > NEW.end_date);
+    IF invalid_count > 0 THEN
+      RAISE EXCEPTION '% activities fall outside the trip date range', invalid_count
+        USING ERRCODE = '23514';
+    END IF;
+  ELSE
+    SELECT COUNT(*)::INTEGER INTO invalid_count
+    FROM trips
+    WHERE id = NEW.trip_id
+      AND NEW.start_date >= trip_date
+      AND NEW.end_date <= end_date;
+    IF invalid_count = 0 THEN
+      RAISE EXCEPTION 'activity falls outside the trip date range'
+        USING ERRCODE = '23514';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql`;
+await sql`DROP TRIGGER IF EXISTS trips_activity_date_range_trigger ON trips`;
+await sql`CREATE CONSTRAINT TRIGGER trips_activity_date_range_trigger
+  AFTER INSERT OR UPDATE OF trip_date, end_date ON trips
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION validate_trip_activity_date_range()`;
+await sql`DROP TRIGGER IF EXISTS activities_trip_date_range_trigger ON activities`;
+await sql`CREATE CONSTRAINT TRIGGER activities_trip_date_range_trigger
+  AFTER INSERT OR UPDATE OF trip_id, start_date, end_date ON activities
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION validate_trip_activity_date_range()`;
 
 await sql`CREATE TABLE IF NOT EXISTS activity_sources (
   activity_id BIGINT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
@@ -442,7 +504,7 @@ $$ LANGUAGE plpgsql`;
 // creation explicit so production Neon and local PostgreSQL behave identically.
 await sql`DROP TRIGGER IF EXISTS trips_plan_revision_trigger ON trips`;
 await sql`CREATE TRIGGER trips_plan_revision_trigger
-  AFTER INSERT OR DELETE OR UPDATE OF slug, title, trip_date, timezone, location ON trips
+  AFTER INSERT OR DELETE OR UPDATE OF slug, title, trip_date, end_date, timezone, location ON trips
   FOR EACH ROW EXECUTE FUNCTION bump_trip_plan_revision()`;
 await sql`DROP TRIGGER IF EXISTS sources_plan_revision_trigger ON sources`;
 await sql`CREATE TRIGGER sources_plan_revision_trigger
@@ -450,7 +512,7 @@ await sql`CREATE TRIGGER sources_plan_revision_trigger
   FOR EACH ROW EXECUTE FUNCTION bump_trip_plan_revision()`;
 await sql`DROP TRIGGER IF EXISTS activities_plan_revision_trigger ON activities`;
 await sql`CREATE TRIGGER activities_plan_revision_trigger
-  AFTER INSERT OR DELETE OR UPDATE OF item_key, branch_id, sort_order, start_time, end_time, display_end, type, icon, title, detail, trip_id ON activities
+  AFTER INSERT OR DELETE OR UPDATE OF item_key, branch_id, sort_order, start_date, start_time, end_date, end_time, display_end, type, icon, title, detail, trip_id ON activities
   FOR EACH ROW EXECUTE FUNCTION bump_trip_plan_revision()`;
 await sql`DROP TRIGGER IF EXISTS schedule_branch_groups_plan_revision_trigger ON schedule_branch_groups`;
 await sql`CREATE TRIGGER schedule_branch_groups_plan_revision_trigger
@@ -556,11 +618,12 @@ for (const tripId of [...new Set(activitiesWithoutKeys.map((row) => String(row.t
 }
 
 const [tripRow] = await sql`
-  INSERT INTO trips (slug, title, trip_date, timezone, location)
-  VALUES (${trip.slug}, ${trip.title}, ${trip.date}, ${trip.timezone}, ${trip.location})
+  INSERT INTO trips (slug, title, trip_date, end_date, timezone, location)
+  VALUES (${trip.slug}, ${trip.title}, ${trip.startDate || trip.date}, ${trip.endDate || trip.startDate || trip.date}, ${trip.timezone}, ${trip.location})
   ON CONFLICT (slug) DO UPDATE SET
     title = EXCLUDED.title,
     trip_date = EXCLUDED.trip_date,
+    end_date = EXCLUDED.end_date,
     timezone = EXCLUDED.timezone,
     location = EXCLUDED.location,
     updated_at = NOW()
@@ -589,8 +652,8 @@ for (const source of sources) {
 
 for (const [index, activity] of assignItemKeys(activities).entries()) {
   const [row] = await sql`
-    INSERT INTO activities (trip_id, item_key, sort_order, start_time, end_time, display_end, type, icon, title, detail)
-    VALUES (${tripRow.id}, ${activity.key}, ${index}, ${activity.start}, ${activity.end}, ${activity.displayEnd || null}, ${activity.type}, ${activity.icon}, ${activity.title}, ${activity.detail})
+    INSERT INTO activities (trip_id, item_key, sort_order, start_date, start_time, end_date, end_time, display_end, type, icon, title, detail)
+    VALUES (${tripRow.id}, ${activity.key}, ${index}, ${activity.startDate || trip.startDate || trip.date}, ${activity.start}, ${activity.endDate || activity.startDate || trip.startDate || trip.date}, ${activity.end}, ${activity.displayEnd || null}, ${activity.type}, ${activity.icon}, ${activity.title}, ${activity.detail})
     RETURNING id
   `;
 

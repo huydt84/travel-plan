@@ -8,16 +8,14 @@ import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { formatScheduleHeading, formatTripTitle } from "../lib/trip-date-label.mjs";
 import { getTripPageTitle } from "../lib/trip-page-title.mjs";
 import { getTripTrackerState } from "../lib/trip-tracker-state.mjs";
+import { activityInstants, enumerateTripDays, formatDateLabel, formatTripDateRange } from "../lib/trip-dates.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
 import ConfirmDialog from "./ConfirmDialog";
 import InvitationDialog from "./InvitationDialog";
 import NotificationCenter from "./NotificationCenter";
 import ViewerMenu from "./ViewerMenu";
 
-const JST_OFFSET = "+09:00";
 const NOTIFICATION_NAVIGATION_EVENT = "travel-plan:notification-navigation";
-
-const toDate = (date, time) => new Date(`${date}T${time}:00${JST_OFFSET}`);
 
 const formatDuration = (milliseconds) => {
   const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
@@ -43,9 +41,17 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
   const [branchAction, setBranchAction] = useState({ id: null, error: "" });
   const [invitationOpen, setInvitationOpen] = useState(initialInvitationOpen);
   const [gmailReturn, setGmailReturn] = useState(initialGmailReturn);
+  const [selectedDay, setSelectedDay] = useState(initialData.trip.startDate);
   const routeListRef = useRef(null);
   const activeStopRef = useRef(null);
   const stationStageRef = useRef(null);
+  const daySelectorRef = useRef(null);
+  const previousLiveDayRef = useRef(initialData.trip.startDate);
+
+  const itinerary = useMemo(() => data.itinerary.map((item) => ({
+    ...item,
+    ...activityInstants(item, data.trip.timezone),
+  })), [data]);
 
   const refreshItinerary = useCallback(() => fetch(`/api/itinerary?slug=${encodeURIComponent(initialData.trip.slug)}`)
       .then((response) => response.ok ? response.json() : Promise.reject(new Error("API request failed")))
@@ -85,6 +91,9 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       if (targetTrip && targetTrip !== data.trip.slug) return;
       const match = url.hash.match(/^#contribution-(\d+)$/);
       if (!match) return;
+      const contribution = suggestions.find((item) => String(item.id) === match[1]);
+      const activity = contribution?.activityId && data.itinerary.find((item) => String(item.id) === String(contribution.activityId));
+      if (activity?.startDate) setSelectedDay(activity.startDate);
       let attempts = 0;
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
@@ -112,13 +121,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
     };
-  }, [data.trip.slug, suggestions]);
-
-  const itinerary = useMemo(() => data.itinerary.map((item) => ({
-    ...item,
-    startAt: toDate(data.trip.date, item.start),
-    endAt: toDate(data.trip.date, item.end),
-  })), [data]);
+  }, [data.itinerary, data.trip.slug, suggestions]);
   const sourceMap = useMemo(() => new Map(data.sources.map((source) => [source.number, source])), [data.sources]);
   const suggestionsByActivity = useMemo(() => {
     const grouped = new Map();
@@ -129,7 +132,30 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     return grouped;
   }, [suggestions]);
   const resolvedState = itinerary.length ? getTripTrackerState(now, itinerary) : null;
-  const tripTitle = formatTripTitle(data.trip.title, data.trip.date, data.trip.timezone, now);
+  const liveDay = resolvedState?.anchor?.startDate || data.trip.startDate;
+  useEffect(() => {
+    setSelectedDay((current) => current === previousLiveDayRef.current ? liveDay : current);
+    previousLiveDayRef.current = liveDay;
+  }, [liveDay]);
+  useEffect(() => {
+    daySelectorRef.current?.querySelector(`[data-trip-day="${selectedDay}"]`)?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [selectedDay]);
+  const tripDays = useMemo(() => enumerateTripDays(data.trip.startDate, data.trip.endDate), [data.trip.endDate, data.trip.startDate]);
+  const selectedItinerary = useMemo(() => itinerary.filter((item) => item.startDate === selectedDay), [itinerary, selectedDay]);
+  const browsingDay = selectedDay !== liveDay;
+  const previewItem = selectedItinerary[0] || null;
+  const displayState = browsingDay && previewItem ? {
+    mode: "preview",
+    current: previewItem,
+    anchor: previewItem,
+    index: -1,
+    next: selectedItinerary[1] || null,
+  } : resolvedState;
+  const tripTitle = formatTripTitle(data.trip.title, data.trip.startDate, data.trip.timezone, now, data.trip.endDate);
   const pageTitle = getTripPageTitle({
     mode: resolvedState?.mode,
     tripTitle,
@@ -194,7 +220,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       window.removeEventListener("resize", align);
       resizeObserver.disconnect();
     };
-  }, [resolvedState?.anchor?.id, itinerary.length]);
+  }, [displayState?.anchor?.id, selectedItinerary.length]);
 
   if (!itinerary.length) {
     return (
@@ -207,7 +233,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
       </main>
     );
   }
-  const state = resolvedState;
+  const state = displayState || resolvedState;
 
   let countdown;
   let progress = 0;
@@ -218,7 +244,13 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
   let range;
   let countdownLabel;
 
-  if (state.mode === "before") {
+  if (state.mode === "preview") {
+    status = "Đang xem trước";
+    kicker = `Ngày ${tripDays.indexOf(selectedDay) + 1}`;
+    title = state.current.title;
+    detail = state.current.detail;
+    range = `${state.current.start} — ${state.current.endDate !== state.current.startDate ? `${formatDateLabel(state.current.endDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })} · ` : ""}${state.current.displayEnd || state.current.end}`;
+  } else if (state.mode === "before") {
     countdown = formatDuration(state.current.startAt - now);
     status = "Sắp bắt đầu";
     kicker = "Chuyến đi bắt đầu sau";
@@ -241,7 +273,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     kicker = state.mode === "gap" ? "Hoạt động tiếp theo" : "Ngay lúc này";
     title = item.title;
     detail = item.detail;
-    range = `${item.start} — ${item.displayEnd || item.end}`;
+    range = `${item.start} — ${item.endDate !== item.startDate ? `${formatDateLabel(item.endDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })} · ` : ""}${item.displayEnd || item.end}`;
     countdownLabel = state.mode === "gap" ? "đến hoạt động" : "còn lại";
   }
 
@@ -252,24 +284,24 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
     second: "2-digit",
     hour12: false,
   }).format(now);
-  const tripDateLabel = new Intl.DateTimeFormat("vi-VN", {
-    timeZone: data.trip.timezone,
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(toDate(data.trip.date, "00:00"));
-  const scheduleHeading = formatScheduleHeading(data.trip.date, data.trip.timezone, now);
+  const tripDateLabel = formatTripDateRange(data.trip, { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+  const scheduleHeading = browsingDay
+    ? `Ngày ${tripDays.indexOf(selectedDay) + 1} · ${formatDateLabel(selectedDay, data.trip.timezone, { weekday: "long", day: "2-digit", month: "2-digit" })}`
+    : formatScheduleHeading(data.trip.startDate, data.trip.timezone, now, data.trip.endDate);
   const isAfter = state.mode === "after";
-  const jumpLabel = isAfter ? "Điểm cuối" : "Hiện tại";
+  const isPreview = state.mode === "preview";
+  const showCountdown = !isAfter && !isPreview;
+  const jumpLabel = browsingDay ? "Về hiện tại" : isAfter ? "Điểm cuối" : "Hiện tại";
   const stationSuggestionActivityId = isAfter ? null : state.current.id;
   const stationSuggestionTarget = isAfter ? "cả chuyến đi" : state.current.title;
   const stationSuggestionKey = stationSuggestionActivityId || "trip";
   const stationSuggestionLabel = isAfter ? "Góp ý cho cả chuyến" : "Góp ý tại ga này";
 
   const jumpToCurrent = () => {
-    const target = isAfter ? state.anchor.id : (state.mode === "active" ? state.current.id : (state.next?.id || itinerary.at(-1).id));
-    document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const targetState = resolvedState;
+    const target = targetState.mode === "after" ? targetState.anchor.id : targetState.anchor.id;
+    setSelectedDay(liveDay);
+    requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" }));
   };
 
   const openSuggestion = (activityId, targetTitle) => {
@@ -390,6 +422,13 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
   const branchGroupsByAnchor = new Map((data.branchGroups || [])
     .filter((group) => group.anchorActivityId != null)
     .map((group) => [group.anchorActivityId, group]));
+  const selectedLast = selectedItinerary.at(-1);
+  const stationNext = state.next || (selectedLast ? itinerary.find((item) => item.startAt >= selectedLast.endAt && item.id !== selectedLast.id) : null);
+  const navigateToActivity = (item) => {
+    if (!item) return;
+    setSelectedDay(item.startDate);
+    requestAnimationFrame(() => document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
 
   return (
     <main className="shell" data-trip-mode={state.mode}>
@@ -404,7 +443,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
             <span className="trip-picker-control">
               <select value={data.trip.slug} onChange={(event) => router.push(`/?trip=${encodeURIComponent(event.target.value)}`)}>
                 {trips.map((trip) => (
-                  <option value={trip.slug} key={trip.slug}>{formatTripTitle(trip.title, trip.date, trip.timezone, now)}</option>
+                  <option value={trip.slug} key={trip.slug}>{formatTripTitle(trip.title, trip.startDate, trip.timezone, now, trip.endDate)}</option>
                 ))}
               </select>
               <span className="trip-picker-affordance" aria-hidden="true">
@@ -426,22 +465,43 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
             <button className="admin-link user-link" type="button" onClick={() => signIn("google", { redirectTo: "/" })}>Đăng nhập</button>
           )}
         </div>
-        <div className="live-clock" aria-label="Giờ hiện tại tại Nhật Bản">
+        <div className="live-clock" aria-label={`Giờ hiện tại tại ${data.trip.timezone}`}>
           <span className="live-dot" aria-hidden="true" />
-          <small>JST</small><span>{clock}</span>
+          <small>{data.trip.timezone === "Asia/Tokyo" ? "JST" : data.trip.timezone}</small><span>{clock}</span>
         </div>
       </header>
 
-      <section className="live-board" aria-label="Tình trạng chuyến đi hiện tại">
+      <nav className="trip-day-selector" aria-label="Chọn ngày trong chuyến đi" ref={daySelectorRef}>
+        {tripDays.map((date, index) => {
+          const count = itinerary.filter((item) => item.startDate === date).length;
+          return (
+            <button key={date} type="button" data-trip-day={date} aria-current={selectedDay === date ? "date" : undefined} onClick={() => setSelectedDay(date)}>
+              <span>Ngày {index + 1}</span>
+              <strong>{formatDateLabel(date, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })}</strong>
+              <small>{count ? `${count} hoạt động` : "Chưa có lịch"}</small>
+            </button>
+          );
+        })}
+      </nav>
+
+      {!selectedItinerary.length && (
+        <section className="empty-trip-day" aria-live="polite">
+          <span className="route-node" aria-hidden="true" />
+          <div><h1>Ngày này chưa có hoạt động</h1><p>Lịch trình vẫn giữ ngày này trong chuyến đi. Chọn một ngày khác để xem tuyến đã lên kế hoạch.</p></div>
+          {browsingDay && <button type="button" className="jump-button" onClick={jumpToCurrent}>Về ngày hiện tại</button>}
+        </section>
+      )}
+
+      {selectedItinerary.length > 0 && <section className="live-board" aria-label={browsingDay ? "Xem trước ngày đã chọn" : "Tình trạng chuyến đi hiện tại"}>
         <aside className="route-overview">
           <div className="route-overview-head">
             <h2>{scheduleHeading}</h2>
             <button type="button" onClick={jumpToCurrent}>{jumpLabel}</button>
           </div>
           <ol className="route-stops" ref={routeListRef}>
-            {itinerary.map((item, index) => {
+            {selectedItinerary.map((item) => {
               const isFocused = item.id === state.anchor.id;
-              const isDone = index < state.index || state.mode === "after";
+              const isDone = item.endAt <= now;
               const isTerminus = isAfter && isFocused;
               const branchGroup = branchGroupsByAnchor.get(item.id);
               return (
@@ -466,7 +526,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                 <span className="station-icon" aria-hidden="true">{isAfter ? <ActionIcon name="check" /> : <TypeIcon type={state.current.type} />}</span>
                 <div><h1>{title}</h1><p className="station-range">{range}</p></div>
               </div>
-              {!isAfter && <div className="countdown-wrap">
+              {showCountdown && <div className="countdown-wrap">
                 <span>{countdownLabel}</span>
                 <strong>{countdown.value}</strong>
                 <small>{countdown.unit}</small>
@@ -486,12 +546,12 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
             <SuggestionList suggestions={suggestionsByActivity.get(stationSuggestionKey) || []} anchorItems={false} {...suggestionListProps} />
           </section>
 
-          {state.next && (
-            <a className="next-station" href={`#${state.next.id}`}>
+          {stationNext && (
+            <a className="next-station" href={`#${stationNext.id}`} onClick={(event) => { event.preventDefault(); navigateToActivity(stationNext); }}>
               <span>Tiếp theo</span>
-              <TypeIcon type={state.next.type} />
-              <strong>{state.next.title}</strong>
-              <small>{state.next.start} · {state.next.branchLabel || state.next.type}</small>
+              <TypeIcon type={stationNext.type} />
+              <strong>{stationNext.title}</strong>
+              <small>{stationNext.startDate !== selectedDay ? `${formatDateLabel(stationNext.startDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })} · ` : ""}{stationNext.start} · {stationNext.branchLabel || stationNext.type}</small>
               <ActionIcon name="right" />
             </a>
           )}
@@ -502,14 +562,14 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
             <span><i className="legend-line done" /> Đã qua</span>
           </div>
         </div>
-      </section>
+      </section>}
 
-      <section className="mobile-route-board" aria-label="Tuyến lịch trình hiện tại">
+      {selectedItinerary.length > 0 && <section className="mobile-route-board" aria-label="Tuyến lịch trình hiện tại">
         <div className="mobile-route-head"><h2>{scheduleHeading}</h2><button type="button" onClick={jumpToCurrent}>{jumpLabel}</button></div>
         <ol>
-          {itinerary.map((item, index) => {
+          {selectedItinerary.map((item) => {
             const isFocused = item.id === state.anchor.id;
-            const isDone = index < state.index || state.mode === "after";
+            const isDone = item.endAt <= now;
             const isTerminus = isAfter && isFocused;
             return (
               <li className={`mobile-route-stop${isFocused && !isAfter ? " is-active" : ""}${isDone ? " is-done" : ""}${isTerminus ? " is-terminus" : ""}`} key={item.id}>
@@ -522,16 +582,16 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                     <div className="mobile-foldout-status"><span>{kicker}</span><strong>{status}</strong></div>
                     <div className="mobile-foldout-title">{isAfter ? <ActionIcon name="check" /> : <TypeIcon type={item.type} />}<h1>{title}</h1></div>
                     <p className="mobile-foldout-range">{range}</p>
-                    {!isAfter && <div className="mobile-foldout-countdown"><span>{countdownLabel}</span><strong>{countdown.value}</strong><small>{countdown.unit}</small></div>}
+                    {showCountdown && <div className="mobile-foldout-countdown"><span>{countdownLabel}</span><strong>{countdown.value}</strong><small>{countdown.unit}</small></div>}
                     {detail && <p className="mobile-foldout-detail">{detail}</p>}
                     {!isAfter && item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                     <div className="station-actions">
                       <button type="button" onClick={() => openSuggestion(stationSuggestionActivityId, stationSuggestionTarget)}>{viewer ? stationSuggestionLabel : "Đăng nhập để góp ý"}</button>
                       <span>{(suggestionsByActivity.get(stationSuggestionKey) || []).length} ghi chú</span>
                     </div>
-                    {state.next && (
-                      <a className="mobile-next-fascia" href={`#${state.next.id}`}>
-                        <span>Tiếp theo · {state.next.start}{state.next.branchLabel ? ` · ${state.next.branchLabel}` : ""}</span><strong>{state.next.title}</strong><ActionIcon name="right" />
+                    {stationNext && (
+                      <a className="mobile-next-fascia" href={`#${stationNext.id}`} onClick={(event) => { event.preventDefault(); navigateToActivity(stationNext); }}>
+                        <span>Tiếp theo · {stationNext.startDate !== selectedDay ? `${formatDateLabel(stationNext.startDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })} · ` : ""}{stationNext.start}{stationNext.branchLabel ? ` · ${stationNext.branchLabel}` : ""}</span><strong>{stationNext.title}</strong><ActionIcon name="right" />
                       </a>
                     )}
                   </section>
@@ -540,11 +600,11 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
             );
           })}
         </ol>
-      </section>
+      </section>}
 
-      {!isAfter && <button className="mobile-live-dock" type="button" onClick={jumpToCurrent}>
-        <span><small>{status}</small><strong>{state.current.title}</strong></span>
-        {state.next && <span><small>Tiếp theo · {state.next.start}</small><strong>{state.next.title}</strong></span>}
+      {resolvedState.mode !== "after" && <button className="mobile-live-dock" type="button" onClick={jumpToCurrent}>
+        <span><small>{browsingDay ? "Về ngày hiện tại" : status}</small><strong>{resolvedState.anchor.title}</strong></span>
+        {resolvedState.next && <span><small>Tiếp theo · {resolvedState.next.start}</small><strong>{resolvedState.next.title}</strong></span>}
         <ActionIcon name="right" />
       </button>}
 
@@ -553,11 +613,11 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
         <button className="jump-button" type="button" onClick={jumpToCurrent}>{isAfter ? "Về điểm cuối" : "Về hiện tại"} <ActionIcon name="down" /></button>
       </div>
 
-      <section className="timeline" aria-label="Lịch trình chi tiết">
-        {startBranchGroup && <div className="trip-start-junction"><BranchJunction group={startBranchGroup} startsTrip viewer={viewer} sourceMap={sourceMap} suggestionsByActivity={suggestionsByActivity} suggestionListProps={suggestionListProps} branchAction={branchAction} onSelect={selectPublicBranch} onSuggest={openSuggestion} /></div>}
-        {itinerary.map((item, index) => {
-          const isCurrent = state.mode === "active" && index === state.index;
-          const isDone = index < state.index || state.mode === "after";
+      {selectedItinerary.length > 0 && <section className="timeline" aria-label={`Lịch trình chi tiết ${selectedDay}`}>
+        {selectedDay === data.trip.startDate && startBranchGroup && <div className="trip-start-junction"><BranchJunction group={startBranchGroup} startsTrip viewer={viewer} sourceMap={sourceMap} suggestionsByActivity={suggestionsByActivity} suggestionListProps={suggestionListProps} branchAction={branchAction} onSelect={selectPublicBranch} onSuggest={openSuggestion} /></div>}
+        {selectedItinerary.map((item) => {
+          const isCurrent = resolvedState.mode === "active" && item.id === resolvedState.current.id;
+          const isDone = item.endAt <= now;
           const branchGroup = branchGroupsByAnchor.get(item.id);
           return (
             <div className="timeline-segment" key={item.id}>
@@ -581,7 +641,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
             </div>
           );
         })}
-      </section>
+      </section>}
 
       <section className="trip-suggestions" aria-labelledby="trip-suggestions-title">
         <h2 id="trip-suggestions-title">Ghi chú cho cả chuyến</h2>

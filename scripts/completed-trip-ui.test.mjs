@@ -13,9 +13,10 @@ test("completed trips use their canonical end time and a trip-level suggestion t
 });
 
 test("completed trips omit countdown furniture and the mobile live dock", () => {
-  assert.match(tracker, /!isAfter && <div className="countdown-wrap">/);
-  assert.match(tracker, /!isAfter && <div className="mobile-foldout-countdown">/);
-  assert.match(tracker, /!isAfter && <button className="mobile-live-dock"/);
+  assert.match(tracker, /showCountdown = !isAfter && !isPreview/);
+  assert.match(tracker, /showCountdown && <div className="countdown-wrap">/);
+  assert.match(tracker, /showCountdown && <div className="mobile-foldout-countdown">/);
+  assert.match(tracker, /resolvedState\.mode !== "after" && <button className="mobile-live-dock"/);
   assert.match(tracker, /data-mode=\{state\.mode\}/);
 });
 

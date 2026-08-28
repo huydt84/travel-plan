@@ -1,6 +1,7 @@
 import TripTracker from "../components/TripTracker";
 import { getViewer } from "../lib/auth";
 import { getCachedItinerary, listCachedTrips } from "../lib/trip-cache";
+import { currentDateInTimezone } from "../lib/trip-dates.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +25,14 @@ export default async function HomePage({ searchParams }) {
   );
 }
 
-const preferredTripSlug = (trips) => {
+export const preferredTripSlug = (trips, now = new Date()) => {
   if (!trips.length) return "sample-trip";
-  const today = Object.fromEntries(new Intl.DateTimeFormat("en", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date()).map((part) => [part.type, part.value]));
-  const date = `${today.year}-${today.month}-${today.day}`;
-  const upcoming = trips.filter((trip) => trip.date >= date).sort((a, b) => a.date.localeCompare(b.date));
-  return (upcoming[0] || trips[0]).slug;
+  const dated = trips.map((trip) => ({ ...trip, today: currentDateInTimezone(now, trip.timezone) }));
+  const ongoing = dated.filter((trip) => trip.startDate <= trip.today && trip.endDate >= trip.today)
+    .sort((left, right) => right.startDate.localeCompare(left.startDate));
+  if (ongoing[0]) return ongoing[0].slug;
+  const upcoming = dated.filter((trip) => trip.startDate > trip.today)
+    .sort((left, right) => left.startDate.localeCompare(right.startDate));
+  if (upcoming[0]) return upcoming[0].slug;
+  return [...dated].sort((left, right) => right.endDate.localeCompare(left.endDate))[0].slug;
 };

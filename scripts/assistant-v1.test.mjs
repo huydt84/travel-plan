@@ -8,7 +8,9 @@ const activity = (overrides = {}) => ({
   id: 1,
   key: "station-a",
   branchId: null,
+  startDate: "2030-01-01",
   start: "09:00",
+  endDate: "2030-01-01",
   end: "10:00",
   displayEnd: null,
   type: "Visit",
@@ -21,7 +23,7 @@ const activity = (overrides = {}) => ({
 
 const snapshot = (overrides = {}) => ({
   revision: 7,
-  trip: { slug: "sample", title: "Sample", date: "2030-01-01", timezone: "Asia/Tokyo", location: "Tokyo" },
+  trip: { slug: "sample", title: "Sample", startDate: "2030-01-01", endDate: "2030-01-02", timezone: "Asia/Tokyo", location: "Tokyo" },
   sources: [{ number: 1, title: "Official", host: "example.com", url: "https://example.com/official" }],
   backbone: [activity(), activity({ id: 2, key: "station-b", start: "11:00", end: "12:00", title: "Station B" })],
   branchGroups: [],
@@ -59,7 +61,7 @@ test("proposal compiler reserves deterministic keys and resolves draft sources",
       kind: "activity.add",
       draftId: "new-stop",
       lane: { kind: "backbone" },
-      value: { start: "10:20", end: "10:50", type: "Visit", icon: "pin", title: "Station A", detail: "A new stop", refs: [{ draftId: "museum" }] },
+      value: { startDate: "2030-01-01", start: "10:20", endDate: "2030-01-01", end: "10:50", type: "Visit", icon: "pin", title: "Station A", detail: "A new stop", refs: [{ draftId: "museum" }] },
     },
   ]);
   assert.equal(compiled.operations[0].kind, "source.add");
@@ -70,7 +72,7 @@ test("proposal compiler reserves deterministic keys and resolves draft sources",
 test("proposal compiler rejects overlaps, missing stable keys, and anchor deletion", () => {
   assert.throws(() => compilePlanProposal(snapshot(), [{
     kind: "activity.add", draftId: "overlap", lane: { kind: "backbone" },
-    value: { start: "09:30", end: "09:45", type: "Visit", icon: "pin", title: "Overlap", detail: "Unsafe" },
+    value: { startDate: "2030-01-01", start: "09:30", endDate: "2030-01-01", end: "09:45", type: "Visit", icon: "pin", title: "Overlap", detail: "Unsafe" },
   }]), /overlap|overlaps|chồng|starts before/i);
   assert.throws(() => compilePlanProposal(snapshot(), [{ kind: "activity.remove", itemKey: "missing" }]), /Không tìm thấy/);
 

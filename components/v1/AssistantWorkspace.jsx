@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import styles from "./assistant.module.css";
+import { formatTripDateRange } from "../../lib/trip-dates.mjs";
 
 const apiJson = async (path, options = {}) => {
   const response = await fetch(path, {
@@ -196,13 +197,13 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
         <aside className={`${styles.routeRail} ${mobilePanel === "route" ? styles.mobileOpen : ""}`} aria-label="Tuyến và cuộc trò chuyện">
           <div className={styles.routeHeading}>
             <h1>{workspace.snapshot?.trip?.title || "Chưa có chuyến đi"}</h1>
-            <p>{workspace.snapshot?.trip?.date} · {workspace.snapshot?.trip?.location}</p>
+            <p>{workspace.snapshot?.trip ? formatTripDateRange(workspace.snapshot.trip) : "—"} · {workspace.snapshot?.trip?.location}</p>
             <span>Phiên bản kế hoạch {workspace.snapshot?.revision ?? "—"}</span>
           </div>
           <ol className={styles.routeSpine}>
             {routeItems.map((item) => (
               <li key={item.key} className={selectedKeys.has(item.key) ? stationSignalClass : ""}>
-                <time>{item.start}</time><i aria-hidden="true" /><span><strong>{item.title}</strong><small>{item.type}</small></span>
+                <time>{item.startDate}<br />{item.start}</time><i aria-hidden="true" /><span><strong>{item.title}</strong><small>{item.type}{item.endDate !== item.startDate ? " · Qua đêm" : ""}</small></span>
               </li>
             ))}
           </ol>

@@ -152,6 +152,21 @@ button, select { cursor: pointer; }
 .live-clock small { color: var(--muted); font: 600 10px/1 var(--display); letter-spacing: .08em; }
 .live-clock span:last-child { font: 600 22px/1 var(--display); letter-spacing: .03em; }
 
+.trip-day-selector, .admin-day-rail { display: flex; margin: 0 0 12px; overflow-x: auto; border: 2px solid var(--navy); background: var(--paper-bright); scrollbar-color: var(--green) var(--paper-deep); scrollbar-width: thin; }
+.trip-day-selector button, .admin-day-rail button { display: grid; flex: 0 0 150px; gap: 4px; min-height: 72px; padding: 10px 13px; border: 0; border-right: 1px solid var(--navy); color: var(--navy); background: transparent; text-align: left; }
+.trip-day-selector button:last-child, .admin-day-rail button:last-child { border-right: 0; }
+.trip-day-selector button:hover, .admin-day-rail button:hover { background: var(--yellow-soft); }
+.trip-day-selector button[aria-current="date"] { color: var(--paper-bright); background: var(--green); }
+.trip-day-selector button span, .admin-day-rail button span { font-size: 8px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.trip-day-selector button strong, .admin-day-rail button strong { font: 600 18px/1 var(--display); text-transform: uppercase; }
+.trip-day-selector button small, .admin-day-rail button small { color: var(--muted); font-size: 9px; }
+.trip-day-selector button[aria-current="date"] small { color: var(--green-soft); }
+.empty-trip-day { position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 18px; min-height: 230px; padding: 36px; overflow: hidden; border: 2px solid var(--navy); background: var(--paper-bright); }
+.empty-trip-day::before { content: ""; position: absolute; top: 0; bottom: 0; left: 56px; width: 6px; background: var(--line); }
+.empty-trip-day > .route-node { width: 24px; height: 24px; border-width: 6px; }
+.empty-trip-day h1 { margin: 0; font: 700 38px/.95 var(--display); text-transform: uppercase; }
+.empty-trip-day p { max-width: 68ch; margin: 10px 0 0; color: var(--navy-soft); font-size: 12px; line-height: 1.6; }
+
 .live-board {
   display: grid;
   grid-template-columns: minmax(280px, 30%) 1fr;
@@ -733,9 +748,23 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
 .admin-schedule-item::before { content: ""; position: absolute; top: 27px; left: 62px; z-index: 1; width: 18px; height: 18px; border: 4px solid var(--green); border-radius: 50%; background: var(--paper-bright); }
 .admin-schedule-item.is-editing { border-bottom-color: var(--green); }
 .admin-schedule-item.is-editing::before { background: var(--green); box-shadow: inset 0 0 0 3px var(--paper-bright); }
-.admin-schedule-time strong, .admin-schedule-time span { display: block; font-variant-numeric: tabular-nums; }
+.admin-schedule-time small, .admin-schedule-time strong, .admin-schedule-time span { display: block; font-variant-numeric: tabular-nums; }
+.admin-schedule-time small { margin-bottom: 5px; color: var(--green-dark); font-size: 8px; font-weight: 700; }
 .admin-schedule-time strong { font: 600 17px/1 var(--display); }
 .admin-schedule-time span { margin-top: 4px; color: var(--muted); font: 500 12px/1 var(--display); }
+.admin-day-rail { margin: 0 0 18px; border-width: 1px; }
+.admin-day-rail button { flex-basis: 142px; min-height: 68px; }
+.admin-day-divider { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 28px 0 8px; padding: 12px 14px 12px 88px; border-block: 1px solid var(--navy); background: var(--yellow-soft); }
+.admin-day-divider span { color: var(--green-dark); font-size: 8px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.admin-day-divider h3 { margin: 4px 0 0; font: 600 22px/1 var(--display); text-transform: uppercase; }
+.trip-shift-option { grid-template-columns: 20px minmax(0, 1fr); align-items: start; padding: 13px 14px; border: 1px solid var(--green); background: var(--green-soft); }
+.trip-shift-option input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--green); }
+.trip-shift-option span, .trip-shift-option strong, .trip-shift-option small { display: block; }
+.trip-shift-option strong { font-size: 11px; }
+.trip-shift-option small { margin-top: 4px; color: var(--green-dark); font-size: 9px; font-weight: 400; }
+.form-guidance, .overnight-note { margin: 0; padding: 10px 12px; border: 1px solid var(--navy); color: var(--navy-soft); background: var(--paper); font-size: 10px; line-height: 1.5; }
+.overnight-note { display: flex; align-items: center; gap: 8px; border-color: var(--green); color: var(--green-dark); background: var(--green-soft); }
+.overnight-note .action-icon { flex: none; }
 .admin-schedule-copy > span { display: inline-flex; align-items: center; gap: 6px; color: var(--green-dark); font-size: 9px; font-weight: 700; text-transform: uppercase; }
 .admin-schedule-copy h3 { margin: 5px 0; font: 600 24px/1.05 var(--display); }
 .admin-schedule-copy p { max-width: 68ch; margin: 0; color: var(--navy-soft); font-size: 10px; line-height: 1.55; }
@@ -784,7 +813,8 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
 .schedule-editor > .source-picker { grid-column: 2; grid-row: 2; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .schedule-form-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
-.schedule-form-grid .schedule-time-field, .schedule-form-grid .schedule-display-field { grid-column: span 2; }
+.schedule-form-grid .schedule-date-field, .schedule-form-grid .schedule-time-field { grid-column: span 3; }
+.schedule-form-grid .schedule-display-field { grid-column: span 2; }
 .schedule-form-grid .schedule-type-field, .schedule-form-grid .schedule-icon-field { grid-column: span 3; }
 .form-grid label, .admin-form > label { display: grid; gap: 6px; color: var(--navy); font-size: 9px; font-weight: 700; }
 .field-optional { margin-left: 5px; color: var(--muted); font-size: 8px; font-weight: 400; text-transform: none; }
@@ -938,6 +968,13 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
   .live-clock { grid-column: 1; grid-row: 2; grid-template-columns: auto 1fr; min-width: 0; min-height: 44px; padding: 6px 8px; border-top: 1px solid var(--navy); border-right: 1px solid var(--navy); }
   .live-clock small { display: none; }
   .live-clock span:last-child { font-size: 16px; }
+  .trip-day-selector { margin-bottom: 10px; scroll-snap-type: x proximity; }
+  .trip-day-selector button { flex-basis: 132px; min-height: 82px; scroll-snap-align: start; }
+  .trip-day-selector button strong { overflow-wrap: anywhere; font-size: 14px; line-height: 1.05; }
+  .empty-trip-day { grid-template-columns: 34px minmax(0, 1fr); gap: 12px; min-height: 260px; padding: 24px 15px; }
+  .empty-trip-day::before { left: 32px; }
+  .empty-trip-day h1 { font-size: 31px; }
+  .empty-trip-day .jump-button { grid-column: 2; justify-self: start; }
   .live-board { display: none; }
   .mobile-route-board { --mobile-route-axis: 68px; --mobile-foldout-left: 76px; --mobile-foldout-border: 2px; display: block; overflow: hidden; border: 2px solid var(--navy); background: var(--paper-bright); }
   .mobile-route-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; padding: 12px 16px; border-bottom: 1px solid var(--navy); }
@@ -965,7 +1002,7 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
   .mobile-foldout-status::after { content: ""; position: absolute; top: -12px; left: 47%; width: 32px; height: 48px; border-right: 5px solid white; border-left: 5px solid white; transform: skewX(-28deg); }
   .mobile-foldout-title { display: flex; align-items: flex-start; gap: 10px; }
   .mobile-foldout-title > .type-icon, .mobile-foldout-title > .action-icon { flex: 0 0 auto; width: 31px; height: 31px; padding: 5px; border: 1px solid var(--green); color: var(--green); }
-  .mobile-foldout-title h1 { margin: -3px 0 0; overflow-wrap: break-word; font: 700 clamp(34px, 10.5vw, 48px)/1 var(--display); letter-spacing: -.02em; text-transform: uppercase; }
+  .mobile-foldout-title h1 { min-width: 0; margin: -3px 0 0; overflow-wrap: break-word; font: 700 clamp(34px, 10.5vw, 48px)/1 var(--display); letter-spacing: -.02em; text-transform: uppercase; }
   .mobile-foldout-range { margin: 14px 0 0 41px; color: var(--green-dark); font: 600 25px/1 var(--display); }
   .mobile-foldout-countdown { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 7px; margin-top: 22px; padding-top: 18px; border-top: 1px dashed var(--navy); }
   .mobile-foldout-countdown span { font: 600 9px/1 var(--display); text-transform: uppercase; }
@@ -1024,6 +1061,11 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
   .confirmation-dialog-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .confirmation-dialog-actions button { min-height: 44px; }
   .admin-header { align-items: flex-start; }
+  .admin-day-rail button { flex-basis: 132px; min-height: 82px; }
+  .admin-day-rail button strong { overflow-wrap: anywhere; font-size: 14px; line-height: 1.05; }
+  .admin-day-divider { align-items: flex-start; margin-top: 22px; padding: 12px; }
+  .admin-day-divider h3 { font-size: 18px; }
+  .admin-day-divider .admin-ghost { flex: none; }
   .admin-nav { margin-bottom: 10px; }
   .admin-nav a { min-width: 0; padding: 12px 7px; font-size: clamp(16px, 5vw, 21px); }
   .admin-nav-badge { min-width: 19px; height: 19px; margin-left: 4px; font-size: 9px; vertical-align: 2px; }
