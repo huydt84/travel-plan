@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
+import { parseContactDirectory } from "../lib/contact-directory.mjs";
 import { formatScheduleHeading, formatTripTitle } from "../lib/trip-date-label.mjs";
 import { getTripPageTitle } from "../lib/trip-page-title.mjs";
 import { getTripTrackerState } from "../lib/trip-tracker-state.mjs";
@@ -533,7 +534,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                 <i className="countdown-progress" style={{ "--progress": Math.min(1, progress) }} aria-hidden="true" />
               </div>}
             </div>
-            {detail && <p className="now-detail">{detail}</p>}
+            {detail && <ActivityDetail detail={detail} placement="station" />}
             {!isAfter && state.current.refs.length > 0 && (
               <div className="citations">{state.current.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>
             )}
@@ -583,7 +584,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                     <div className="mobile-foldout-title">{isAfter ? <ActionIcon name="check" /> : <TypeIcon type={item.type} />}<h1>{title}</h1></div>
                     <p className="mobile-foldout-range">{range}</p>
                     {showCountdown && <div className="mobile-foldout-countdown"><span>{countdownLabel}</span><strong>{countdown.value}</strong><small>{countdown.unit}</small></div>}
-                    {detail && <p className="mobile-foldout-detail">{detail}</p>}
+                    {detail && <ActivityDetail detail={detail} placement="mobile" />}
                     {!isAfter && item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                     <div className="station-actions">
                       <button type="button" onClick={() => openSuggestion(stationSuggestionActivityId, stationSuggestionTarget)}>{viewer ? stationSuggestionLabel : "Đăng nhập để góp ý"}</button>
@@ -629,7 +630,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                     <span className="type-label"><TypeIcon type={item.type} />{item.type}{item.branchLabel ? ` · ${item.branchLabel}` : ""}</span>
                     <span className="done-label">Đã qua</span>
                   </div>
-                  <h3>{item.title}</h3>{item.detail && <p>{item.detail}</p>}
+                  <h3>{item.title}</h3>{item.detail && <ActivityDetail detail={item.detail} placement="timeline" />}
                   {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                   <SuggestionList suggestions={suggestionsByActivity.get(item.id) || []} {...suggestionListProps} />
                   <button className="suggestion-trigger" type="button" onClick={() => openSuggestion(item.id, item.title)}>
@@ -752,7 +753,7 @@ function BranchJunction({ group, startsTrip = false, viewer, sourceMap, suggesti
                       <article className="branch-mini-stop" id={item.id} key={item.id}>
                         <time>{item.start}<span>{item.displayEnd || item.end}</span></time>
                         <i aria-hidden="true" />
-                        <div><span className="type-label"><TypeIcon type={item.type} />{item.type}</span><h4>{item.title}</h4>{item.detail && <p>{item.detail}</p>}
+                        <div><span className="type-label"><TypeIcon type={item.type} />{item.type}</span><h4>{item.title}</h4>{item.detail && <ActivityDetail detail={item.detail} placement="branch" />}
                           {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                           <SuggestionList suggestions={suggestionsByActivity.get(item.id) || []} {...suggestionListProps} />
                           <button className="suggestion-trigger" type="button" onClick={() => onSuggest(item.id, item.title)}>{viewer ? "Góp ý cho mục này" : "Đăng nhập để góp ý"}</button>
@@ -768,6 +769,61 @@ function BranchJunction({ group, startsTrip = false, viewer, sourceMap, suggesti
         </div>
       )}
     </section>
+  );
+}
+
+function ActivityDetail({ detail, placement }) {
+  const contacts = parseContactDirectory(detail);
+  if (!contacts) {
+    const className = placement === "station" ? "now-detail" : placement === "mobile" ? "mobile-foldout-detail" : undefined;
+    return <p className={className}>{detail}</p>;
+  }
+  return <ContactDirectory contacts={contacts} placement={placement} />;
+}
+
+function ContactDirectory({ contacts, placement }) {
+  const [copyState, setCopyState] = useState({ phone: null, status: "idle" });
+  const resetTimerRef = useRef(null);
+
+  useEffect(() => () => window.clearTimeout(resetTimerRef.current), []);
+
+  const copyPhone = async (contact) => {
+    window.clearTimeout(resetTimerRef.current);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(contact.phone);
+      setCopyState({ phone: contact.phone, status: "copied" });
+    } catch {
+      setCopyState({ phone: contact.phone, status: "error" });
+    }
+    resetTimerRef.current = window.setTimeout(() => setCopyState({ phone: null, status: "idle" }), 2_000);
+  };
+
+  return (
+    <div className={`contact-directory contact-directory-${placement}`} aria-label="Số điện thoại đặt bàn">
+      {contacts.map((contact) => {
+        const state = copyState.phone === contact.phone ? copyState.status : "idle";
+        const buttonLabel = state === "copied" ? "Đã sao chép" : state === "error" ? "Không sao chép được, thử lại" : "Sao chép";
+        return (
+          <div className="contact-directory-row" key={`${contact.name}-${contact.phone}`}>
+            <span className="contact-directory-name">{contact.name}</span>
+            <a className="contact-directory-phone" href={`tel:${contact.dial}`} aria-label={`Gọi ${contact.name} theo số ${contact.phone}`}>{contact.phone}</a>
+            <button
+              className={state === "copied" ? "is-copied" : state === "error" ? "is-error" : ""}
+              type="button"
+              aria-label={`${buttonLabel} số điện thoại ${contact.name}`}
+              title={`${buttonLabel} số điện thoại`}
+              onClick={() => copyPhone(contact)}
+            >
+              <ActionIcon name={state === "copied" ? "check" : "copy"} />
+            </button>
+          </div>
+        );
+      })}
+      <span className="sr-only" aria-live="polite" aria-atomic="true">
+        {copyState.status === "copied" ? `Đã sao chép ${copyState.phone}.` : copyState.status === "error" ? `Không sao chép được ${copyState.phone}. Chạm lại để thử.` : ""}
+      </span>
+    </div>
   );
 }
 

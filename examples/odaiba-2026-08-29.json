@@ -1,0 +1,209 @@
+{
+  "trip": {
+    "slug": "odaiba-rainbow-drone-show-2026-08-29",
+    "title": "Odaiba Rainbow & Drone Show",
+    "startDate": "2026-08-29",
+    "endDate": "2026-08-29",
+    "timezone": "Asia/Tokyo",
+    "location": "Odaiba, Tokyo"
+  },
+  "sources": [
+    {
+      "number": 1,
+      "title": "TOKYO Rainbow Summer Festival ＜DECKS Tokyo Beach＞ - TokyoOdaiba.net",
+      "url": "https://www.tokyo-odaiba.net/en/event_tourism/dex_tokyo_rainbow2026/"
+    },
+    {
+      "number": 2,
+      "title": "Tokyo Aqua Symphony",
+      "url": "https://tokyoaquasymphony.jp/en/"
+    },
+    {
+      "number": 3,
+      "title": "Special Event: Tokyo Aqua Symphony × Drone Show - TokyoOdaiba.net",
+      "url": "https://www.tokyo-odaiba.net/en/event_tourism/ta_symphony_droneshow_202608/"
+    }
+  ],
+  "schedule": [
+    {
+      "key": "call-dinner-reservation",
+      "start": "11:00",
+      "end": "11:10",
+      "type": "Reservation",
+      "icon": "📞",
+      "title": "Gọi đặt bàn dinner",
+      "detail": "Red Lobster — 03-3599-5521\nTGI FRIDAYS — 050-3196-3586",
+      "refs": []
+    },
+    {
+      "key": "higashi-nakayama-to-odaiba-kaihinkoen",
+      "start": "15:00",
+      "end": "16:05",
+      "displayEnd": "~16:05",
+      "type": "Transit",
+      "icon": "🚝",
+      "title": "Higashi-Nakayama → Odaiba-kaihinkoen",
+      "detail": "Khởi hành khoảng 15:00. Ngắm cảnh từ trên cao và đoạn qua Rainbow Bridge.",
+      "refs": []
+    },
+    {
+      "key": "tokyo-rainbow-summer-festival",
+      "start": "16:10",
+      "end": "17:00",
+      "type": "Festival",
+      "icon": "🌈",
+      "title": "TOKYO Rainbow Summer Festival — DECKS 3F",
+      "detail": "Chỉ ghé event này; thấy gì vui thì chơi, không cần đi hết. Free entry; cuối tuần mở 11:00–21:00.",
+      "refs": [1]
+    },
+    {
+      "key": "chill-ven-vinh",
+      "start": "17:00",
+      "end": "18:30",
+      "type": "Relax",
+      "icon": "🌊",
+      "title": "Chill ven vịnh",
+      "detail": "Ra phía Seaside Deck/Odaiba Marine Park. Đi một chút, ngồi một chút, café hoặc uống nước nếu muốn. Không có điểm tiếp theo phải check-in.",
+      "refs": []
+    },
+    {
+      "key": "walk-to-tokyo-aqua-symphony",
+      "start": "18:30",
+      "end": "18:45",
+      "type": "Walk",
+      "icon": "🚶",
+      "title": "Đi về khu Tokyo Aqua Symphony",
+      "detail": "Từ từ đi về khu biểu diễn. Website chính thức ghi địa điểm cách Daiba Station khoảng 3 phút đi bộ.",
+      "refs": [2]
+    },
+    {
+      "key": "choose-drone-viewing-spot",
+      "start": "18:45",
+      "end": "19:00",
+      "type": "Break",
+      "icon": "🪑",
+      "title": "Chọn chỗ xem, nghỉ chân",
+      "detail": "Ổn định vị trí xem trước suất drone đầu tiên.",
+      "refs": [3]
+    },
+    {
+      "key": "drone-show-1",
+      "start": "19:00",
+      "end": "19:10",
+      "type": "Show",
+      "icon": "🚁",
+      "title": "Drone #1 + Aqua Symphony",
+      "detail": "Tokyo Aqua Symphony kết hợp trình diễn 800 drone.",
+      "refs": [3]
+    },
+    {
+      "key": "walk-to-aqua-city-6f",
+      "start": "19:10",
+      "end": "19:20",
+      "type": "Walk",
+      "icon": "🚶",
+      "title": "Đi vào Aqua City 6F",
+      "detail": "Di chuyển vào khu nhà hàng và chọn phương án dinner theo kết quả gọi lúc 11:00. Nếu cả Red Lobster và TGI FRIDAYS đều không nhận reservation, walk-in hỏi bàn sau drone #1; The Oven là backup cuối.",
+      "refs": [],
+      "branchGroup": {
+        "key": "dinner-choice",
+        "title": "Dinner — chọn 1 trong 3 phương án",
+        "defaultBranchKey": "red-lobster",
+        "branches": [
+          {
+            "key": "red-lobster",
+            "label": "Red Lobster",
+            "condition": "Ưu tiên 1 — khi nhận được reservation hoặc có bàn walk-in",
+            "schedule": [
+              {
+                "key": "dinner-red-lobster",
+                "start": "19:20",
+                "end": "20:35",
+                "type": "Dinner",
+                "icon": "🦞",
+                "title": "Dinner — Red Lobster Odaiba",
+                "detail": "Ưu tiên 1. Seafood tại Aqua City 6F; mở 11:00–23:00. Lúc 11:00 gọi 03-3599-5521 hỏi reservation cho 2 người khoảng 19:20 và xin 窓側の席. Nếu không nhận reservation thì thử walk-in sau drone #1.",
+                "refs": []
+              }
+            ]
+          },
+          {
+            "key": "tgi-fridays",
+            "label": "TGI FRIDAYS",
+            "condition": "Ưu tiên 2 — khi Red Lobster không nhận reservation hoặc không có bàn walk-in",
+            "schedule": [
+              {
+                "key": "dinner-tgi-fridays",
+                "start": "19:20",
+                "end": "20:35",
+                "type": "Dinner",
+                "icon": "🍔",
+                "title": "Dinner — TGI FRIDAYS Odaiba Aqua City",
+                "detail": "Phương án rẻ và casual hơn; mở 11:00–22:00. Nếu Red Lobster không nhận reservation, gọi 050-3196-3586 ngay sau đó. Nếu cả hai nơi đều không nhận reservation thì thử walk-in sau drone #1.",
+                "refs": []
+              }
+            ]
+          },
+          {
+            "key": "the-oven",
+            "label": "The Oven",
+            "condition": "Backup cuối — khi reservation và walk-in ở hai phương án ưu tiên đều không được",
+            "schedule": [
+              {
+                "key": "dinner-the-oven",
+                "start": "19:20",
+                "end": "20:35",
+                "type": "Dinner",
+                "icon": "🍽️",
+                "title": "Dinner — The Oven",
+                "detail": "Phương án backup. Buffet khoảng ¥2,000–3,000/người; tối thứ Bảy mở 17:00–21:30.",
+                "refs": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "key": "waterfront-break-after-dinner",
+      "start": "20:35",
+      "end": "20:50",
+      "type": "Relax",
+      "icon": "🌊",
+      "title": "Ra waterfront",
+      "detail": "Đi bộ nhẹ hoặc ngồi một lúc sau dinner.",
+      "refs": []
+    },
+    {
+      "key": "return-to-drone-viewing-area",
+      "start": "20:50",
+      "end": "21:00",
+      "type": "Walk",
+      "icon": "🚶",
+      "title": "Quay về khu xem drone",
+      "detail": "Trở lại vị trí xem trước suất thứ hai.",
+      "refs": [3]
+    },
+    {
+      "key": "drone-show-2",
+      "start": "21:00",
+      "end": "21:10",
+      "type": "Show",
+      "icon": "🚁",
+      "title": "Drone #2 + Aqua Symphony",
+      "detail": "Suất Tokyo Aqua Symphony kết hợp drone thứ hai trong ngày.",
+      "refs": [3]
+    },
+    {
+      "key": "night-walk-rainbow-bridge",
+      "start": "21:10",
+      "end": "23:59",
+      "displayEnd": "trở đi",
+      "type": "Walk",
+      "icon": "❤️",
+      "title": "Night walk ngắm Rainbow Bridge",
+      "detail": "Đi dạo buổi tối và ngắm Rainbow Bridge. Không đặt giờ kết thúc cứng.",
+      "refs": []
+    }
+  ]
+}

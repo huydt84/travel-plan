@@ -40,6 +40,52 @@ test("public tracker title reflects the current trip state", async ({ page }) =>
   await expect(page).toHaveTitle(/^(Sắp bắt đầu|Đang diễn ra|Đang chờ|Đã kết thúc) · /);
 });
 
+test("reservation phone directory stays compact and copies the selected number", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.route("**/api/itinerary?slug=*", async (route) => {
+    const response = await route.fetch();
+    const itinerary = await response.json();
+    itinerary.itinerary[0].detail = "Red Lobster — 03-3599-5521\nTGI FRIDAYS — 050-3196-3586";
+    await route.fulfill({ response, json: itinerary });
+  });
+  await gotoHealthy(page, "/");
+
+  const firstActivity = page.locator(".timeline-item").first();
+  const directory = firstActivity.getByLabel("Số điện thoại đặt bàn");
+  const redLobsterPhone = directory.getByRole("link", { name: "Gọi Red Lobster theo số 03-3599-5521" });
+  const redLobsterCopy = directory.getByRole("button", { name: "Sao chép số điện thoại Red Lobster" });
+  await expect(directory).toBeVisible();
+  await expect(directory.getByText("TGI FRIDAYS", { exact: true })).toBeVisible();
+  await expect(redLobsterPhone).toHaveAttribute("href", "tel:0335995521");
+  await expect(redLobsterCopy).toHaveText("");
+  await redLobsterCopy.click();
+  await expect(directory.getByRole("button", { name: "Đã sao chép số điện thoại Red Lobster" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe("03-3599-5521");
+
+  for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(viewport);
+    const geometry = await directory.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const buttons = [...element.querySelectorAll("button")].map((button) => button.getBoundingClientRect());
+      return {
+        left: rect.left,
+        right: rect.right,
+        viewportWidth: window.innerWidth,
+        phoneLinksFullyVisible: [...element.querySelectorAll(".contact-directory-phone")].every((link) => link.scrollWidth <= link.clientWidth + 1),
+        smallestButtonWidth: Math.min(...buttons.map((button) => button.width)),
+        smallestButtonHeight: Math.min(...buttons.map((button) => button.height)),
+      };
+    });
+    expect(geometry.left).toBeGreaterThanOrEqual(0);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
+    expect(geometry.phoneLinksFullyVisible).toBe(true);
+    if (viewport.width === 320) {
+      expect(geometry.smallestButtonWidth).toBeGreaterThanOrEqual(44);
+      expect(geometry.smallestButtonHeight).toBeGreaterThanOrEqual(44);
+    }
+  }
+});
+
 test("activity heartbeat pauses in hidden tabs and resumes when visible", async ({ page }) => {
   let activityRequests = 0;
   await page.addInitScript(() => {
