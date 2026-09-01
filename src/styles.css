@@ -225,9 +225,9 @@ button, select { cursor: pointer; }
 .countdown-progress { position: relative; display: block; height: 6px; margin-top: 24px; overflow: hidden; background: var(--paper-deep); }
 .countdown-progress::after { content: ""; position: absolute; inset: 0; background: var(--green); transform: scaleX(var(--progress)); transform-origin: left; transition: transform .6s cubic-bezier(.16, 1, .3, 1); }
 .now-detail { max-width: 70ch; margin: 30px 0 0 76px; color: var(--navy-soft); font-size: 13px; line-height: 1.65; }
-.contact-directory { display: grid; max-width: 560px; border: 1px solid var(--navy); background: var(--paper-bright); }
+.contact-directory { display: grid; grid-template-columns: minmax(112px, 1fr) auto 42px; max-width: 560px; border: 1px solid var(--navy); background: var(--paper-bright); }
 .contact-directory-station { margin: 30px 0 0 76px; }
-.contact-directory-row { display: grid; grid-template-columns: minmax(112px, 1fr) auto 42px; align-items: stretch; min-width: 0; }
+.contact-directory-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: stretch; min-width: 0; }
 .contact-directory-row + .contact-directory-row { border-top: 1px solid var(--line); }
 .contact-directory-name { align-self: center; min-width: 0; padding: 11px 13px; overflow: hidden; font: 600 16px/1 var(--display); text-overflow: ellipsis; white-space: nowrap; }
 .contact-directory-phone { display: flex; align-items: center; min-width: 0; padding: 10px 13px; border-left: 1px solid var(--line); color: var(--green-dark); font: 600 16px/1 var(--display); font-variant-numeric: tabular-nums; text-decoration-thickness: 1px; text-underline-offset: 3px; white-space: nowrap; }
@@ -1024,7 +1024,7 @@ footer { display: flex; justify-content: space-between; gap: 16px; max-width: 11
   .mobile-foldout-countdown strong { color: var(--green); font: 700 43px/.85 var(--display); font-variant-numeric: tabular-nums; text-align: center; }
   .mobile-foldout-countdown small { color: var(--muted); font-size: 8px; }
   .mobile-foldout-detail { margin: 20px 0 0; color: var(--navy-soft); font-size: 11px; line-height: 1.55; }
-  .contact-directory-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .contact-directory { grid-template-columns: minmax(0, 1fr) auto; }
   .contact-directory-name { grid-column: 1 / -1; padding: 9px 10px 6px; font-size: 15px; }
   .contact-directory-phone { min-height: 44px; padding: 8px; border-left: 0; font-size: 14px; }
   .contact-directory-row button { min-width: 44px; min-height: 44px; }

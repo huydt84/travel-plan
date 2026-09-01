@@ -40,6 +40,35 @@ test("public tracker title reflects the current trip state", async ({ page }) =>
   await expect(page).toHaveTitle(/^(Sắp bắt đầu|Đang diễn ra|Đang chờ|Đã kết thúc) · /);
 });
 
+test("active activity uses activity-neutral feedback terminology", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-08-09T05:00:30.000Z") });
+  await gotoHealthy(page, "/");
+
+  await expect(page.locator(".now-station .station-actions button")).toHaveText("Góp ý cho hoạt động này");
+  await expect(page.locator(".timeline .suggestion-trigger").first()).toHaveText("Góp ý cho hoạt động này");
+});
+
+test("reservation activity uses a dedicated icon instead of the visit fallback", async ({ page }) => {
+  await page.route("**/api/itinerary?slug=*", async (route) => {
+    const response = await route.fetch();
+    const itinerary = await response.json();
+    itinerary.itinerary[0].type = "Reservation";
+    itinerary.itinerary[0].title = "Reservation icon probe";
+    itinerary.itinerary[1].type = "Visit";
+    itinerary.itinerary[1].title = "Visit icon probe";
+    await route.fulfill({ response, json: itinerary });
+  });
+  await gotoHealthy(page, "/");
+
+  const reservationIcon = page.getByRole("heading", { name: "Reservation icon probe", exact: true }).locator("..").locator(".type-icon");
+  const visitIcon = page.getByRole("heading", { name: "Visit icon probe", exact: true }).locator("..").locator(".type-icon");
+  await expect(reservationIcon).toBeVisible();
+  await expect(visitIcon).toBeVisible();
+  const [reservationMarkup, visitMarkup] = await Promise.all([reservationIcon.evaluate((icon) => icon.outerHTML), visitIcon.evaluate((icon) => icon.outerHTML)]);
+  expect(reservationMarkup, "Reservation must not render the generic location icon").not.toBe(visitMarkup);
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
 test("reservation phone directory stays compact and copies the selected number", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.route("**/api/itinerary?slug=*", async (route) => {
@@ -71,6 +100,7 @@ test("reservation phone directory stays compact and copies the selected number",
         left: rect.left,
         right: rect.right,
         viewportWidth: window.innerWidth,
+        phoneLinkLefts: [...element.querySelectorAll(".contact-directory-phone")].map((link) => link.getBoundingClientRect().left),
         phoneLinksFullyVisible: [...element.querySelectorAll(".contact-directory-phone")].every((link) => link.scrollWidth <= link.clientWidth + 1),
         smallestButtonWidth: Math.min(...buttons.map((button) => button.width)),
         smallestButtonHeight: Math.min(...buttons.map((button) => button.height)),
@@ -79,6 +109,9 @@ test("reservation phone directory stays compact and copies the selected number",
     expect(geometry.left).toBeGreaterThanOrEqual(0);
     expect(geometry.right).toBeLessThanOrEqual(geometry.viewportWidth);
     expect(geometry.phoneLinksFullyVisible).toBe(true);
+    if (viewport.width >= 1440) {
+      expect(Math.max(...geometry.phoneLinkLefts) - Math.min(...geometry.phoneLinkLefts), "phone columns must align across rows").toBeLessThanOrEqual(0.5);
+    }
     if (viewport.width === 320) {
       expect(geometry.smallestButtonWidth).toBeGreaterThanOrEqual(44);
       expect(geometry.smallestButtonHeight).toBeGreaterThanOrEqual(44);

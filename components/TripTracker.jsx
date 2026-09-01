@@ -296,7 +296,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
   const stationSuggestionActivityId = isAfter ? null : state.current.id;
   const stationSuggestionTarget = isAfter ? "cả chuyến đi" : state.current.title;
   const stationSuggestionKey = stationSuggestionActivityId || "trip";
-  const stationSuggestionLabel = isAfter ? "Góp ý cho cả chuyến" : "Góp ý tại ga này";
+  const stationSuggestionLabel = isAfter ? "Góp ý cho cả chuyến" : "Góp ý cho hoạt động này";
 
   const jumpToCurrent = () => {
     const targetState = resolvedState;
@@ -634,7 +634,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
                   {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                   <SuggestionList suggestions={suggestionsByActivity.get(item.id) || []} {...suggestionListProps} />
                   <button className="suggestion-trigger" type="button" onClick={() => openSuggestion(item.id, item.title)}>
-                    {viewer ? "Góp ý cho mục này" : "Đăng nhập để góp ý"}
+                    {viewer ? "Góp ý cho hoạt động này" : "Đăng nhập để góp ý"}
                   </button>
                 </div>
               </article>
@@ -756,7 +756,7 @@ function BranchJunction({ group, startsTrip = false, viewer, sourceMap, suggesti
                         <div><span className="type-label"><TypeIcon type={item.type} />{item.type}</span><h4>{item.title}</h4>{item.detail && <ActivityDetail detail={item.detail} placement="branch" />}
                           {item.refs.length > 0 && <div className="citations">{item.refs.map((ref) => <Citation key={ref} source={sourceMap.get(ref)} />)}</div>}
                           <SuggestionList suggestions={suggestionsByActivity.get(item.id) || []} {...suggestionListProps} />
-                          <button className="suggestion-trigger" type="button" onClick={() => onSuggest(item.id, item.title)}>{viewer ? "Góp ý cho mục này" : "Đăng nhập để góp ý"}</button>
+                          <button className="suggestion-trigger" type="button" onClick={() => onSuggest(item.id, item.title)}>{viewer ? "Góp ý cho hoạt động này" : "Đăng nhập để góp ý"}</button>
                         </div>
                       </article>
                     ))}
