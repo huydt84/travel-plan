@@ -26,7 +26,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Package management
 
-- Use pnpm 11.19.0 for all project commands; use `pnpm exec` for installed tools and `pnpm dlx` for one-off tools. Do not use raw npm or npx.
+- Use pnpm 11.25.0 for all project commands; use `pnpm exec` for installed tools and `pnpm dlx` for one-off tools. Do not use raw npm or npx.
 - Install with `pnpm install --frozen-lockfile`. Keep the pinned package manager, `pnpm-lock.yaml`, and `pnpm-workspace.yaml` security settings in sync. Review dependency scripts before granting narrowly scoped build permissions; never disable protections just to make installation succeed.
 
 ## Local development
@@ -64,10 +64,10 @@ Use this runbook for a production deploy from Codex desktop.
 2. Deploy the linked project directly with the Vercel CLI:
 
    ```sh
-   rtk pnpm dlx vercel --prod --yes
+   rtk pnpm run deploy:prod
    ```
 
-   Do not inspect or print environment values. If authentication has expired, ask the user to complete `pnpm dlx vercel login` once, then retry the deploy.
+   Do not inspect or print environment values. If authentication has expired, ask the user to complete `pnpm exec vercel login` once, then retry the deploy.
 
 3. Smoke-check the production alias and expected admin hierarchy:
 
@@ -80,4 +80,4 @@ Use this runbook for a production deploy from Codex desktop.
 
    `/` should be `200`, `/admin` should be `404`, and the trips/users routes should be `200`.
 
-Database migrations are separate from deployment. Run `pnpm run db:migrate` only for an intentional schema change; schedule data changes in Neon do not require a Vercel redeploy.
+The authorized production command syncs environment configuration, applies pending migrations, then deploys using the locked Vercel CLI. Review pending migrations before running it. Use `pnpm exec vercel --prod --yes` only when intentionally deploying without environment sync or migrations. Schedule data changes in Neon do not require a Vercel redeploy.

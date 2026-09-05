@@ -53,6 +53,38 @@ typography:
     fontSize: "15px"
     fontWeight: 400
     lineHeight: 1.75
+  assistant-title:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "20px"
+    fontWeight: 600
+    lineHeight: 1.3
+  assistant-title-compact:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "18px"
+    fontWeight: 600
+    lineHeight: 1.3
+  assistant-welcome:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "24px"
+    fontWeight: 600
+    lineHeight: 1.35
+  assistant-drawer-title:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "20px"
+    fontWeight: 600
+    lineHeight: 1.35
+  assistant-subtitle:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "18px"
+    fontWeight: 600
+    lineHeight: 1.4
+  assistant-entry:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "16px"
+    lineHeight: 1.5
+  assistant-detail:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "14px"
   label:
     fontFamily: "Noto Sans, system-ui, sans-serif"
     fontSize: "9px"
@@ -62,6 +94,7 @@ typography:
 rounded:
   field: "3px"
   control: "4px"
+  composer: "8px"
   round: "50%"
 spacing:
   micro: "7px"
@@ -111,6 +144,18 @@ components:
     typography: "{typography.conversation-body}"
     rounded: "{rounded.control}"
     padding: "14px 18px"
+  assistant-composer:
+    backgroundColor: "{colors.paper-bright}"
+    textColor: "{colors.navy}"
+    typography: "{typography.assistant-entry}"
+    rounded: "{rounded.composer}"
+    padding: "8px"
+  assistant-icon:
+    backgroundColor: "transparent"
+    textColor: "{colors.navy}"
+    rounded: "{rounded.control}"
+    width: "44px"
+    height: "44px"
   next-fascia:
     backgroundColor: "{colors.yellow-soft}"
     textColor: "{colors.navy}"
@@ -187,7 +232,7 @@ The palette is deliberately small and operational: navy establishes station auth
 - **Headline** (700, fluid 35–56px, 0.95 line-height): Major public sections and plan summaries.
 - **Title** (600, 24px, 1.05 line-height): Timetable rows, editor sections, and compact station names.
 - **Body** (400, 12px, 1.62 line-height): Existing compact itinerary detail and explanatory copy; this incumbent scale does not govern conversation prose.
-- **Conversation:** Noto Sans uses a 15px/1.65 base for user messages and the workspace, with 16px/1.75 assistant responses reduced to 15px at 760px and below. Responses stay within 72ch. Composer entry remains 16px/1.5; source and change details use 14px, with secondary drawer metadata at 12px. Short workspace and drawer titles use condensed 28px/1.1 type (24px workspace title on compact screens); headings inside Markdown remain neutral sans for continuous reading.
+- **Conversation:** The conversation-body role governs user messages and the workspace. Dedicated-page replies retain conversation-response sizing even at 320px; only companion replies use conversation-response-compact. Responses stay within 72ch. Assistant structure uses neutral sans throughout: assistant-title for the header, assistant-title-compact at container widths up to 600px, assistant-welcome for welcome and access headings, assistant-drawer-title for drawer headings, and assistant-subtitle for evidence and change headings. Composer entry uses assistant-entry; source and change body details use assistant-detail, with secondary drawer metadata at 12px. Headings inside Markdown remain neutral sans for continuous reading.
 - **Label** (700, 9px, 0.08em letter-spacing): Types, statuses, control labels, and metadata. Uppercase is used for compact operational labels, not full paragraphs.
 - **Timing:** All clocks, ranges, countdowns, and schedule columns use tabular numerals. Timing may scale to display size but remains in the condensed family.
 
@@ -211,7 +256,7 @@ Spacing follows compact operational increments rather than airy marketing rhythm
 
 **The Route-Persistence Rule.** Responsive adaptation may reflow or replace the desktop composition, but it may not turn itinerary stations into a stack of detached cards.
 
-The assistant has one scrollable message column between a nonshrinking header/toolbar and composer. On the tracker, the companion sits beside the itinerary at widths of 1200px and above: 480px wide, growing to 600px at 1800px. The tracker gives up the same width and reflows its control band. Below 1200px, the companion becomes a full-screen dialog; the dedicated `/assistant` page uses the full viewport at every size. History, sources, and proposal review share an on-demand right-side drawer, capped at 600px and filling narrower screens. The current implementation supersedes the former `/v1` three-column workspace; conversation, evidence, and review are not permanent parallel columns.
+The assistant has one scrollable message column between a nonshrinking header/toolbar and composer. The message and composer content share a centered 760px reading column. At assistant container widths up to 600px, the title and window actions occupy the first header row; the trip picker, history, and new-conversation controls share the second row. Wider containers place conversation actions beside the title and give trip selection the second row. On the tracker, the companion sits beside the itinerary at viewport widths of 1200px and above. Its default width is 480px, or 600px from 1800px; a saved user preference overrides the default. The left edge resizes the companion from 360px to the smaller of 960px or viewport width minus 640px. The tracker gives up exactly the current panel width and responds to its remaining container width. At 1100px and below, its control band reflows, station title and countdown stack, and station type and padding compact. At 800px and below, the current station sits above the ruled route overview, whose list scrolls within 400px. These companion-scoped rules prevent overlap without changing the standalone tracker layout. Below 1200px, the companion becomes a full-screen dialog; the dedicated `/assistant` page uses the full viewport at every size. History, sources, and proposal review share an on-demand right-side drawer, capped at 600px and filling narrower screens. The current implementation supersedes the former `/v1` three-column workspace; conversation, evidence, and review are not permanent parallel columns.
 
 **The Reading-First Rule.** Keep trip selection, history, and new conversation above the message column, the compact composer below it, and detailed evidence and proposal review in focus-restoring drawers. Preserve the first-viewport controls at 320px without squeezing the message type.
 
@@ -229,7 +274,9 @@ The assistant inspection drawer uses a plain translucent navy scrim (`rgb(16 36 
 
 ## Shapes
 
-The default silhouette is square and architectural. Borders are usually 1px for timetable rules and 2px for structural enclosures. Small controls and fields use only 3–4px corner radii. Major surfaces use clipped corners rather than rounded rectangles: editors clip at 10px, current timeline panels at 12px, contribution panels and composers at 14px, login boards at 16px, and the desktop active station at 18px with a route-facing notch. Next-stop fascias use directional polygon ends.
+The default silhouette is square and architectural. Borders are usually 1px for timetable rules and 2px for structural enclosures. Small controls and fields use only 3–4px corner radii. Major surfaces use clipped corners rather than rounded rectangles: editors clip at 10px, current timeline panels at 12px, contribution panels and contribution composers at 14px, login boards at 16px, and the desktop active station at 18px with a route-facing notch. Next-stop fascias use directional polygon ends.
+
+The assistant composer uses the scoped composer radius around one shared input-and-action frame; its other controls retain the small control radius. This exception supports conversational entry without changing itinerary panel geometry.
 
 Circles are semantic and scarce: route nodes, live indicators, and user avatars only. Code-native line icons use rounded strokes, but their containers stay square.
 
@@ -288,11 +335,15 @@ Public and owner rows share time/rail/content alignment, thin separators, conden
 
 ### Integrated Assistant
 
-The trip launcher is a small outlined, deep-green action with a line-SVG conversation icon and a rectangular unread count. User messages align right on washed green with 4px corners; assistant responses remain on the paper field. Authorship labels, spacing, and content distinguish the two speakers. Markdown links are underlined deep green; tables scroll within their own region, and long text wraps without widening the workspace.
+The trip launcher is a small outlined, deep-green action with a line-SVG conversation icon and a rectangular unread count. The dedicated page has separate Back and Thu nhỏ controls: Back returns to the trip with chat hidden; Thu nhỏ preserves the selected trip and conversation and opens chat beside the tracker (or full screen below 1200px). Mở rộng preserves that context when entering the dedicated page. User messages align right on washed green with 4px corners; assistant responses remain on the paper field. Authorship labels, spacing, and content distinguish the two speakers. Markdown links are underlined deep green; tables scroll within their own region, and long text wraps without widening the workspace.
 
-The composer is an attached bright-paper strip with a ruled top edge, a labeled 16px textarea, and explicit Send or Stop. Entry can grow up to 180px while the message region keeps its own scroll. Main conversation actions and citation targets have a 44px minimum target; the textarea starts at 48px. Busy states retain the question and show a textual progress or interrupted state.
+The composer sits on the paper field with a single bright-paper frame enclosing both the labeled textarea and the bottom-right Send or Stop icon. It uses the assistant-composer and assistant-entry tokens, a thin muted rule, and a deep-green focus border. Entry starts at 48px and can grow up to 180px while the message region keeps its own scroll. Header, drawer-close, Send, and Stop icons use 44px controls, accessible names, and matching native title hints; citation targets retain a 44px minimum. The keyboard hint hides on small screens while the explicit-apply assurance remains visible. Busy states retain the question and show textual progress or interruption.
+
+Welcome content preserves its Vietnamese wording with the assistant-welcome heading and quiet, left-aligned prompt rows. The access surface is a simple centered paper-field composition with the same heading role.
 
 History uses ruled rows and a green wash for the selected conversation. Source and proposal actions attach to their response and open the shared drawer. Pending review uses transfer paper; applied results use washed green; conflicts, expiry, and destructive changes use service-red fields with text. Before/after content remains inspectable, and Apply stays explicit and visible near the drawer bottom. Dialogs restore focus on close. New content does not force the reader away from an older response; a recovery action appears when needed.
+
+The desktop resize edge is a labeled, focusable vertical separator with current/minimum/maximum width exposed to assistive technology. A 12px pointer region straddles the navy seam, expanding to 44px for coarse pointers; a centered 4px by 44px grey grip becomes deep green on hover, focus, or drag. Keyboard focus has a yellow outline. Left/Right grow/shrink by 24px, or 80px with Shift; Home/End choose the bounds. Enter or double-click restores the responsive default, and Escape cancels an active drag. Accepted pointer and keyboard changes retain a best-effort local width preference.
 
 ### Motion and Live State
 

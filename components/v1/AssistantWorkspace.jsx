@@ -7,6 +7,7 @@ import { useConversation } from "./useConversation";
 import { apiJson } from "./transport.mjs";
 import MessageContent from "./MessageContent";
 import Composer from "./Composer";
+import AssistantIcon from "./AssistantIcon";
 import ConversationHistory from "./ConversationHistory";
 import { EvidencePanel, ChangePanel } from "./ProposalReview";
 import styles from "./assistant.module.css";
@@ -18,16 +19,24 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
   const [panel, setPanel] = useState(null), [selectedId, setSelectedId] = useState(null), [applying, setApplying] = useState(false);
   const [newResponse, setNewResponse] = useState(false);
   const listRef = useRef(null), nearEnd = useRef(true), olderAnchor = useRef(null), focusCitation = useRef(null), citationFocus = useRef(null);
+  const retryFocus = useRef(null);
   const running = chat.turns.some((turn) => turn.status === "running");
   const selected = chat.turns.find((turn) => turn.id === selectedId) || chat.turns.at(-1);
   const changeSet = selected?.changeSet;
+  useEffect(() => {
+    if (!chat.retrying && retryFocus.current) {
+      const target = listRef.current?.querySelector(`[data-exchange="${retryFocus.current}"]`);
+      target?.focus({ preventScroll: true });
+      retryFocus.current = null;
+    }
+  }, [chat.retrying]);
   useEffect(() => {
     const element = listRef.current;
     if (!element) return;
     if (olderAnchor.current !== null) { element.scrollTop += element.scrollHeight - olderAnchor.current; olderAnchor.current = null; return; }
     if (nearEnd.current) element.scrollTop = element.scrollHeight;
     else if (running) { const timer = setTimeout(() => setNewResponse(true), 0); return () => clearTimeout(timer); }
-  }, [chat.turns, running]);
+  }, [chat.turns, running, chat.disconnected, chat.retrying]);
   useEffect(() => {
     nearEnd.current = true;
     const element = listRef.current;
@@ -55,38 +64,63 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
   };
   return <section className={`${styles.shell} ${companion ? styles.companion : ""}`} aria-label="Trợ lý hành trình">
     <header className={styles.topbar}>
-      <div><Link href={`/?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}`} onClick={onClose} className={styles.backLink}>Lịch trình</Link><h1>Trợ lý hành trình</h1></div>
-      <div className={styles.headerActions}>{companion && <Link href={`/assistant?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}${chat.workspace?.selectedConversation ? `&conversation=${chat.workspace.selectedConversation.id}` : ""}`} onClick={onClose}>Mở rộng</Link>}{onClose && <button type="button" onClick={onClose}>Đóng</button>}</div>
+      <div className={styles.headingGroup}>
+        {!companion && <Link href={`/?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}`} className={styles.iconButton} aria-label="Lịch trình" title="Lịch trình"><AssistantIcon name="back" /></Link>}
+        <h1>Trợ lý hành trình</h1>
+      </div>
+      <div className={styles.headerActions}>
+        {!companion && <Link className={styles.iconButton} href={`/?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}&chat=1${chat.workspace?.selectedConversation ? `&conversation=${chat.workspace.selectedConversation.id}` : ""}`} aria-label="Thu nhỏ" title="Thu nhỏ về lịch trình"><AssistantIcon name="collapse" /></Link>}
+        {companion && <Link className={styles.iconButton} href={`/assistant?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}${chat.workspace?.selectedConversation ? `&conversation=${chat.workspace.selectedConversation.id}` : ""}`} aria-label="Mở rộng" title="Mở rộng"><AssistantIcon name="expand" /></Link>}
+        {onClose && <button className={styles.iconButton} type="button" onClick={onClose} aria-label="Đóng" title="Đóng"><AssistantIcon name="close" /></button>}
+      </div>
+      <div className={styles.toolbar}>
+        <label className={styles.tripControl}><span>Chuyến đi</span><select aria-label="Chuyến đi" value={chat.workspace?.selectedTripSlug || ""} onChange={(event) => { setPanel(null); chat.selectTrip(event.target.value); }} disabled={chat.loading || chat.submitting}>
+          {chat.workspace?.trips.map((trip) => <option key={trip.slug} value={trip.slug}>{trip.title}</option>)}
+        </select></label>
+      </div>
+      <div className={styles.conversationActions}>
+        <button className={styles.iconButton} type="button" disabled={chat.loading} onClick={() => { setPanel("history"); void chat.history(); }} aria-label="Lịch sử" title="Lịch sử"><AssistantIcon name="history" /></button>
+        <button className={styles.iconButton} type="button" disabled={chat.loading || chat.submitting} onClick={chat.newConversation} aria-label="Trò chuyện mới" title="Trò chuyện mới"><AssistantIcon name="new" /></button>
+      </div>
     </header>
-    <div className={styles.toolbar}>
-      <label className={styles.tripControl}><span>Chuyến đi</span><select aria-label="Chuyến đi" value={chat.workspace?.selectedTripSlug || ""} onChange={(event) => { setPanel(null); chat.selectTrip(event.target.value); }} disabled={chat.loading || chat.submitting}>
-        {chat.workspace?.trips.map((trip) => <option key={trip.slug} value={trip.slug}>{trip.title}</option>)}
-      </select></label>
-      <div><button type="button" disabled={chat.loading} onClick={() => { setPanel("history"); void chat.history(); }}>Lịch sử</button><button type="button" disabled={chat.loading || chat.submitting} onClick={chat.newConversation}>Trò chuyện mới</button></div>
-    </div>
     <div className={styles.turnList} ref={listRef} aria-label="Nội dung cuộc trò chuyện" aria-busy={chat.loading} onScroll={(event) => { const el = event.currentTarget; nearEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; if (nearEnd.current) setNewResponse(false); }}>
       {chat.loading ? <p role="status">Đang tải cuộc trò chuyện…</p> : <>
         {chat.workspace?.nextCursor && <button className={styles.secondaryButton} onClick={() => { olderAnchor.current = listRef.current.scrollHeight; void chat.older(); }}>Xem trao đổi trước</button>}
-        {!chat.turns.length && <div className={styles.firstRun}><div className={styles.routeMark} aria-hidden="true"><span /><i /><span /></div><h2>Cùng lên một chuyến đi<br />vừa ý hơn.</h2><p>Hỏi về lịch trình, tìm hiểu điểm đến, hoặc chuẩn bị thay đổi. Bạn luôn là người quyết định.</p>
-          <div>{["Tóm tắt lịch và các khoảng thời gian gấp", "Kiểm tra giờ mở cửa của một địa điểm", "So sánh cách đi giữa hai hoạt động"].map((prompt) => <button key={prompt} onClick={() => { chat.setMessage(prompt); document.getElementById("assistant-message")?.focus(); }}>{prompt}</button>)}</div></div>}
-        {chat.turns.map((turn) => <article key={turn.id} className={styles.turn} aria-label={`Lượt trao đổi: ${turn.input}`}>
+        {!chat.turns.length && <div className={styles.firstRun}><h2>Cùng lên một chuyến đi vừa ý hơn.</h2><p>Hỏi về lịch trình, tìm hiểu điểm đến, hoặc chuẩn bị thay đổi. Bạn luôn là người quyết định.</p>
+          <div>{["Tóm tắt lịch và các khoảng thời gian gấp", "Kiểm tra giờ mở cửa của một địa điểm", "So sánh cách đi giữa hai hoạt động"].map((prompt) => <button key={prompt} onClick={() => { chat.setMessage(prompt); document.getElementById("assistant-message")?.focus(); }}><AssistantIcon name="prompt" /><span>{prompt}</span></button>)}</div></div>}
+        {chat.turns.map((turn, index) => <article key={turn.exchangeId || turn.id} className={styles.turn} aria-label={`Lượt trao đổi: ${turn.input}`}>
           <div className={styles.userMessage}><span>Bạn</span><p>{turn.input}</p></div>
-          <div className={styles.assistantMessage}><span>Trợ lý</span>
+          <div className={styles.assistantMessage} data-exchange={turn.exchangeId || turn.id} tabIndex={-1}><span>Trợ lý</span>
             {turn.output && <MessageContent text={turn.output} citations={turn.citations} onCitation={(citation) => inspect(turn, "evidence", citation)} />}
-            {turn.status === "running" && <p className={styles.running} role="status">{chat.progress || "Đang trả lời…"}</p>}
-            {turn.status === "failed" && <div className={styles.interrupted}><p>{turn.errorCode === "TURN_CANCELLED" ? "Đã dừng trả lời." : "Câu trả lời chưa hoàn tất."} Lịch chưa được thay đổi bởi yêu cầu này.</p><button disabled={running} onClick={() => chat.send(turn.input)}>Thử lại yêu cầu</button></div>}
+            {turn.status === "running" && chat.disconnected?.turnId !== turn.id && <p className={styles.running} role="status">{chat.progress || "Đang trả lời…"}</p>}
+            {turn.status === "failed" && <div className={styles.interrupted}>
+              <p role="status">{turn.errorCode === "TURN_CANCELLED" ? "Đã dừng trả lời." : turn.output ? "Câu trả lời bị gián đoạn." : "Không thể bắt đầu trả lời. Hãy thử lại."}</p>
+              {index === chat.turns.length - 1 && <button disabled={running || chat.submitting || chat.loading} onClick={() => { retryFocus.current = turn.exchangeId || turn.id; void chat.retry(turn); }}>{chat.retrying === turn.id ? "Đang thử lại…" : "Thử lại"}</button>}
+            </div>}
+            {chat.disconnected?.turnId === turn.id && <div className={styles.interrupted}>
+              <p role="status">{[401, 403, 404].includes(chat.disconnected.status) ? "Không thể truy cập câu trả lời. Hãy kiểm tra đăng nhập và quyền truy cập." : "Mất kết nối với câu trả lời"}</p>
+              {![401, 403, 404].includes(chat.disconnected.status) && <button onClick={chat.reconnect}>Kết nối lại</button>}
+            </div>}
             <div className={styles.messageActions}>
               {!!turn.citations?.length && <button onClick={() => inspect(turn, "evidence")}>Nguồn · {turn.citations.length}</button>}
-              {turn.changeSet && <button data-status={turn.changeSet.status} className={styles.reviewButton} onClick={() => inspect(turn, "changes")}>{turn.changeSet.status === "applied" ? "Xem thay đổi đã áp dụng" : ["expired", "conflicted"].includes(turn.changeSet.status) ? "Xem đề xuất không còn hiệu lực" : `Xem ${turn.changeSet.preview.changes.length} thay đổi được đề xuất`}</button>}
+              {turn.status === "completed" && turn.changeSet && <button data-status={turn.changeSet.status} className={styles.reviewButton} onClick={() => inspect(turn, "changes")}>{turn.changeSet.status === "applied" ? "Xem thay đổi đã áp dụng" : ["expired", "conflicted"].includes(turn.changeSet.status) ? "Xem đề xuất không còn hiệu lực" : `Xem ${turn.changeSet.preview.changes.length} thay đổi được đề xuất`}</button>}
             </div>
           </div>
         </article>)}
       </>}
     </div>
-    {newResponse && <button className={styles.newResponse} onClick={() => { nearEnd.current = true; listRef.current.scrollTop = listRef.current.scrollHeight; setNewResponse(false); }}>Có câu trả lời mới</button>}
+    {chat.submissionFailure && <div role="alert" className={styles.errorBanner}>
+      <span>{chat.submissionFailure.message}</span>
+      {(!chat.submissionFailure.status || chat.submissionFailure.status >= 500) && <button disabled={chat.submitting} onClick={chat.retrySubmission}>Thử lại</button>}
+      {chat.submissionFailure.status === 409 && <button onClick={() => chat.load({ trip: chat.workspace.selectedTripSlug, conversation: chat.workspace.selectedConversation?.id })}>Tải lại cuộc trò chuyện</button>}
+    </div>}
+
     {chat.error && <div role="alert" className={styles.errorBanner}>{chat.error}<button onClick={() => chat.load({ trip: chat.workspace?.selectedTripSlug, conversation: chat.workspace?.selectedConversation?.id, replace: true })}>Kết nối lại</button></div>}
+    <div className={styles.composerDock}>
+    {newResponse && <button className={styles.newResponse} onClick={() => { nearEnd.current = true; listRef.current.scrollTop = listRef.current.scrollHeight; setNewResponse(false); }}>Có câu trả lời mới</button>}
     <Composer message={chat.message} setMessage={chat.setMessage} onSubmit={chat.submit} onStop={chat.stop} running={running} disabled={chat.submitting || chat.loading || !chat.workspace?.selectedTripSlug} />
-    {panel && <Dialog onClose={() => setPanel(null)} pending={applying} overlayClassName={styles.overlay} initialFocusRef={citationFocus}><section className={styles.inspection}><header><DialogTitle>{panel === "history" ? "Lịch sử trò chuyện" : panel === "evidence" ? "Nguồn tham khảo" : "Xem lại thay đổi"}</DialogTitle><button disabled={applying} onClick={() => setPanel(null)}>Đóng</button></header>
+    </div>
+    {panel && <Dialog onClose={() => setPanel(null)} pending={applying} overlayClassName={styles.overlay} initialFocusRef={citationFocus}><section className={styles.inspection}><header><DialogTitle>{panel === "history" ? "Lịch sử trò chuyện" : panel === "evidence" ? "Nguồn tham khảo" : "Xem lại thay đổi"}</DialogTitle><button className={styles.iconButton} disabled={applying} onClick={() => setPanel(null)} aria-label="Đóng" title="Đóng"><AssistantIcon name="close" /></button></header>
       {panel === "history" ? <ConversationHistory conversations={chat.workspace?.conversations || []} selectedId={chat.workspace?.selectedConversation?.id} allTrips={chat.allTrips} onFilter={(all) => chat.history(false, all)} onMore={() => chat.history(true)} hasMore={!!chat.workspace?.historyCursor} onNew={() => { setPanel(null); chat.newConversation(); }} onSelect={(conversation) => { setPanel(null); chat.selectConversation(conversation); }} />
         : panel === "evidence" ? <EvidencePanel focusId={focusCitation.current} focusRef={citationFocus} citations={selected?.citations || []} /> : <ChangePanel changeSet={changeSet} busy={applying} onConfirm={confirm} onRegenerate={() => { setPanel(null); chat.setMessage(`Tạo lại đề xuất từ lịch mới nhất: ${selected.input}`); }} />}
     </section></Dialog>}

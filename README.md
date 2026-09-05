@@ -4,7 +4,7 @@ Next.js app backed by Neon Postgres.
 
 ## Package management
 
-Use Node.js 22.13+ and pnpm 11.19.0 (pinned in `package.json`). Install pnpm using the [official installation instructions](https://pnpm.io/installation), then run `pnpm install --frozen-lockfile` before starting development. Commit `pnpm-lock.yaml` with dependency changes; do not generate an npm lockfile.
+Use Node.js 22.13+ and pnpm 11.25.0 (pinned in `package.json`). Install pnpm using the [official installation instructions](https://pnpm.io/installation), then run `pnpm install --frozen-lockfile` before starting development. Commit `pnpm-lock.yaml` with dependency changes; do not generate an npm lockfile.
 
 `pnpm-workspace.yaml` enforces a one-day release delay, blocks exotic transitive dependency sources and trust downgrades, and fails on unreviewed dependency install scripts. The current install hooks are explicitly disabled because published artifacts work without them. Review any new hook before changing `allowBuilds`; do not enable all builds or bypass the security settings to make an install pass. These controls reduce supply-chain risk but cannot guarantee safe packages. See [pnpm security guidance](https://pnpm.io/supply-chain-security).
 
@@ -113,11 +113,19 @@ New non-owner contributions also enqueue a private owner email through Resend. C
 
 Pending owner emails retry immediately and through the daily Vercel cron route. Configure a random `CRON_SECRET` of at least 16 bytes; Vercel supplies it as the cron route's bearer token. The worker stops after five failed attempts and never logs message bodies or secrets.
 
-This feature adds database tables, so run `pnpm run db:migrate` intentionally before deploying code that depends on it.
+This feature adds database tables. The `deploy:prod` command applies pending migrations before deploying the code that depends on them.
 
 ## Deploy
 
-Run `pnpm run vercel:env` to sync every non-`LOCAL_` variable declared in `.env.template` from the local `.env` into Vercel Production and Preview, then run `pnpm dlx vercel deploy --prod`. The template is the deployment allowlist; adding a deployable variable never requires editing the sync script. The command only upserts declared variables and does not remove unrelated Vercel configuration.
+Run one command after changing code or local environment configuration:
+
+```bash
+pnpm run deploy:prod
+```
+
+The Vercel CLI is a pinned development dependency invoked with `pnpm exec`; deployment does not resolve a new CLI through `dlx`. See [deployment toolchain decisions](docs/deployment-toolchain.md) for version and supply-chain review details.
+
+This runs three steps in order: `vercel:env` syncs every non-`LOCAL_` variable declared in `.env.template` from the local `.env` into Vercel Production and Preview; `db:migrate` applies pending migrations to the database configured by `POSTGRES_URI`; then Vercel deploys to Production. A failed sync or migration stops the remaining steps. Already-applied migrations are skipped, and seed data is not imported. The template is the deployment allowlist; adding a deployable variable never requires editing the sync script. Environment sync only upserts declared variables and does not remove unrelated Vercel configuration.
 
 ## Import a trip with Codex
 

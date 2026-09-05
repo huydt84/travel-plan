@@ -63,9 +63,9 @@ test("reload reconciles a running lease and explicit retry creates one new turn"
     await page.reload();
     await expect(page.getByRole("button", { name: "Dừng", exact: true })).toBeVisible();
     await f.sql`UPDATE assistant_turns SET lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=${accepted.turn.id}`;
-    await expect(page.getByRole("button", { name: "Thử lại yêu cầu" })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: "Thử lại" })).toBeVisible({ timeout: 10000 });
     await page.unroute("**/api/v1/trips/*/assistant/turns");
-    await page.getByRole("button", { name: "Thử lại yêu cầu" }).click();
+    await page.getByRole("button", { name: "Thử lại" }).click();
     await expect(page.getByText("Đây là chế độ mô phỏng cục bộ.", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Dừng", exact: true })).toHaveCount(0);
     const rows = await f.sql`SELECT client_turn_id,status FROM assistant_turns WHERE conversation_id=${accepted.conversation.id}`;

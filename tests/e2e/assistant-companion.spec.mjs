@@ -44,7 +44,9 @@ test("a real workflow streams before completion and survives switching trips and
     await expect(page.getByRole("button", { name: "Trò chuyện mới" })).toBeEnabled();
     await page.getByRole("button", { name: "Trò chuyện mới" }).click();
     const acceptance = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/assistant/turns"));
-    await input.fill("Tóm tắt Tokyo"); await input.press("Enter");
+    // Multiple paragraphs give the explicitly simulated provider enough chunks
+    // to observe real background progress without relying on subsecond navigation.
+    await input.fill("Tóm tắt Tokyo\n\n" + Array.from({ length: 8 }, (_, i) => `Mục kiểm tra ${i + 1}`).join("\n\n")); await input.press("Enter");
     const acceptedResponse = await acceptance;
     expect(acceptedResponse.status()).toBe(202);
     const { runId } = await acceptedResponse.json();
@@ -144,7 +146,7 @@ test("conversation and turn pagination reach old history without losing scroll p
   } finally { await f.close(); }
 });
 
-test("durable acceptance, outbox retry and worker claims remain idempotent", async ({ page }) => {
+test("durable acceptance, single dispatch and worker claims remain idempotent", async ({ page }) => {
   const f = await fixture(page.request);
   try {
     const input = { ownerEmail, tripSlug: f.trips[0].slug, conversationId: null, clientTurnId: randomUUID(), input: "Queued", title: "Queued", leaseMs: 600000, maxTurnsPerHour: 100, background: true };
@@ -152,11 +154,8 @@ test("durable acceptance, outbox retry and worker claims remain idempotent", asy
     expect(a.turn.id).toBe(b.turn.id);
     const background = createBackgroundStore(f.store);
     expect(await f.sql`SELECT * FROM assistant_jobs WHERE turn_id=${a.turn.id}`).toHaveLength(1);
-    const first = await background.dispatchable(a.turn.id);
-    expect(first).toHaveLength(1);
-    expect(await background.dispatchable(a.turn.id)).toHaveLength(0);
-    await f.sql`UPDATE assistant_jobs SET dispatch_after=NOW()-INTERVAL '1 second' WHERE turn_id=${a.turn.id}`;
-    expect(await background.dispatchable(a.turn.id)).toHaveLength(1);
+    expect(await background.beginDispatch(a.turn.id)).toBe(true);
+    expect(await background.beginDispatch(a.turn.id)).toBe(false);
     expect((await Promise.all([background.claim(a.turn.id, 60000), background.claim(a.turn.id, 60000)])).sort()).toEqual([false, true]);
     await background.append(a.turn.id, { type: "answer-delta", runId: a.turn.id, text: "Partial" });
     await f.store.failTurn(a.turn.id, "TURN_CANCELLED");

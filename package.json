@@ -18,6 +18,7 @@
     "trip:import": "node --env-file=.env scripts/import-trip.mjs",
     "trip:import:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node scripts/import-trip.mjs",
     "vercel:env": "node --env-file=.env scripts/sync-vercel-env.mjs",
+    "deploy:prod": "pnpm run vercel:env && pnpm run db:migrate && pnpm exec vercel --prod --yes",
     "db:seed": "node --env-file=.env scripts/seed.mjs",
     "db:seed:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node scripts/seed.mjs",
     "test:assistant:live": "node --env-file=.env scripts/assistant-smoke.mjs"
@@ -42,11 +43,12 @@
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.3.0"
+    "eslint-config-next": "^16.3.0",
+    "vercel": "58.4.4"
   },
-  "packageManager": "pnpm@11.19.0",
+  "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=22.13.0",
-    "pnpm": "11.19.0"
+    "pnpm": "11.25.0"
   }
 }

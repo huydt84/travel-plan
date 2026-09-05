@@ -191,7 +191,7 @@ for (const viewport of [
       };
     });
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await gotoHealthy(page, "/admin/trips");
+    await gotoHealthy(page, "/admin/trips?trip=kamakura-2026-08-09");
     await page.getByRole("button", { name: /Thêm hoạt động vào/ }).first().click();
 
     const editor = page.locator(".schedule-inline-editor");
@@ -282,7 +282,7 @@ for (const viewport of [
 ]) {
   test(`${viewport.name} branching keeps a continuous rail and compact parallel alternatives`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await gotoHealthy(page, "/");
+    await gotoHealthy(page, "/?trip=kamakura-2026-08-09");
 
     const junction = page.locator(".branch-junction").first();
     await expect(junction).toBeVisible();
@@ -314,7 +314,7 @@ for (const viewport of [
     expect(layout.suggestionHeight).toBeLessThan(44);
     expect(layout.branchButtonHeight).toBeLessThan(44);
 
-    await gotoHealthy(page, "/admin/trips");
+    await gotoHealthy(page, "/admin/trips?trip=kamakura-2026-08-09");
     const adminLayout = await page.evaluate(() => {
       const group = document.querySelector(".admin-branch-group");
       const options = group.querySelector(".admin-branch-options");
@@ -339,7 +339,7 @@ for (const viewport of [
 
 test("mobile branch accordion spans the route and reconnects on the rail axis", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 760 });
-  await gotoHealthy(page, "/");
+  await gotoHealthy(page, "/?trip=kamakura-2026-08-09");
 
   const geometry = await page.evaluate(() => {
     const group = document.querySelector(".branch-junction");

@@ -98,7 +98,7 @@ PostgreSQL and include:
 | Activity plus citations | `schedule-persistence.spec.mjs` forces FK failures and checks partial-edit semantics |
 | Whole-plan import / seeds | `import-persistence.spec.mjs` checks keys, selected branches, notes, create-only conflicts and rollback |
 | AI confirmation | `assistant-persistence.spec.mjs` checks rollback, stale revision guards, citation clearing and receipt replay |
-| Assistant background execution | `assistant-companion.spec.mjs` checks Workflow delivery, per-trip state, event/cancellation fences and outbox retry; see [assistant operations](agentic-v1.md) |
+| Assistant background execution | `assistant-companion.spec.mjs` checks Workflow delivery, per-trip state, event/cancellation fences and manual retry; see [assistant operations](agentic-v1.md) |
 | Permissions and visibility | Existing contribution/role/notification browser suites plus invitation handler tests |
 | Drafts and focus | Branch editor and invitation browser tests |
 | Layout and completed trips | `maintenance-ui.spec.mjs` checks geometry, timers, feedback and anonymous heartbeat |

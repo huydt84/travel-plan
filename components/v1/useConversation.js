@@ -8,6 +8,10 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
   const [message, setMessageState] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [submissionFailure, setSubmissionFailure] = useState(null);
+  const [disconnected, setDisconnected] = useState(null);
+  const [retrying, setRetrying] = useState(null);
+  const sending = useRef(false);
   const [progress, setProgress] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [allTrips, setAllTrips] = useState(false);
@@ -38,6 +42,7 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
 
   const observe = useCallback((turn, token) => {
     streamController.current?.abort();
+    setDisconnected(null);
     const controller = new AbortController(); streamController.current = controller;
     // Rebuild partial output from the persisted event log on each attachment.
     void observeRun(turn.id, (event) => {
@@ -50,14 +55,14 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
         setProgress("");
         window.dispatchEvent(new Event("assistant-completed"));
       }
-    }, controller.signal).catch((failure) => { if (generation.current === token && !controller.signal.aborted) { setError(failure.message); setProgress("Mất kết nối · mở lại cuộc trò chuyện để kết nối lại"); } });
+    }, controller.signal).catch((failure) => { if (generation.current === token && !controller.signal.aborted) { setDisconnected({ turnId: turn.id, status: failure.status }); setProgress(""); } });
   }, []);
 
   const load = useCallback(async ({ trip, conversation = null, replace = false, navigation = true } = {}) => {
     const token = ++generation.current;
     loadController.current?.abort(); streamController.current?.abort();
     const controller = new AbortController(); loadController.current = controller;
-    setLoading(true); setError(""); setProgress("");
+    setLoading(true); setError(""); setProgress(""); setDisconnected(null); setSubmissionFailure(null);
     try {
       const params = new URLSearchParams();
       if (trip) params.set("trip", trip);
@@ -66,9 +71,11 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
       try { pending = JSON.parse(read(`pending:${trip}`) || "null"); } catch { pending = null; }
       if (pending && conversation !== "new" && (!conversation || conversation === pending.conversationId)) params.set("request", pending.clientTurnId);
       const next = await apiJson(`/api/v1/assistant/workspace?${params}`, { signal: controller.signal });
-      if (next.request?.found) { persist(`pending:${trip}`, ""); persist(`draft:${trip}`, ""); }
-
       if (generation.current !== token) return;
+      if (next.request?.found) {
+        persist(`pending:${trip}`, "");
+        if (!pending?.retryOfTurnId && read(`draft:${trip}`) === pending?.message) persist(`draft:${trip}`, "");
+      } else if (pending) setSubmissionFailure({ body: pending, trip, message: "Chưa xác nhận được yêu cầu. Hãy thử lại." });
       if (conversation === "new") { next.selectedConversation = null; next.turns = []; next.nextCursor = null; }
       setWorkspace(next); setTurns(next.turns); setAllTrips(false);
       setMessageState(read(`draft:${next.selectedTripSlug}`));
@@ -102,13 +109,14 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
   };
   const newConversation = () => void load({ trip: workspace.selectedTripSlug, conversation: "new" });
   const send = async (input = message.trim(), retryRequest = null) => {
-    if (!input || submitting || loading || turns.some((turn) => turn.status === "running")) return;
+    if (!input || sending.current || submitting || loading || turns.some((turn) => turn.status === "running")) return;
     const token = generation.current;
     const trip = workspace.selectedTripSlug;
     const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input };
     try { sessionStorage.setItem(prefix + `pending:${trip}`, JSON.stringify(body)); }
     catch { setError("Hãy bật lưu trữ phiên để gửi yêu cầu có thể khôi phục."); return; }
-    setSubmitting(true); setError("");
+    sending.current = true; setSubmitting(true); setError(""); setSubmissionFailure(null);
+    setRetrying(body.retryOfTurnId || null);
     try {
       let accepted;
       try {
@@ -118,23 +126,51 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
         if (failure.status && failure.status < 500) { persist(`pending:${trip}`, ""); throw failure; }
         const recovered = await apiJson(`/api/v1/assistant/workspace?trip=${encodeURIComponent(trip)}&request=${body.clientTurnId}`);
         if (!recovered.request?.found) throw failure;
-        accepted = { runId: recovered.request.turn.id, conversationId: recovered.selectedConversation.id };
+        accepted = { runId: recovered.request.turn.id, conversationId: recovered.selectedConversation.id, turn: recovered.request.turn };
       }
-      persist(`pending:${trip}`, ""); persist(`draft:${trip}`, ""); persist(`conversation:${trip}`, accepted.conversationId);
+      persist(`pending:${trip}`, "");
+      if (!body.retryOfTurnId && read(`draft:${trip}`) === body.message) persist(`draft:${trip}`, "");
+      persist(`conversation:${trip}`, accepted.conversationId);
       if (generation.current !== token) return;
-      const turn = { id: accepted.runId, clientTurnId: body.clientTurnId, input, output: "", citations: [], status: "running" };
-      setMessageState("");
+      const saved = accepted.turn || { id: accepted.runId, clientTurnId: body.clientTurnId, input, output: "", citations: [], status: accepted.status || "running" };
+      const turn = saved.status === "running" ? { ...saved, output: "" } : saved;
+      setMessageState(read(`draft:${trip}`));
       setWorkspace((next) => ({ ...next, selectedConversation: { id: accepted.conversationId, tripSlug: trip, title: input } }));
       syncUrl(trip, accepted.conversationId, true);
-      setTurns((items) => [...items.filter((item) => item.id !== turn.id), turn]);
-      setProgress("Đang chờ trợ lý"); observe(turn, token);
+      setTurns((items) => {
+        const index = items.findIndex((item) => item.id === body.retryOfTurnId || item.id === turn.id);
+        if (index < 0) return [...items, turn];
+        return items.map((item, i) => i === index ? turn : item);
+      });
+      if (turn.status === "running") { setProgress("Đang chờ trợ lý"); observe(turn, token); }
+      else setProgress("");
       window.dispatchEvent(new Event("assistant-completed"));
-    } catch (failure) { if (generation.current === token) setError(failure.message + " Bạn có thể gửi lại cùng yêu cầu."); }
-    finally { setSubmitting(false); }
+    } catch (failure) {
+      if (generation.current === token) setSubmissionFailure({ body, trip, status: failure.status, code: failure.code,
+        message: failure.status && failure.status < 500 ? failure.message : "Không thể bắt đầu trả lời. Hãy thử lại." });
+    } finally { sending.current = false; setSubmitting(false); setRetrying(null); }
   };
+  const retry = (turn) => {
+    let pending;
+    try { pending = JSON.parse(read(`pending:${workspace.selectedTripSlug}`) || "null"); } catch { pending = null; }
+    if (pending && pending.retryOfTurnId !== turn.id) { setError("Chưa xác nhận được yêu cầu trước. Hãy kết nối lại trước khi gửi yêu cầu khác."); return; }
+    return send(turn.input, pending || { clientTurnId: crypto.randomUUID(),
+      conversationId: workspace.selectedConversation.id, message: turn.input, retryOfTurnId: turn.id });
+  };
+  const reconnect = () => {
+    const turn = turns.find((item) => item.id === disconnected?.turnId);
+    if (!turn) return;
+    setTurns((items) => items.map((item) => item.id === turn.id ? { ...item, output: "" } : item));
+    observe(turn, generation.current);
+  };
+  const retrySubmission = () => submissionFailure && send(submissionFailure.body.message, submissionFailure.body);
   const submit = () => {
     let pending;
     try { pending = JSON.parse(read(`pending:${workspace.selectedTripSlug}`) || "null"); } catch { pending = null; }
+    if (pending && pending.message !== message.trim()) {
+      setSubmissionFailure({ body: pending, trip: workspace.selectedTripSlug, message: "Chưa xác nhận được yêu cầu trước. Thử lại yêu cầu đó trước khi gửi nội dung khác." });
+      return;
+    }
     return send(pending?.message || message.trim(), pending);
   };
   const stop = async () => {
@@ -169,5 +205,6 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
     } catch (failure) { if (token === generation.current) setError(failure.message); }
   };
   return { workspace, turns, setTurns, message, setMessage, loading, error, setError, progress, submitting, allTrips,
-    load, selectTrip, selectConversation, newConversation, submit, send, stop, history, older };
+    load, selectTrip, selectConversation, newConversation, submit, send, stop, history, older,
+    retry, retrying, submissionFailure, retrySubmission, disconnected, reconnect };
 }

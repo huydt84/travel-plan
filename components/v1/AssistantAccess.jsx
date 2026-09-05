@@ -10,7 +10,6 @@ export default function AssistantAccess({ viewer }) {
     <main className={styles.accessShell}>
       <section className={styles.accessBoard} aria-labelledby="v1-access-title">
         <Link className={styles.backLink} href="/">Về lịch hiện tại</Link>
-        <div className={styles.accessRail} aria-hidden="true"><i /><i /><i /></div>
         <div>
           <h1 id="v1-access-title">Trợ lý hành trình</h1>
           <p>{signedIn

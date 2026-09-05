@@ -69,8 +69,24 @@ for (const viewport of viewports) {
         if (surface.name === "public tracker" && viewport.touch) {
           await expect(page.locator(".desktop-manage-link")).toBeHidden();
         }
+        if (["trip companion", "agentic assistant"].includes(surface.name)) {
+          const shell = page.getByRole("region", { name: "Trợ lý hành trình", exact: true });
+          const header = await shell.locator("header").first().boundingBox();
+          if (viewport.width === 320) expect(header.height).toBeLessThanOrEqual(160);
+          const input = page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" });
+          await expect(input).toBeEnabled();
+          await input.fill("Kiểm tra bố cục " + "nội dung dài ".repeat(40));
+          const field = await input.boundingBox();
+          const send = await page.getByRole("button", { name: "Gửi yêu cầu", exact: true }).boundingBox();
+          expect(field.y).toBeGreaterThanOrEqual(header.y + header.height);
+          expect(send.y).toBeGreaterThanOrEqual(field.y + field.height);
+          expect(send.y + send.height).toBeLessThanOrEqual(viewport.height);
+          expect(field.x + field.width).toBeLessThanOrEqual(viewport.width);
+          await input.fill("");
+          await input.blur();
+        }
         await page.waitForTimeout(250);
-        await page.screenshot({ path: testInfo.outputPath(`${surface.name.replaceAll(" ", "-")}.png`), fullPage: true });
+        await page.screenshot({ path: testInfo.outputPath(`${surface.name.replaceAll(" ", "-")}.png`), fullPage: false });
 
         const audit = await page.evaluate(({ touch }) => {
           const visible = (element) => {

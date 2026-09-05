@@ -17,7 +17,7 @@ test(`home recovers a deleted cached trip at ${viewport.width}`, async ({ page, 
     expect(created.status()).toBe(201);
     // Warm only the list, leaving the selected itinerary uncached. This is
     // exactly what two local Next servers sharing a test database can produce.
-    expect((await (await request.get("/api/trips")).json()).trips.some((trip) => trip.slug === slug)).toBe(true);
+    await expect.poll(async () => (await (await request.get("/api/trips")).json()).trips.some((trip) => trip.slug === slug)).toBe(true);
     await page.goto(`/?trip=${original[0].slug}`);
     await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" }).locator(`option[value="${slug}"]`)).toHaveCount(1);
     await sql`DELETE FROM trips WHERE slug=${slug}`;

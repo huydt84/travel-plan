@@ -3,6 +3,7 @@ import { createContext, Suspense, useContext, useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Dialog, { DialogTitle } from "../ui/Dialog";
+import { useCompanionWidth } from "./useCompanionWidth";
 import { apiJson } from "./transport.mjs";
 import styles from "./companion.module.css";
 const Workspace = dynamic(() => import("./AssistantWorkspace"), { loading: () => <p role="status">Đang mở trợ lý…</p> });
@@ -29,12 +30,9 @@ export default function AssistantProvider({ viewer, children }) {
   const params = new URLSearchParams(query);
   const enabled = !!viewer?.isAdmin;
   const visible = enabled && params.get("chat") === "1" && pathname !== "/assistant";
-  const [mobile, setMobile] = useState(false), [count, setCount] = useState(0);
-  useEffect(() => {
-    const query = matchMedia("(max-width: 1199px)");
-    const update = () => setMobile(query.matches);
-    update(); query.addEventListener("change", update); return () => query.removeEventListener("change", update);
-  }, []);
+  const [count, setCount] = useState(0);
+  const { width, mobile, dragging, separatorProps } = useCompanionWidth();
+  const panelStyle = { "--assistant-panel-width": `${width}px` };
   useEffect(() => {
     if (!enabled) return;
     let active = true;
@@ -73,8 +71,8 @@ export default function AssistantProvider({ viewer, children }) {
   const workspace = visible ? <Workspace viewer={viewer} tripSlug={params.get("trip")} companion onClose={close} onTripChange={switchTrip} /> : null;
   return <AssistantContext.Provider value={{ enabled, count, open }}>
     <Suspense fallback={null}><AssistantLocation onChange={setLocation} /></Suspense>
-    <div className={visible && !mobile ? styles.withCompanion : undefined}>{children}</div>
+    <div className={visible && !mobile ? styles.withCompanion : undefined} style={panelStyle} data-resizing={dragging || undefined}>{children}</div>
     {visible && (mobile ? <Dialog onClose={close} overlayClassName={styles.mobileOverlay}><div className={styles.mobilePanel}><DialogTitle asChild><span className="sr-only">Trợ lý hành trình</span></DialogTitle>{workspace}</div></Dialog>
-      : <aside className={styles.panel} aria-label="Trợ lý cho chuyến đi hiện tại">{workspace}</aside>)}
+      : <aside id="trip-companion-panel" className={styles.panel} style={panelStyle} data-resizing={dragging || undefined} aria-label="Trợ lý cho chuyến đi hiện tại"><div className={styles.resizeHandle} {...separatorProps} />{workspace}</aside>)}
   </AssistantContext.Provider>;
 }

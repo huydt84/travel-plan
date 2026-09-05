@@ -4,7 +4,7 @@ for (const viewport of [{ name: "phone", width: 320, height: 760 }, { name: "mac
   test(`${viewport.name} completed trips omit timers and target trip-level feedback`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.clock.install({ time: new Date("2040-01-01T00:00:00Z") });
-    await gotoHealthy(page, "/");
+    await gotoHealthy(page, "/?trip=kamakura-2026-08-09");
     const station = page.locator(viewport.width === 320 ? ".mobile-active-foldout" : ".now-station");
     await expect(station).toContainText("Hoàn tất lúc 23:59");
     await expect(station.locator(".countdown-wrap, .mobile-foldout-countdown")).toHaveCount(0);

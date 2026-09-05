@@ -12,7 +12,7 @@ for (const name of variableNames) {
   if (!value) throw new Error(`${name} is missing from the process environment.`);
   const child = spawn(
     "pnpm",
-    ["dlx", "vercel", "env", "add", name, "production,preview", "--force", "--sensitive", "--yes"],
+    ["exec", "vercel", "env", "add", name, "production,preview", "--force", "--sensitive", "--yes"],
     { stdio: ["pipe", "inherit", "inherit"] },
   );
   child.stdin.end(value);

@@ -4,6 +4,8 @@ blockExoticSubdeps: true
 trustPolicy: no-downgrade
 # Accepted existing locked releases; keep these exceptions version-specific.
 trustPolicyExclude:
+  # Reviewed registry signatures and publisher metadata; see docs/deployment-toolchain.md.
+  - undici@5.29.0
   - next-auth@5.0.0-beta.32
   - eslint-import-resolver-typescript@3.10.1
   - semver@6.3.1
