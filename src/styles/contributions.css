@@ -1,0 +1,76 @@
+.suggestion-trigger { margin-top: 16px; padding: 7px 0; border: 0; border-bottom: 1px solid var(--green); color: var(--green-dark); background: transparent; font-size: 9px; font-weight: 700; }
+.suggestion-trigger:hover { color: var(--navy); border-color: var(--navy); }
+.suggestion-list { display: grid; gap: 7px; margin-top: 16px; }
+.suggestion-note { position: relative; padding: 14px; border: 1px solid color-mix(in srgb, var(--yellow) 68%, var(--navy)); background: var(--yellow-soft); }
+.suggestion-note.comment { border-color: var(--green); background: var(--green-soft); }
+.suggestion-note.is-hidden { border-color: var(--line); background: var(--paper); }
+.suggestion-note-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.suggestion-note-meta, .suggestion-note-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.suggestion-note strong { font-size: 12px; }
+.suggestion-note-meta > span { color: var(--muted); font-size: 9px; }
+.suggestion-note > p { max-width: 76ch; margin: 8px 0 0; color: var(--navy); font-size: 12px; line-height: 1.62; white-space: pre-wrap; }
+.suggestion-note-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed color-mix(in srgb, var(--navy) 28%, transparent); }
+.suggestion-note-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 7px 11px; border: 1px solid color-mix(in srgb, var(--navy) 42%, transparent); border-radius: 3px; color: var(--navy); background: color-mix(in srgb, var(--paper-bright) 72%, transparent); font-size: 9px; font-weight: 700; }
+.suggestion-note-actions .action-icon { width: 14px; height: 14px; stroke-width: 2.4; }
+.suggestion-note-actions button:hover { border-color: var(--navy); color: var(--paper-bright); background: var(--navy); }
+.suggestion-note-actions .suggestion-resolve-action:not(.is-complete) { border-color: var(--green); color: var(--paper-bright); background: var(--green); }
+.suggestion-note-actions .suggestion-resolve-action:not(.is-complete):hover { border-color: var(--green-dark); background: var(--green-dark); }
+.suggestion-note-actions .suggestion-resolve-action.is-complete { border-color: var(--green); color: var(--green-dark); background: var(--paper-bright); }
+.suggestion-note-actions .suggestion-visibility-action { color: var(--green-dark); }
+.suggestion-note-actions button.danger { border-color: var(--red); color: var(--red); background: var(--red-soft); }
+.suggestion-note-actions button.danger:hover { color: white; background: var(--red); }
+.suggestion-note-actions button:disabled { opacity: .55; cursor: wait; }
+.suggestion-note .suggestion-action-state, .suggestion-note .suggestion-action-error { margin: 10px 0 0; padding: 8px 10px; border: 1px solid var(--line); background: var(--paper-bright); font-size: 9px; }
+.suggestion-note .suggestion-action-state { color: var(--muted); }
+.suggestion-note .suggestion-action-error { color: var(--red); font-weight: 700; }
+.suggestion-status { padding: 3px 5px; border: 1px solid var(--green); border-radius: 3px; color: var(--green-dark) !important; font-weight: 700; }
+.suggestion-status.rejected { border-color: var(--red); color: var(--red) !important; background: var(--red-soft); }
+.suggestion-status.hidden { border-color: var(--muted); color: var(--navy-soft) !important; background: var(--paper-deep); }
+.suggestion-more { position: relative; }
+.suggestion-note-actions .suggestion-more-trigger { width: 36px; padding: 0; }
+.suggestion-more-menu { position: absolute; z-index: 6; bottom: calc(100% + 6px); left: 0; width: max-content; min-width: 132px; border: 1px solid var(--red); background: var(--paper-bright); }
+.suggestion-more-menu button { width: 100%; min-height: 40px; border: 0; }
+.hidden-suggestion-drawer { border: 1px solid var(--line); background: var(--paper); }
+.hidden-suggestion-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 40px; padding: 8px 11px; border: 0; color: var(--navy); background: transparent; font-size: 9px; font-weight: 700; text-align: left; }
+.hidden-suggestion-toggle:hover { color: var(--paper-bright); background: var(--navy); }
+.hidden-suggestion-toggle span:last-child { color: var(--green-dark); }
+.hidden-suggestion-toggle:hover span:last-child { color: var(--yellow); }
+.hidden-suggestion-list { display: grid; gap: 7px; padding: 7px; border-top: 1px solid var(--line); }
+
+.trip-suggestions { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 18px; max-width: 1120px; margin: 74px auto 28px; padding: 26px; border: 2px solid var(--navy); background: var(--yellow-soft); clip-path: polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%); }
+.trip-suggestions h2 { margin: 0; font: 700 36px/1 var(--display); text-transform: uppercase; }
+.trip-suggestions > .suggestion-list { grid-column: 1 / -1; }
+.sources { max-width: 1120px; margin: 0 auto; padding: 34px; color: var(--paper-bright); background: var(--navy); }
+.sources .section-heading { max-width: none; border-bottom-color: rgba(255, 255, 255, .55); }
+.sources .section-heading h2 { font-size: 40px; }
+.source-list { display: grid; grid-template-columns: 1fr 1fr; }
+.source-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; padding: 17px; border-right: 1px solid rgba(255, 255, 255, .22); border-bottom: 1px solid rgba(255, 255, 255, .22); text-decoration: none; }
+.source-card:nth-child(even) { border-right: 0; }
+.source-card:hover { color: var(--navy); background: var(--yellow); }
+.source-number { color: var(--yellow); font: 700 25px/1 var(--display); }
+.source-card:hover .source-number { color: var(--navy); }
+.source-card strong, .source-card small { display: block; }
+.source-card strong { font-size: 11px; line-height: 1.45; }
+.source-card small { margin-top: 3px; color: #b8c1cb; font-size: 9px; }
+.source-card:hover small { color: var(--navy-soft); }
+footer { display: flex; justify-content: space-between; gap: 16px; max-width: 1120px; margin: 0 auto; padding: 26px 2px 8px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
+
+.suggestion-overlay { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(16, 36, 61, .62); backdrop-filter: blur(4px); }
+.suggestion-composer { width: min(100%, 560px); padding: 26px; border: 2px solid var(--navy); background: var(--paper-bright); clip-path: polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%); }
+.suggestion-composer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 2px solid var(--navy); }
+.suggestion-composer-head h2 { margin: 0; font: 700 34px/1 var(--display); }
+.suggestion-composer-head > button { flex: 0 0 auto; width: 32px; height: 32px; border: 1px solid var(--navy); color: var(--navy); background: transparent; font-size: 20px; }
+.suggestion-composer-head > button .action-icon { vertical-align: -3px; }
+.suggestion-composer-head > button:hover { color: white; background: var(--navy); }
+.suggestion-composer label { display: grid; gap: 7px; margin-top: 18px; color: var(--navy); font-size: 10px; font-weight: 700; }
+.suggestion-composer select, .suggestion-composer textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--navy); border-radius: 3px; outline: 0; color: var(--navy); background: white; font-size: 13px; line-height: 1.5; }
+.suggestion-composer textarea { resize: vertical; }
+.suggestion-composer-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.confirmation-overlay { z-index: 100; }
+.confirmation-dialog { width: min(100%, 510px); padding: 24px; border: 2px solid var(--navy); background: var(--paper-bright); clip-path: polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%); }
+.confirmation-dialog h2 { max-width: 17ch; margin: 0; font: 700 38px/.95 var(--display); text-transform: uppercase; text-wrap: balance; }
+.confirmation-dialog > p { margin: 14px 0 0; color: var(--navy-soft); font-size: 12px; line-height: 1.6; }
+.confirmation-dialog blockquote { max-height: 120px; overflow: auto; margin: 17px 0 0; padding: 12px 14px; border: 1px solid var(--line); color: var(--navy); background: var(--paper); font-size: 11px; line-height: 1.55; white-space: pre-wrap; }
+.confirmation-dialog .form-error { color: var(--red); }
+.confirmation-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+

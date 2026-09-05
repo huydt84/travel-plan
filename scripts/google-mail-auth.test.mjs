@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   GMAIL_SEND_SCOPE,
@@ -18,27 +17,6 @@ const env = {
   AUTH_GOOGLE_SECRET: "google-client-secret",
 };
 const request = new Request("https://travel.example/api/invitations");
-
-test("basic login requests profile only and Gmail consent is incremental", async () => {
-  const [authSource, dialogSource, errorSource] = await Promise.all([
-    readFile(new URL("../auth.js", import.meta.url), "utf8"),
-    readFile(new URL("../components/InvitationDialog.jsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/auth/invitation-error/page.js", import.meta.url), "utf8"),
-  ]);
-  assert.match(authSource, /BASIC_GOOGLE_SCOPE = "openid email profile"/);
-  assert.doesNotMatch(authSource, /scope: `openid email profile \$\{GMAIL_SEND_SCOPE\}`/);
-  assert.doesNotMatch(authSource, /access_type: "offline"/);
-  assert.doesNotMatch(authSource, /prompt: "consent"/);
-  assert.match(authSource, /error: "\/auth\/invitation-error"/);
-  assert.match(dialogSource, /scope: `openid email profile \$\{GMAIL_SEND_SCOPE\}`/);
-  assert.match(dialogSource, /include_granted_scopes: "true"/);
-  assert.match(dialogSource, /access_type: "offline"/);
-  assert.match(dialogSource, /prompt: "consent"/);
-  assert.match(errorSource, /travel-plan:invite:return/);
-  assert.match(authSource, /token\.googleAccessToken = account\.access_token/);
-  assert.doesNotMatch(authSource, /session\.googleAccessToken/);
-  assert.doesNotMatch(authSource, /session\.user\.googleAccessToken/);
-});
 
 test("reports Gmail authorization without refreshing a token", async () => {
   const state = await getGoogleMailAuthorizationState(request, {
@@ -106,4 +84,22 @@ test("rejects sessions without Gmail consent and invalid refresh responses", asy
     InvitationAuthorizationError,
   );
   await assert.rejects(refreshGoogleAccessToken("refresh-token", { env: {} }), InvitationConfigurationError);
+});
+
+test("login uses basic scopes; explicit Gmail consent adds offline send access", async () => {
+  const { googleLoginParams, googleMailConsentParams, createGoogleAuthCallbacks } = await import("../lib/google-auth-policy.mjs");
+  assert.equal(googleLoginParams.scope, "openid email profile");
+  assert.equal(googleLoginParams.prompt, undefined);
+  assert.equal(googleLoginParams.access_type, undefined);
+  assert.equal(googleMailConsentParams.scope, `openid email profile ${GMAIL_SEND_SCOPE}`);
+  assert.equal(googleMailConsentParams.prompt, "consent");
+  assert.equal(googleMailConsentParams.access_type, "offline");
+  const callbacks = createGoogleAuthCallbacks(() => "owner@example.com");
+  assert.equal(await callbacks.signIn({ account: { provider: "google" }, profile: { email: "owner@example.com", email_verified: true } }), true);
+  assert.equal(await callbacks.signIn({ account: { provider: "google" }, profile: { email: "owner@example.com", email_verified: false } }), false);
+  const token = await callbacks.jwt({ token: { googleRefreshToken: "previous" }, account: { provider: "google", access_token: "private-token", scope: GMAIL_SEND_SCOPE, expires_at: 123 } });
+  assert.equal(token.googleRefreshToken, "previous");
+  assert.equal(token.googleAccessToken, "private-token");
+  const session = await callbacks.session({ session: { user: { email: "OWNER@example.com" } }, token });
+  assert.deepEqual(session, { user: { email: "OWNER@example.com", isOwner: true, isAdmin: true, role: "owner" } });
 });

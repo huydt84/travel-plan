@@ -183,7 +183,7 @@ for (const viewport of [
   { name: "macbook", width: 1440, height: 900 },
   { name: "dell", width: 1920, height: 1080 },
 ]) {
-  test(`${viewport.name} activity editor uses guided controls and the available space`, async ({ page }) => {
+  test(`${viewport.name} activity editor uses guided controls and the available space`, async ({ page }, testInfo) => {
     await page.addInitScript(() => {
       window.__scheduleTimePickerCalls = 0;
       HTMLInputElement.prototype.showPicker = function showPicker() {
@@ -242,7 +242,20 @@ for (const viewport of [
       expect(geometry.selectFontSize).toBeGreaterThanOrEqual(16);
     }
 
+    await editor.screenshot({ path: testInfo.outputPath("branch-editor.png") });
+    await editor.getByLabel("Tiêu đề").fill("Unsaved branch draft");
     await editor.getByRole("button", { name: "Hủy", exact: true }).first().click();
+    const discard = page.getByRole("dialog", { name: "Bỏ thay đổi chưa lưu?" });
+    await expect(discard).toBeVisible();
+    await expect(discard.getByRole("button", { name: "Tiếp tục sửa" })).toBeFocused();
+    await discard.screenshot({ path: testInfo.outputPath("discard-draft.png") });
+    await page.keyboard.press("Escape");
+    await expect(discard).not.toBeVisible();
+    await expect(editor.getByLabel("Tiêu đề")).toHaveValue("Unsaved branch draft");
+    await editor.getByRole("button", { name: "Hủy", exact: true }).first().click();
+    await discard.getByRole("button", { name: "Bỏ thay đổi", exact: true }).click();
+    await expect(editor).not.toBeVisible();
+    await expect(page.getByRole("button", { name: /Thêm hoạt động vào/ }).first()).toBeFocused();
     await page.getByRole("button", { name: "Thêm hoạt động", exact: true }).click();
     const backboneEditor = page.locator(".schedule-create-editor");
     await expect(backboneEditor).toBeVisible();
@@ -254,6 +267,7 @@ for (const viewport of [
       height: Math.round(form.getBoundingClientRect().height),
       columns: getComputedStyle(form).gridTemplateColumns.split(" ").filter(Boolean).length,
     }));
+    await backboneEditor.screenshot({ path: testInfo.outputPath("backbone-editor.png") });
     expect(backboneGeometry.documentWidth).toBe(backboneGeometry.viewportWidth);
     if (viewport.name !== "phone") {
       expect(backboneGeometry.height).toBeLessThan(760);

@@ -6,7 +6,7 @@ Next.js app backed by Neon Postgres.
 
 1. Copy `.env.template` to `.env` and fill in the Neon and Google OAuth values.
 2. Set `AUTH_OWNER_EMAIL` to the private email address for the owner account. Every other verified Google account starts with the `member` role; the owner can promote members to `admin` from the user management screen.
-3. Run `npm run db:migrate` to create and seed the database.
+3. Run `npm run db:migrate` to upgrade the schema. Run `npm run db:seed` separately if you want the sample trip.
 4. Run `npm run dev`.
 
 ## Local admin mode
@@ -16,10 +16,11 @@ Coding agents can exercise the complete admin UI and CRUD flow locally without a
 ```bash
 npm run db:up:local
 npm run db:migrate:local
+npm run db:seed:local
 npm run dev:admin
 ```
 
-Open `http://127.0.0.1:3000/admin`. The header identifies this session as **Local admin · Docker Postgres**. The default database is `postgresql://travel:travel@127.0.0.1:55432/travel_local`; `LOCAL_POSTGRES_URI` may override it, but local admin rejects non-loopback hosts and never falls back to `POSTGRES_URI`. Its read cache is also namespaced away from normal data.
+Open `http://127.0.0.1:3000/admin/trips`. The header identifies this session as **Local admin · Docker Postgres**. The default database is `postgresql://travel:travel@127.0.0.1:55432/travel_local`; `LOCAL_POSTGRES_URI` may override it, but local admin rejects non-loopback hosts and never falls back to `POSTGRES_URI`. Its read cache is also namespaced away from normal data.
 
 Stop the container without deleting its data with:
 
@@ -27,7 +28,7 @@ Stop the container without deleting its data with:
 npm run db:down:local
 ```
 
-The named Docker volume persists across restarts. To intentionally erase all local trip data, run `docker compose down --volumes`, start the database again, and rerun `npm run db:migrate:local`.
+The named Docker volume persists across restarts. To intentionally erase all local trip data, run `docker compose down --volumes`, start the database again, and rerun `npm run db:migrate:local` followed by `npm run db:seed:local`.
 
 To preview or apply a trip import against the same local database:
 
@@ -64,6 +65,10 @@ Trip plans and schedules are publicly readable, including by signed-out visitors
 | View the user and activity audit | Yes | Yes | No |
 | Promote members or demote admins | Yes | No | No |
 | Receive personal in-app notifications | No; the owner is intentionally excluded | Yes, for trips in which they participate | Yes, for trips in which they participate |
+
+## Maintaining the codebase
+
+See [the maintenance guide](docs/maintenance.md) for module ownership, versioned migrations, and verification. Migrations never seed or reset trip metadata. Seeds create a missing trip atomically and leave an existing trip untouched.
 
 ## CRUD API
 

@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { createInvitationDraft, formatInvitationTripDate } from "../lib/invitation-draft.mjs";
 import { ActionIcon } from "./Icons";
 
-const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+import { googleMailConsentParams } from "../lib/google-auth-policy.mjs";
 const DRAFT_TTL_MS = 30 * 60 * 1000;
 const MAX_RECIPIENTS = 6;
 
@@ -221,12 +221,7 @@ export default function InvitationDialog({ open, onClose, viewer, trip, itinerar
     const url = new URL(callbackUrl());
     url.searchParams.set("gmail", "return");
     window.sessionStorage.setItem("travel-plan:invite:return", url.toString());
-    signIn("google", { redirectTo: url.toString() }, {
-      scope: `openid email profile ${GMAIL_SEND_SCOPE}`,
-      include_granted_scopes: "true",
-      access_type: "offline",
-      prompt: "consent",
-    });
+    signIn("google", { redirectTo: url.toString() }, googleMailConsentParams);
   };
 
   const sendInvitations = async (event) => {

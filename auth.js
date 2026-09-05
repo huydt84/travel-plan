@@ -4,8 +4,8 @@ import { ADMIN_ROUTES } from "./lib/admin-routes.mjs";
 import { recordUserLogin } from "./lib/user-repository";
 import { resolveLocalAdminMode } from "./lib/runtime-config.mjs";
 
-export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
-export const BASIC_GOOGLE_SCOPE = "openid email profile";
+import { googleLoginParams, createGoogleAuthCallbacks } from "./lib/google-auth-policy.mjs";
+export { GMAIL_SEND_SCOPE, BASIC_GOOGLE_SCOPE } from "./lib/google-auth-policy.mjs";
 
 export const ownerEmail = () => {
   if (resolveLocalAdminMode().enabled) return "local-admin@localhost.invalid";
@@ -22,11 +22,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
       authorization: {
-        params: {
-          scope: BASIC_GOOGLE_SCOPE,
-          response_type: "code",
-          include_granted_scopes: "true",
-        },
+        params: googleLoginParams,
       },
     }),
   ],
@@ -34,29 +30,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: ADMIN_ROUTES.trips,
     error: "/auth/invitation-error",
   },
-  callbacks: {
-    async signIn({ account, profile }) {
-      if (account?.provider !== "google") return false;
-      return Boolean(profile?.email_verified && profile?.email);
-    },
-    async jwt({ token, account }) {
-      if (account?.provider === "google") {
-        token.googleAccessToken = account.access_token;
-        token.googleRefreshToken = account.refresh_token || token.googleRefreshToken;
-        token.googleAccessTokenExpiresAt = account.expires_at;
-        token.googleScope = account.scope;
-      }
-      return token;
-    },
-    async session({ session }) {
-      const email = session.user?.email?.toLowerCase();
-      const isOwner = Boolean(email && email === ownerEmail());
-      session.user.isOwner = isOwner;
-      session.user.isAdmin = isOwner;
-      session.user.role = isOwner ? "owner" : "member";
-      return session;
-    },
-  },
+  callbacks: createGoogleAuthCallbacks(ownerEmail),
   events: {
     async signIn({ user, profile }) {
       await recordUserLogin({

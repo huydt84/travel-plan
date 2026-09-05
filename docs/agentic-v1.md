@@ -9,6 +9,7 @@ The pilot is off by default. Local admin mode uses the deterministic model adapt
 ```sh
 npm run db:up:local
 npm run db:migrate:local
+npm run db:seed:local
 AGENTIC_V1_ENABLED=true APP_URL=http://127.0.0.1:3000 npm run dev:admin
 ```
 

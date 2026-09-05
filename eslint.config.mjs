@@ -3,6 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 
 export default defineConfig([
   ...nextVitals,
+  { rules: { "no-undef": "error" } },
   globalIgnores([
     ".next/**",
     ".next-playwright/**",

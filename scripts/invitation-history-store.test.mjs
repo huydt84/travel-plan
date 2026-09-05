@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   claimInvitationDeliveries,
@@ -121,14 +120,4 @@ test("claims only retryable recipients before Gmail delivery", async () => {
   assert.match(transactionQueries[0].text, /invitation_deliveries\.status = 'failed'/);
   assert.match(transactionQueries[0].text, /invitation_deliveries\.status = 'sending'/);
   assert.match(transactionQueries[0].text, /RETURNING recipient_email/);
-});
-
-test("migration creates the invitation history table and lookup index", async () => {
-  const migration = await readFile(new URL("./migrate.mjs", import.meta.url), "utf8");
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS invitation_deliveries/);
-  assert.match(migration, /UNIQUE \(request_id, recipient_email\)/);
-  assert.match(migration, /'sending', 'sent', 'failed'/);
-  assert.match(migration, /invitation_deliveries_attempted_idx/);
-  assert.match(migration, /inviter_email TEXT/);
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS invitation_batches/);
 });

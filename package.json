@@ -17,7 +17,9 @@
     "db:migrate:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node scripts/migrate.mjs",
     "trip:import": "node --env-file=.env scripts/import-trip.mjs",
     "trip:import:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node scripts/import-trip.mjs",
-    "vercel:env": "node --env-file=.env scripts/sync-vercel-env.mjs"
+    "vercel:env": "node --env-file=.env scripts/sync-vercel-env.mjs",
+    "db:seed": "node --env-file=.env scripts/seed.mjs",
+    "db:seed:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node scripts/seed.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.17.1",
@@ -26,9 +28,11 @@
     "luxon": "^3.7.2",
     "next": "^16.3.0",
     "next-auth": "^5.0.0-beta.32",
+    "node-pg-migrate": "^9.0.0",
     "pg": "^8.23.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "sql-template-tag": "^5.2.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

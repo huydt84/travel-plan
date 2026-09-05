@@ -1,5 +1,7 @@
 "use client";
 
+import { requestJson } from "../lib/request-json.mjs";
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -7,15 +9,7 @@ import { signOut } from "next-auth/react";
 import AdminNav from "./AdminNav";
 import TripRequestDetails, { formatRequestRange, requestStateLabels } from "./TripRequestDetails";
 
-const api = async (path, options = {}) => {
-  const response = await fetch(path, {
-    ...options,
-    headers: options.body ? { "content-type": "application/json" } : options.headers,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Không thể cập nhật yêu cầu");
-  return payload;
-};
+const api = (path, options) => requestJson(path, options, "Không thể cập nhật yêu cầu");
 
 export default function TripRequestAdminApp({ viewer, initialRequests, trips, pendingInvitationCount = 0 }) {
   const router = useRouter();

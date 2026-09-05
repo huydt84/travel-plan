@@ -71,3 +71,55 @@ test("admin trip form exposes a date range", async ({ page }) => {
   await expect(page.getByLabel("Ngày bắt đầu")).toBeVisible();
   await expect(page.getByLabel("Ngày kết thúc")).toBeVisible();
 });
+
+test("branch edits order evening and next-morning activities by date", async ({ page, request }) => {
+  const slug = `multi-day-branch-${Date.now()}`;
+  const schedule = (title, date, start, end) => ({
+    title, startDate: date, endDate: date, start, end,
+    type: "Visit", icon: "📍", detail: "", refs: [],
+  });
+  try {
+    expect((await request.post("/api/trips", { data: {
+      slug, title: "Multi-day branch", startDate: "2032-04-10", endDate: "2032-04-11",
+      timezone: "Asia/Tokyo", location: "Tokyo",
+    } })).status()).toBe(201);
+    const ids = [];
+    for (const item of [
+      schedule("Anchor", "2032-04-10", "16:00", "17:00"),
+      schedule("Evening", "2032-04-10", "18:00", "19:00"),
+      schedule("Rejoin", "2032-04-11", "12:00", "13:00"),
+    ]) {
+      const response = await request.post(`/api/trips/${slug}/schedule`, { data: item });
+      expect(response.status()).toBe(201);
+      ids.push((await response.json()).id);
+    }
+    const response = await request.post(`/api/trips/${slug}/branches`, { data: {
+      title: "Overnight alternatives", anchorActivityId: ids[0], segmentActivityIds: [ids[1]],
+      defaultBranch: { key: "normal", label: "Normal", condition: "Normal conditions" },
+      alternateBranch: { key: "skip", label: "Skip", condition: "Skip the stops" },
+    } });
+    expect(response.status()).toBe(201);
+    const plan = await response.json();
+    const branch = plan.branchGroups[0].branches.find((item) => item.isDefault);
+    const morning = await request.post(`/api/trips/${slug}/schedule`, { data: {
+      ...schedule("Morning", "2032-04-11", "09:00", "10:00"), branchId: branch.id,
+    } });
+    expect(morning.status()).toBe(201);
+    const morningId = (await morning.json()).id;
+    const updated = await request.patch(`/api/trips/${slug}/schedule/${morningId}`, { data: { start: "09:15" } });
+    expect(updated.status()).toBe(200);
+    const overlap = await request.patch(`/api/trips/${slug}/schedule/${morningId}`, { data: {
+      startDate: "2032-04-10", endDate: "2032-04-10", start: "18:30", end: "19:30",
+    } });
+    expect(overlap.status()).toBe(400);
+
+    await gotoHealthy(page, `/?trip=${slug}`);
+    await page.getByRole("navigation", { name: "Chọn ngày trong chuyến đi" }).getByRole("button", { name: /Ngày 2/ }).click();
+    await expect(page.getByRole("heading", { name: "Morning", exact: true }).last()).toBeVisible();
+    const final = await (await request.get(`/api/trips/${slug}`)).json();
+    expect(final.branchGroups[0].branches.find((item) => item.id === branch.id).itinerary.map((item) => item.title))
+      .toEqual(["Evening", "Morning"]);
+  } finally {
+    await request.delete(`/api/trips/${slug}`);
+  }
+});

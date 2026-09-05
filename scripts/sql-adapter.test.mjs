@@ -66,3 +66,29 @@ test("rolls back and releases the connection when a transaction fails", async ()
   assert.deepEqual(calls, ["BEGIN", "ROLLBACK"]);
   assert.equal(released, true);
 });
+
+test("shared schedule fragments use Neon's real tagged-template and batch interfaces", async () => {
+  const { neonConfig } = await import("@neondatabase/serverless");
+  const { createSqlAdapter } = await import("../lib/sql-adapter.mjs");
+  const { saveScheduleRecord } = await import("../lib/schedule-store.mjs");
+  const previousFetch = neonConfig.fetchFunction;
+  const batches = [];
+  neonConfig.fetchFunction = async (_url, options) => {
+    const batch = JSON.parse(options.body);
+    batches.push(batch);
+    assert.equal(options.headers["Neon-Batch-Isolation-Level"], "Serializable");
+    return { ok: true, json: async () => ({ results: batch.queries.map((_, index) => ({ fields: index === 0 ? [{ name: "id", dataTypeID: 20 }] : [], rows: index === 0 ? [["42"]] : [] })) }) };
+  };
+  try {
+    const sql = createSqlAdapter({ driver: "neon-http", databaseUrl: "postgresql://test:test@database.invalid/test" });
+    const title = "It's a title; DROP TABLE activities; --";
+    assert.equal(await saveScheduleRecord(sql, { tripId: "7", itemKey: "safe-key", input: { startDate: "2030-01-01", start: "09:00", endDate: "2030-01-01", end: "10:00", type: "Visit", icon: "x", title, detail: "" }, sourceIds: [1] }), "42");
+    assert.equal(batches[0].queries.length, 3);
+    assert.ok(batches[0].queries[0].params.includes(title));
+    assert.ok(!batches[0].queries[0].query.includes(title));
+    await saveScheduleRecord(sql, { tripId: "7", activityId: "42", input: { title: "Update" } });
+    assert.equal(batches[1].queries.length, 1);
+  } finally {
+    neonConfig.fetchFunction = previousFetch;
+  }
+});

@@ -1,5 +1,7 @@
 "use client";
 
+import { requestJson } from "../lib/request-json.mjs";
+
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
@@ -9,15 +11,7 @@ import ViewerMenu from "./ViewerMenu";
 
 const emptyRequest = { startDate: "", endDate: "", places: [""], sources: [], notes: "" };
 
-const api = async (path, options = {}) => {
-  const response = await fetch(path, {
-    ...options,
-    headers: options.body ? { "content-type": "application/json" } : options.headers,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || "Không thể cập nhật yêu cầu");
-  return payload;
-};
+const api = (path, options) => requestJson(path, options, "Không thể cập nhật yêu cầu");
 
 export default function TripRequestApp({ viewer, initialRequests }) {
   if (!viewer) return <RequestLogin />;

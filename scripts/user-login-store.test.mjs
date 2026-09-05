@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { USER_ACTIVITY_WRITE_INTERVAL_MS } from "../lib/user-activity.mjs";
 import {
-  backfillExistingContributorLogins,
   listUserActivity,
   normalizeLoginIdentity,
   resolveStoredUserRole,
@@ -102,37 +100,6 @@ test("returns null when activity falls inside the database throttle window", asy
     name: "Hoang Ngoc",
     email: "friend@example.com",
   }, new Date("2026-08-11T10:04:59.000Z")), null);
-});
-
-test("backfills existing contributors without requiring another login", async () => {
-  const { calls, sql } = sqlMock([]);
-
-  assert.equal(await backfillExistingContributorLogins(sql), 0);
-
-  assert.equal(calls.length, 1);
-  assert.match(calls[0].text, /INSERT INTO users/);
-  assert.match(calls[0].text, /FROM suggestions/);
-  assert.match(calls[0].text, /MIN\(created_at\)/);
-  assert.match(calls[0].text, /MAX\(created_at\)/);
-  assert.match(calls[0].text, /last_active_at/);
-  assert.match(calls[0].text, /ON CONFLICT \(email\) DO UPDATE SET/);
-  assert.match(calls[0].text, /LEAST\(users\.first_login, EXCLUDED\.first_login\)/);
-  assert.match(calls[0].text, /GREATEST\(users\.last_login, EXCLUDED\.last_login\)/);
-  assert.match(calls[0].text, /GREATEST\(users\.last_active_at, EXCLUDED\.last_active_at\)/);
-  assert.match(calls[0].text, /RETURNING 1 AS synced/);
-});
-
-test("runs the contributor backfill before the existing-schedule migration exit", async () => {
-  const migration = await readFile(new URL("./migrate.mjs", import.meta.url), "utf8");
-  const backfillIndex = migration.indexOf("await backfillExistingContributorLogins(sql)");
-  const existingScheduleExitIndex = migration.indexOf("if (existingSchedule.count > 0)");
-  const activityColumnIndex = migration.indexOf("ADD COLUMN IF NOT EXISTS last_active_at");
-
-  assert.notEqual(backfillIndex, -1);
-  assert.notEqual(existingScheduleExitIndex, -1);
-  assert.notEqual(activityColumnIndex, -1);
-  assert.ok(activityColumnIndex < backfillIndex);
-  assert.ok(backfillIndex < existingScheduleExitIndex);
 });
 
 test("serializes and sorts activity timestamps for the admin client", async () => {

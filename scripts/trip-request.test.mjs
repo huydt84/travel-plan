@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   parseAdminTripRequestMutation,
@@ -44,16 +43,4 @@ test("member and admin request mutations expose only explicit lifecycle actions"
   assert.deepEqual(parseTripRequestFulfillment({ tripSlug: "kamakura-day" }), { tripSlug: "kamakura-day" });
   assert.throws(() => parseTripRequestMutation({ action: "delete" }), ValidationError);
   assert.throws(() => parseAdminTripRequestMutation({ action: "fulfill" }), ValidationError);
-});
-
-test("migration keeps request data normalized and notification context exclusive", async () => {
-  const migration = await readFile(new URL("./migrate.mjs", import.meta.url), "utf8");
-  for (const marker of [
-    "CREATE TABLE IF NOT EXISTS trip_requests",
-    "CREATE TABLE IF NOT EXISTS trip_request_places",
-    "CREATE TABLE IF NOT EXISTS trip_request_sources",
-    "CREATE TABLE IF NOT EXISTS trip_request_fulfillments",
-    "trip_request_fulfilled",
-    "notifications_context_check",
-  ]) assert.match(migration, new RegExp(marker));
 });

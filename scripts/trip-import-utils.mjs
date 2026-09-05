@@ -1,3 +1,5 @@
+import { validateBranchTimeline } from "../lib/schedule-branching.mjs";
+import { slugify } from "../lib/schedule-keys.mjs";
 import { compareActivityDateTime, isIsoDate, validateActivityInterval } from "../lib/trip-dates.mjs";
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -13,13 +15,7 @@ const text = (value, field, max = 500) => {
   return value.trim();
 };
 
-export const slugify = (value) => value
-  .normalize("NFKD")
-  .replace(/[\u0300-\u036f]/g, "")
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, "-")
-  .replace(/^-|-$/g, "")
-  .slice(0, 100) || "activity";
+export { slugify } from "../lib/schedule-keys.mjs";
 
 export function assignItemKeys(items) {
   const seen = new Map();
@@ -108,9 +104,8 @@ export function normalizeTripImport(raw) {
       const rawBranchSchedule = branch.schedule ?? [];
       if (!Array.isArray(rawBranchSchedule)) fail(`${branchField}.schedule must be an array`);
       const branchSchedule = rawBranchSchedule.map((item, itemIndex) => parseActivity(item, `${branchField}.schedule[${itemIndex}]`, { allowBranch: false }));
-      for (let index = 1; index < branchSchedule.length; index += 1) {
-        if (`${branchSchedule[index].startDate}T${branchSchedule[index].start}` < `${branchSchedule[index - 1].endDate}T${branchSchedule[index - 1].end}`) fail(`${branchField}.schedule must be ordered without overlaps`);
-      }
+      try { validateBranchTimeline({ anchor: null, rejoin: null, itinerary: branchSchedule }); }
+      catch (error) { fail(`${branchField}.schedule: ${error.message}`); }
       return {
         key: branch.key ? text(branch.key, `${branchField}.key`, 120) : slugify(text(branch.label, `${branchField}.label`, 80)),
         label: text(branch.label, `${branchField}.label`, 80),
@@ -168,16 +163,15 @@ export function normalizeTripImport(raw) {
     if (!item.branchGroup) continue;
     const rejoin = keyedSchedule[index + 1] || null;
     for (const branch of item.branchGroup.branches) {
-      if (branch.schedule[0] && `${branch.schedule[0].startDate}T${branch.schedule[0].start}` < `${item.endDate}T${item.end}`) fail(`branch ${branch.key} starts before its anchor ends`);
-      const lastBranchItem = branch.schedule.at(-1);
-      if (rejoin && lastBranchItem && `${lastBranchItem.endDate}T${lastBranchItem.end}` > `${rejoin.startDate}T${rejoin.start}`) fail(`branch ${branch.key} ends after its rejoin activity starts`);
+      try { validateBranchTimeline({ anchor: item, rejoin, itinerary: branch.schedule }); }
+      catch (error) { fail(`branch ${branch.key}: ${error.message}`); }
     }
   }
   if (keyedStartBranchGroup) {
     const firstSharedActivity = keyedSchedule[0];
     for (const branch of keyedStartBranchGroup.branches) {
-      const lastBranchItem = branch.schedule.at(-1);
-      if (lastBranchItem && `${lastBranchItem.endDate}T${lastBranchItem.end}` > `${firstSharedActivity.startDate}T${firstSharedActivity.start}`) fail(`start branch ${branch.key} ends after its first shared activity starts`);
+      try { validateBranchTimeline({ anchor: null, rejoin: firstSharedActivity, itinerary: branch.schedule }); }
+      catch (error) { fail(`start branch ${branch.key}: ${error.message}`); }
     }
   }
   return { trip, sources, schedule: keyedSchedule, startBranchGroup: keyedStartBranchGroup };
