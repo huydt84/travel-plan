@@ -596,6 +596,7 @@ function Dashboard({
       )}
 
       <AdminNav
+        tripSlug={selectedSlug}
         active="trips"
         pendingInvitationCount={pendingInvitationCount}
         pendingTripRequestCount={pendingTripRequestCount}

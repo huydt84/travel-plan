@@ -13,7 +13,20 @@ verifyDepsBeforeRun: error
 # These packages ship usable artifacts; their install hooks are unnecessary.
 # New packages with install scripts fail until reviewed here.
 allowBuilds:
+  '@swc/core': false
+  cbor-extract: false
+  esbuild: false
   '@google/genai': false
   fsevents: false
   protobufjs: false
   unrs-resolver: false
+
+# Latest functions release with publisher provenance; satisfies Workflow's ^3.4.3.
+overrides:
+  '@vercel/functions': 3.7.6
+  # Provenance-bearing compatible v4 watcher (later v4 releases lack it).
+  chokidar@^4: 4.0.1
+  # Stay on the compatible 1.15 ABI with attested platform binaries.
+  '@swc/core': 1.15.47
+  # Last attested release within the queue client's compatible range.
+  '@vercel/oidc': 3.8.1

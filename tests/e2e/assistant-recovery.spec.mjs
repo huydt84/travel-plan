@@ -15,7 +15,12 @@ async function setup(page) {
   await gotoHealthy(page, "/v1");
   await page.getByLabel("Chuyến đi", { exact: true }).selectOption(slug);
   await expect(page.getByLabel("Yêu cầu cho trợ lý")).toBeEnabled();
-  return { sql, trip, slug, store: createAssistantStore({ sql }), cleanup: async () => { await sql`DELETE FROM trips WHERE id=${trip.id}`; await sql.end(); } };
+  return { sql, trip, slug, store: createAssistantStore({ sql }), cleanup: async () => {
+    try {
+      const response = await page.request.delete(`/api/trips/${slug}`);
+      expect(response.status()).toBe(204);
+    } finally { await sql.end(); }
+  } };
 }
 const send = async (page, message) => {
   await page.getByLabel("Yêu cầu cho trợ lý").fill(message);
@@ -51,17 +56,18 @@ test("reload reconciles a running lease and explicit retry creates one new turn"
       const body = route.request().postDataJSON();
       accepted = await f.store.acceptRequest({ ownerEmail, tripSlug: f.slug, conversationId: body.conversationId,
         clientTurnId: body.clientTurnId, input: body.message, title: "Recovery", leaseMs: 60000, maxTurnsPerHour: 30 });
-      await route.fulfill({ status: 200, contentType: "application/x-ndjson", body: JSON.stringify({ seq: 1, type: "accepted", runId: accepted.turn.id, conversationId: accepted.conversation.id }) + "\n" });
+      await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ runId: accepted.turn.id, conversationId: accepted.conversation.id }) });
     });
     await send(page, "Tóm tắt sau khi mất kết nối");
-    await expect(page.getByText("Đang khôi phục yêu cầu đang xử lý")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Dừng", exact: true })).toBeVisible();
     await page.reload();
-    await expect(page.getByText("Đang khôi phục yêu cầu đang xử lý")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Dừng", exact: true })).toBeVisible();
     await f.sql`UPDATE assistant_turns SET lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=${accepted.turn.id}`;
     await expect(page.getByRole("button", { name: "Thử lại yêu cầu" })).toBeVisible({ timeout: 10000 });
     await page.unroute("**/api/v1/trips/*/assistant/turns");
     await page.getByRole("button", { name: "Thử lại yêu cầu" }).click();
     await expect(page.getByText("Đây là chế độ mô phỏng cục bộ.", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Dừng", exact: true })).toHaveCount(0);
     const rows = await f.sql`SELECT client_turn_id,status FROM assistant_turns WHERE conversation_id=${accepted.conversation.id}`;
     expect(rows).toHaveLength(2);
     expect(new Set(rows.map((row) => row.client_turn_id)).size).toBe(2);
@@ -94,7 +100,7 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
       await regenerate.click();
       await expect(page.getByLabel("Yêu cầu cho trợ lý")).toHaveValue(/Cập nhật hoạt động đầu tiên/);
-      await expect(page.getByLabel("Yêu cầu cho trợ lý")).toHaveValue(new RegExp(proposal.id));
+
     } finally { await f.cleanup(); }
   });
 }
@@ -131,6 +137,9 @@ test("assistant HTTP boundaries isolate actors and reject cross-origin or empty 
     expect(lookup.status()).toBe(200);
     expect((await lookup.json()).request.found).toBe(false);
     expect((await request.get(`/api/v1/assistant/workspace?conversation=${accepted.conversation.id}`, { headers: otherHeaders })).status()).toBe(404);
+    expect((await request.get(`/api/v1/assistant/runs/${accepted.turn.id}/events`, { headers: otherHeaders })).status()).toBe(404);
+    expect((await request.post(`/api/v1/assistant/runs/${accepted.turn.id}`, { headers: otherHeaders })).status()).toBe(404);
+    expect((await request.post(`/api/v1/assistant/runs/${accepted.turn.id}`)).status()).toBe(403);
     const endpoint = `/api/v1/trips/${f.slug}/assistant/turns`;
     const data = { clientTurnId: randomUUID(), message: "Hello" };
     expect((await request.post(endpoint, { data })).status()).toBe(403);

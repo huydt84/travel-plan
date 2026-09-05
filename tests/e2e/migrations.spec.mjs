@@ -84,7 +84,8 @@ test("a failed migration rolls back its DDL and ledger entry and can be retried"
     await cp(new URL("../../migrations", import.meta.url), dir, { recursive: true });
     await isolatedSchema(async (db, migrate) => {
       await migrate();
-      const file = join(dir, "1788652800001_failure.mjs");
+      const latest = Math.max(...(await readdir(dir)).filter((name) => /^\d+.*\.mjs$/.test(name)).map((name) => Number(name.split("_")[0])));
+      const file = join(dir, `${latest + 1}_failure.mjs`);
       await writeFile(file, "export async function up(pgm) { await pgm.db.query('CREATE TABLE rollback_probe (id INTEGER)'); await pgm.db.query('SELECT * FROM retry_dependency'); }");
       await expect(migrate({ dir })).rejects.toThrow();
       expect((await db.query("SELECT to_regclass('rollback_probe') AS name")).rows[0].name).toBeNull();

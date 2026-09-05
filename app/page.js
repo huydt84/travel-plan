@@ -2,17 +2,35 @@ import TripTracker from "../components/TripTracker";
 import { getViewer } from "../lib/auth";
 import { getCachedItinerary, listCachedTrips } from "../lib/trip-cache";
 import { currentDateInTimezone } from "../lib/trip-dates.mjs";
+import { getItinerary, listTrips } from "../lib/itinerary-repository";
+import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage({ searchParams }) {
-  const [params, trips, viewer] = await Promise.all([searchParams, listCachedTrips(), getViewer()]);
+  const [params, cachedTrips, viewer] = await Promise.all([searchParams, listCachedTrips(), getViewer()]);
+  let trips = cachedTrips;
   const { trip: requestedTrip, invite, gmail } = params;
   const requestedSlug = typeof requestedTrip === "string" && trips.some((trip) => trip.slug === requestedTrip)
     ? requestedTrip
     : null;
   const selectedSlug = requestedSlug || preferredTripSlug(trips);
-  const itinerary = await getCachedItinerary(selectedSlug);
+  let itinerary;
+  try {
+    itinerary = await getCachedItinerary(selectedSlug);
+  } catch (error) {
+    if (error.code !== "TRIP_NOT_FOUND") throw error;
+    // Another server/importer may delete a trip without invalidating this
+    // process's cached list. Recover from authoritative data, not the same cache.
+    trips = await listTrips();
+    if (!trips.length) notFound();
+    const freshSlug = trips.some((trip) => trip.slug === requestedSlug) ? requestedSlug : preferredTripSlug(trips);
+    try { itinerary = await getItinerary(freshSlug); }
+    catch (freshError) {
+      if (freshError.code === "TRIP_NOT_FOUND") notFound();
+      throw freshError;
+    }
+  }
   return (
     <TripTracker
       key={itinerary.trip.slug}

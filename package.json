@@ -34,7 +34,10 @@
     "pg": "^8.23.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "sql-template-tag": "^5.2.1"
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "sql-template-tag": "^5.2.1",
+    "workflow": "^4.8.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

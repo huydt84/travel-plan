@@ -6,6 +6,8 @@ export default defineConfig([
   { rules: { "no-undef": "error" } },
   globalIgnores([
     ".next/**",
+    "app/.well-known/workflow/**",
+    ".workflow-data/**",
     ".next-playwright/**",
     "out/**",
     "build/**",

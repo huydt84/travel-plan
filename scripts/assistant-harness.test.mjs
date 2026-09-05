@@ -16,6 +16,8 @@ test("proposal validation reaches the model for repair before publication", asyn
     { steps: [call("stage_plan_changes", { operations: [{ kind: "activity.update", itemKey: "missing", set: { title: "New" } }] })] },
     (request) => {
       assert.ok(request.input[0].result.error);
+      assert.match(request.system_instruction, /Never claim to have committed a plan/);
+      assert.match(request.system_instruction, /activity.update/);
       return { steps: [call("stage_plan_changes", { operations: [{ kind: "activity.update", itemKey: "museum", set: { title: "New" } }] })] };
     },
     { output_text: "Ready to review" },

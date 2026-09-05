@@ -98,6 +98,7 @@ PostgreSQL and include:
 | Activity plus citations | `schedule-persistence.spec.mjs` forces FK failures and checks partial-edit semantics |
 | Whole-plan import / seeds | `import-persistence.spec.mjs` checks keys, selected branches, notes, create-only conflicts and rollback |
 | AI confirmation | `assistant-persistence.spec.mjs` checks rollback, stale revision guards, citation clearing and receipt replay |
+| Assistant background execution | `assistant-companion.spec.mjs` checks Workflow delivery, per-trip state, event/cancellation fences and outbox retry; see [assistant operations](agentic-v1.md) |
 | Permissions and visibility | Existing contribution/role/notification browser suites plus invitation handler tests |
 | Drafts and focus | Branch editor and invitation browser tests |
 | Layout and completed trips | `maintenance-ui.spec.mjs` checks geometry, timers, feedback and anonymous heartbeat |
@@ -107,3 +108,25 @@ Tests no longer inspect application source files to infer runtime behavior.
 Inspect the complete screenshot batch, fix findings together, then run the
 confirmation batch and relevant feature tests. Database integration tests create
 and remove isolated schemas or uniquely named records; production is never used.
+
+### Check the running local preview after test cleanup
+
+The preview on port 3000 and the E2E server on 3100 share local PostgreSQL but
+maintain separate Next caches. A passing suite on 3100 does not prove that the
+already-running preview remains healthy after fixture deletion. Browser fixture
+cleanup should use the trip DELETE API so its own server invalidates cached data.
+The home page also recovers from a missing cached selection using fresh database
+reads, because another process can delete a trip without invalidating its cache.
+
+With the local admin preview running, verify that exact failure and the assistant
+integration on the same server:
+
+```sh
+E2E_BASE_URL=http://127.0.0.1:3000 pnpm exec playwright test tests/e2e/trip-cache-recovery.spec.mjs
+```
+
+This regression warms the home page's list without loading the disposable trip's
+itinerary, deletes that trip through another database client, revisits `/`, and
+checks the tracker, inherited assistant trip and history at all three canonical
+viewports. It reproduced an HTTP 500 before the recovery fix. The override accepts
+only loopback hosts and does not start a second server.

@@ -8,6 +8,10 @@
     {
       "path": "/api/internal/notification-email-retry",
       "schedule": "17 0 * * *"
+    },
+    {
+      "path": "/api/internal/assistant-dispatch",
+      "schedule": "* * * * *"
     }
   ],
   "installCommand": "pnpm install --frozen-lockfile",

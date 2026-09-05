@@ -1,3 +1,6 @@
+import AssistantProvider from "../components/v1/AssistantProvider";
+import { getViewer } from "../lib/auth";
+import { resolveAgenticV1Config } from "../lib/v1/config.mjs";
 import "../src/styles.css";
 import { Barlow_Condensed, Noto_Sans } from "next/font/google";
 import ActivityHeartbeat from "../components/ActivityHeartbeat";
@@ -38,11 +41,12 @@ export const viewport = {
   themeColor: "#f4f1e8",
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const viewer = resolveAgenticV1Config().enabled ? await getViewer() : null;
   return (
     <html lang="vi" className={`${bodyFont.variable} ${displayFont.variable}`} data-scroll-behavior="smooth">
       <body>
-        {children}
+        <AssistantProvider viewer={viewer}>{children}</AssistantProvider>
         <ActivityHeartbeat />
       </body>
     </html>

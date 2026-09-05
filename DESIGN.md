@@ -1,6 +1,6 @@
 ---
 name: "Lịch trình chuyến đi"
-description: "A live trip day rendered as one continuous transit line."
+description: "A live trip day and its integrated planning companion in one transit-atlas world."
 colors:
   navy: "#10243d"
   navy-soft: "#32445a"
@@ -38,6 +38,21 @@ typography:
     fontSize: "12px"
     fontWeight: 400
     lineHeight: 1.62
+  conversation-body:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: 1.65
+  conversation-response:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "16px"
+    fontWeight: 400
+    lineHeight: 1.75
+  conversation-response-compact:
+    fontFamily: "Noto Sans, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: 1.75
   label:
     fontFamily: "Noto Sans, system-ui, sans-serif"
     fontSize: "9px"
@@ -90,6 +105,12 @@ components:
     backgroundColor: "{colors.paper-bright}"
     textColor: "{colors.navy}"
     padding: "clamp(22px, 4vw, 42px)"
+  conversation-user:
+    backgroundColor: "{colors.green-soft}"
+    textColor: "{colors.navy}"
+    typography: "{typography.conversation-body}"
+    rounded: "{rounded.control}"
+    padding: "14px 18px"
   next-fascia:
     backgroundColor: "{colors.yellow-soft}"
     textColor: "{colors.navy}"
@@ -106,6 +127,8 @@ The interface treats a day trip as one piece of transit infrastructure. Every ac
 
 The world is warm paper printed with navy station ink, route green, and transfer yellow. Compressed headings, tabular time, clipped enamel-like panels, timetable rules, and route-node geometry create authority without luxury styling. Density is intentional but calm: large status and time are readable under interrupted attention, while details and provenance remain available in place.
 
+The integrated assistant extends this same world with a ruled reading column, a compact composer, and contextual inspection drawers. Its calmer conversational density preserves paper, ink, and route signals while giving long Vietnamese responses room to breathe.
+
 **Key Characteristics:**
 
 - One continuous route is the organizing geometry on every itinerary surface.
@@ -113,7 +136,7 @@ The world is warm paper printed with navy station ink, route green, and transfer
 - Route green means current, completed, progress, or constructive action; transfer yellow means next or pending attention.
 - Compressed display type carries stations and time; neutral sans carries explanation and forms.
 - Square, ruled, clipped construction replaces detached rounded travel cards.
-- Public and owner views share the same timetable grammar at different operating densities.
+- Public, owner, and assistant views share the same paper and timetable grammar at different reading densities.
 
 ## Colors
 
@@ -163,13 +186,14 @@ The palette is deliberately small and operational: navy establishes station auth
 - **Display** (700, fluid 44–80px, 0.86 line-height): Active station names, primary countdowns, and the largest admin headings. Display text may wrap tightly but stays balanced and uppercase when it represents a station-board declaration.
 - **Headline** (700, fluid 35–56px, 0.95 line-height): Major public sections and plan summaries.
 - **Title** (600, 24px, 1.05 line-height): Timetable rows, editor sections, and compact station names.
-- **Body** (400, 12px, 1.62 line-height): Activity detail and explanatory copy; keep readable passages near 68–72 characters.
+- **Body** (400, 12px, 1.62 line-height): Existing compact itinerary detail and explanatory copy; this incumbent scale does not govern conversation prose.
+- **Conversation:** Noto Sans uses a 15px/1.65 base for user messages and the workspace, with 16px/1.75 assistant responses reduced to 15px at 760px and below. Responses stay within 72ch. Composer entry remains 16px/1.5; source and change details use 14px, with secondary drawer metadata at 12px. Short workspace and drawer titles use condensed 28px/1.1 type (24px workspace title on compact screens); headings inside Markdown remain neutral sans for continuous reading.
 - **Label** (700, 9px, 0.08em letter-spacing): Types, statuses, control labels, and metadata. Uppercase is used for compact operational labels, not full paragraphs.
 - **Timing:** All clocks, ranges, countdowns, and schedule columns use tabular numerals. Timing may scale to display size but remains in the condensed family.
 
 ### Named Rules
 
-**The Platform Voice Rule.** Use condensed type for destinations, status, and time; use the neutral sans only for explanation, provenance, authorship, and form entry.
+**The Platform Voice Rule.** Use condensed type for destinations, status, and time; use the neutral sans for explanation, provenance, authorship, form entry, and conversation structure.
 
 **The Vietnamese Legibility Rule.** Never tighten Noto Sans body copy to mimic the condensed display face; preserve generous line-height and complete diacritics.
 
@@ -187,9 +211,15 @@ Spacing follows compact operational increments rather than airy marketing rhythm
 
 **The Route-Persistence Rule.** Responsive adaptation may reflow or replace the desktop composition, but it may not turn itinerary stations into a stack of detached cards.
 
+The assistant has one scrollable message column between a nonshrinking header/toolbar and composer. On the tracker, the companion sits beside the itinerary at widths of 1200px and above: 480px wide, growing to 600px at 1800px. The tracker gives up the same width and reflows its control band. Below 1200px, the companion becomes a full-screen dialog; the dedicated `/assistant` page uses the full viewport at every size. History, sources, and proposal review share an on-demand right-side drawer, capped at 600px and filling narrower screens. The current implementation supersedes the former `/v1` three-column workspace; conversation, evidence, and review are not permanent parallel columns.
+
+**The Reading-First Rule.** Keep trip selection, history, and new conversation above the message column, the compact composer below it, and detailed evidence and proposal review in focus-restoring drawers. Preserve the first-viewport controls at 320px without squeezing the message type.
+
 ## Elevation & Depth
 
 The system is flat by construction. There are no ambient card shadows. Depth comes from 1px timetable rules, 2px structural outlines, 6px inactive/completed rails, 10px active route segments, solid status fields, clipping, and the paper-to-bright-paper tonal shift. The only shadow-like treatments are functional: an inset ring inside completed nodes, a 3px translucent green field focus halo, the live-dot pulse, and the navy modal scrim with 4px backdrop blur.
+
+The assistant inspection drawer uses a plain translucent navy scrim (`rgb(16 36 61 / .35)`) without added blur or a floating shadow; its fixed companion uses a single navy seam against the tracker.
 
 ### Named Rules
 
@@ -256,9 +286,17 @@ The next stop is a directional yellow-paper strip with a navy label block, green
 
 Public and owner rows share time/rail/content alignment, thin separators, condensed titles, type pictograms, and restrained body detail. The public current row opens into a clipped green-wash panel. Owner rows add edit/delete controls but keep the route node and time column intact. Suggestion moderation uses a compact metadata/copy/control grid beneath the same plan, not a separate application shell.
 
+### Integrated Assistant
+
+The trip launcher is a small outlined, deep-green action with a line-SVG conversation icon and a rectangular unread count. User messages align right on washed green with 4px corners; assistant responses remain on the paper field. Authorship labels, spacing, and content distinguish the two speakers. Markdown links are underlined deep green; tables scroll within their own region, and long text wraps without widening the workspace.
+
+The composer is an attached bright-paper strip with a ruled top edge, a labeled 16px textarea, and explicit Send or Stop. Entry can grow up to 180px while the message region keeps its own scroll. Main conversation actions and citation targets have a 44px minimum target; the textarea starts at 48px. Busy states retain the question and show a textual progress or interrupted state.
+
+History uses ruled rows and a green wash for the selected conversation. Source and proposal actions attach to their response and open the shared drawer. Pending review uses transfer paper; applied results use washed green; conflicts, expiry, and destructive changes use service-red fields with text. Before/after content remains inspectable, and Apply stays explicit and visible near the drawer bottom. Dialogs restore focus on close. New content does not force the reader away from an older response; a recovery action appears when needed.
+
 ### Motion and Live State
 
-The live dot pulses on a 2.1-second ease-out cycle; countdown progress advances over 600ms with a fast-out, slow-arrive curve; loading skeletons alternate opacity over 1.2 seconds. Motion confirms liveness or state change and never gates content. Under `prefers-reduced-motion: reduce`, smooth scrolling, animation, and transition are disabled across elements and pseudo-elements.
+The live dot pulses on a 2.1-second ease-out cycle; countdown progress advances over 600ms with a fast-out, slow-arrive curve; loading skeletons alternate opacity over 1.2 seconds. The assistant running dot alternates opacity over 1.4 seconds with ease-in-out. Motion confirms liveness or state change and never gates content. Under `prefers-reduced-motion: reduce`, smooth scrolling, animation, and transition are disabled across elements and pseudo-elements.
 
 ## Do's and Don'ts
 
@@ -271,6 +309,7 @@ The live dot pulses on a 2.1-second ease-out cycle; countdown progress advances 
 - **Do** keep contribution notes attached to their station or to the explicitly labeled whole-trip contribution region.
 - **Do** use code-native line SVG pictograms with consistent 1.8–2px rounded strokes.
 - **Do** preserve a 320px minimum viewport, safe-area padding, one-handed mobile controls, and the reduced-motion override.
+- **Do** use the intentional 15–16px conversation scale and keep sources and explicit proposal review reachable from each response.
 
 ### Don't:
 
@@ -280,3 +319,4 @@ The live dot pulses on a 2.1-second ease-out cycle; countdown progress advances 
 - **Don't** communicate before/current/gap/completed, suggestion status, or errors by color alone.
 - **Don't** let the owner control room drift into a different SaaS design language; it edits the same timetable infrastructure.
 - **Don't** hide citations, contribution context, or real schedule detail in pursuit of visual minimalism.
+- **Don't** reuse compact itinerary metadata sizes for chat paragraphs or restore the obsolete three-column assistant layout.

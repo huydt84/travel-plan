@@ -49,12 +49,14 @@ if (missing.length) {
     const actor = { email: "live-harness@localhost.invalid", isAdmin: true };
     const run = await assistant.startTurn({ actor, tripSlug: slug, clientTurnId: randomUUID(),
       message: "Find the official Tokyo National Museum website using search_web and cite it. Then stage exactly one change: update activity museum title to Tokyo National Museum. Preserve all other fields. This is a staging request, not permission to apply." });
-    let completed;
+    let completed, deltas = 0;
     for await (const event of run.events) {
+      if (event.type === "answer-delta" && event.text) deltas++;
       if (event.type === "failed") { console.log(`Harness outcome: ${event.error.code}`); throw new Error("Harness turn failed"); }
       if (event.type === "completed") completed = event.turn;
     }
     assert.ok(completed?.changeSet && completed.citations.length);
+    assert.ok(deltas > 0, "Gemini must emit public answer deltas before completion");
     assert.deepEqual(await readSnapshot(), before, "Staging must not mutate the plan");
     phase = "explicit confirmation and replay";
     const confirmation = { actor, proposalId: completed.changeSet.id, confirmationToken: completed.changeSet.confirmationToken };

@@ -3,6 +3,7 @@ import trackerStyles from "../src/styles/tracker.module.css";
 import navigationStyles from "../src/styles/navigation.module.css";
 import contributionsStyles from "../src/styles/contributions.module.css";
 
+import { AssistantLauncher } from "./v1/AssistantProvider";
 import Footer from "./ui/Footer";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
@@ -554,6 +555,7 @@ export default function TripTracker({
               {tripDateLabel} · {data.trip.location}
             </small>
           </label>
+          <AssistantLauncher tripSlug={data.trip.slug} />
           <button
             className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`}
             type="button"

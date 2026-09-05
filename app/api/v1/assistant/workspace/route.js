@@ -12,6 +12,8 @@ export async function GET(request) {
       actor,
       clientTurnId: url.searchParams.get("request"),
       before: url.searchParams.get("before"),
+      historyBefore: url.searchParams.get("historyBefore"),
+      allTrips: url.searchParams.get("allTrips") === "1",
       tripSlug: url.searchParams.get("trip"),
       conversationId: url.searchParams.get("conversation"),
     });

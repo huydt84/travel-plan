@@ -76,6 +76,10 @@ Trip plans and schedules are publicly readable, including by signed-out visitors
 | Promote members or demote admins | Yes | No | No |
 | Receive personal in-app notifications | No; the owner is intentionally excluded | Yes, for trips in which they participate | Yes, for trips in which they participate |
 
+## Trip assistant
+
+The admin-only **Trợ lý** companion opens beside the selected itinerary and has an expanded `/assistant` view. It supports streamed replies, per-trip drafts, paginated history, sources and explicit proposal review. Enable it with `AGENTIC_V1_ENABLED=true` after local migrations. See [assistant development and operations](docs/agentic-v1.md) for Workflow dispatch, Stop/reconnect behavior, verification and the separate production rollout.
+
 ## Maintaining the codebase
 
 See [the maintenance guide](docs/maintenance.md) for module ownership, versioned migrations, and verification. Migrations never seed or reset trip metadata. Seeds create a missing trip atomically and leave an existing trip untouched.

@@ -1,0 +1,28 @@
+.launcher { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 12px; min-height: 44px; font: 700 12px/1.3 var(--font-body), sans-serif; border: 1px solid var(--green-dark); border-radius: 4px; background: var(--paper-bright); color: var(--green-dark); cursor: pointer; white-space: nowrap; }
+.launcher:hover { background: var(--green-soft); }
+.launcher span { padding: 3px 5px; background: var(--green-dark); color: var(--paper-bright); border-radius: 3px; }
+.panel { position: fixed; inset: 0 0 0 auto; width: 480px; z-index: 30; border-left: 1px solid var(--navy); background: var(--paper); }
+.withCompanion { margin-right: 480px; container-type: inline-size; }
+.mobileOverlay { position: fixed; inset: 0; z-index: 50; background: var(--paper); }
+.mobilePanel { width: 100%; height: 100dvh; }
+@media (min-width: 1800px) { .panel { width: 600px; } .withCompanion { margin-right: 600px; } }
+@media (max-width: 1199px) { .withCompanion { margin-right: 0; } }
+
+:global(.trip-context):has(.launcher) { grid-template-columns: minmax(0, 1fr) auto auto; }
+@container (max-width: 1100px) {
+  .withCompanion :global(.trip-bar) { grid-template-columns: 1fr auto; }
+  .withCompanion :global(.product-mark) { display: none; }
+  .withCompanion :global(.trip-context) { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--navy); }
+}
+@media (max-width: 680px) {
+  :global(.trip-context):has(.launcher) { grid-template-columns: minmax(0, 1fr) auto; }
+  :global(.trip-context):has(.launcher) :global(.trip-picker) { grid-column: 1 / -1; }
+}
+
+@media (max-width: 680px) {
+  :global(.trip-bar):has(.launcher) { grid-template-columns: minmax(0, 1fr) auto; }
+  :global(.trip-bar):has(.launcher) :global(.product-mark) { display: none; }
+  :global(.trip-bar):has(.launcher) :global(.trip-context) { grid-column: 1 / -1; grid-row: 1; border-right: 0; }
+  :global(.trip-bar):has(.launcher) :global(.viewer-utilities) { grid-column: 2; grid-row: 2; }
+  :global(.trip-bar):has(.launcher) :global(.live-clock) { grid-column: 1; grid-row: 2; }
+}

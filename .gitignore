@@ -18,3 +18,8 @@ test-results
 
 .DS_Store
 .impeccable
+
+# Generated Workflow runtime and local execution state
+app/.well-known/workflow/
+.workflow-data/
+/.swc

@@ -1,110 +1,108 @@
-# Agentic travel assistant `/v1`
+# Integrated trip assistant
 
-`/v1` is an additive, owner/admin-only pilot. It shares authentication and canonical trip data with the current application, but keeps its UI, HTTP adapters, conversations, prompts, provider adapters, and proposal write flow isolated under `app/v1`, `app/api/v1`, `components/v1`, and `lib/v1`.
+The feature-gated, admin-only assistant opens from **Trợ lý** beside the tracker’s trip controls or in admin navigation. It inherits the selected trip. At 1200px and above it accompanies the itinerary; smaller screens use a full-screen dialog. `/assistant` provides an expanded destination using the same conversation components. `/v1` redirects there, preserving `trip` and `conversation` parameters. Internal API and module names retain `v1` to avoid unrelated domain churn.
 
-## Enable locally
+## Local development
 
-The pilot is off by default. Local admin mode uses the deterministic model adapter, so it does not call external providers:
+Use pnpm 11.19.0 and the isolated local database:
 
 ```sh
+pnpm install --frozen-lockfile
 pnpm run db:up:local
 pnpm run db:migrate:local
 pnpm run db:seed:local
 AGENTIC_V1_ENABLED=true APP_URL=http://127.0.0.1:3000 pnpm run dev:admin
 ```
 
-Open `http://127.0.0.1:3000/v1`.
+Open `http://127.0.0.1:3000` and choose **Trợ lý**. Local admin mode defaults to a clearly labelled deterministic provider. Workflow runs locally through its Next.js integration; keep the development server running. The SDK owns generated `app/.well-known/workflow` routes and `.workflow-data`, both ignored by Git. Do not edit generated workflow routes.
 
-## Production configuration
+`next.config.mjs` uses `withWorkflow`; `workflows/assistant.js` defines the workflow and execution step. This follows the [official Next.js integration](https://github.com/vercel/workflow/blob/main/docs/content/docs/v4/getting-started/next.mdx). If a proxy is added later, exclude the SDK’s `.well-known/workflow` paths from its matcher.
 
-Configure server-side values without exposing them to the browser:
+## Module boundaries
 
-- `AGENTIC_V1_ENABLED=true` exposes the route. Leave it false to return 404.
-- `GEMINI_API_KEY` enables the official Gemini adapter and separate Google Search grounding interaction.
-- `GEMINI_MODEL` pins the model name; it defaults to `gemini-3.6-flash` and should not use a `latest` alias.
-- `GOOGLE_MAPS_PLATFORM_API_KEY` is a separate, API-restricted key for Places API (New) and Routes API.
-- `AUTH_SECRET` signs proposal confirmation tokens.
+| Module | Responsibility |
+| --- | --- |
+| `AssistantProvider.jsx` | Shared entry, responsive companion, recent background-completion badge |
+| `useConversation.js` | Trip/conversation selection, drafts, history, recovery and obsolete-load cancellation |
+| `transport.mjs` | Accepted JSON submissions and cursor-based event observation |
+| `MessageContent.jsx` | Safe Markdown/GFM and grouped evidence controls |
+| `Composer.jsx` | Growing input, Enter/Shift+Enter, IME and explicit Stop |
+| `ConversationHistory.jsx` | Current-trip/all-trip history and pagination |
+| `ProposalReview.jsx` | Sources, before/after values and explicit Apply |
+| `background.mjs`, `background-store.mjs`, `dispatch.js` | Accepted jobs, durable dispatch, worker claims and event publication |
+| `travel-assistant.mjs`, `gemini-adapter.mjs`, `committer.mjs` | Existing bounded model/tools and atomic proposal confirmation |
 
-Run `pnpm run db:migrate` intentionally before enabling the production pilot. Deployment alone does not migrate the database.
+Assistant URL observation has its own Suspense boundary. It must never duplicate or suspend the existing tracker as a loading fallback.
 
-## Module boundary
+## Acceptance, execution and recovery
 
-The server exposes three workflows:
+Submission and observation are separate. `POST /api/v1/trips/:slug/assistant/turns` accepts `{clientTurnId, conversationId?, message}` and returns HTTP 202 with `runId`, `conversationId`, `status` and `replayed`. It requires authenticated admin identity and same-origin browser context. The browser saves request identity and input before submission. An ambiguous response is recovered through actor-scoped request lookup; retries use the same identity and cannot create a second turn. A retry after a terminal failure uses a new identity.
 
-```js
-loadWorkspace(input)
-startTurn(input)
-confirmProposal(input)
-```
+`accept_assistant_background_request` wraps actor-locked acceptance and inserts the job outbox plus queued event in the same database transaction. The acceptance response attempts Workflow dispatch. A dispatch failure leaves a retryable row. `/api/internal/assistant-dispatch`, authenticated by `CRON_SECRET`, retries due jobs every minute through Vercel Cron. Dispatch claims use `SKIP LOCKED` and a one-minute retry interval. The Workflow ID is persisted on the job; ambiguous starts are safe because only one worker can claim the turn. One turn may run per conversation; different conversations may run independently under the existing actor quota.
 
-Browser identity is never accepted. Each route obtains the actor through `getViewer()`, requires an admin role, and scopes conversations to the normalized actor email and one trip. `startTurn` returns increasing NDJSON events and persists the terminal result. All events include the run ID; an accepted event precedes progress and exactly one terminal event. A dropped stream is an uncertain outcome, not proof that the server failed. Tool progress is safe status text, not model reasoning or raw provider payloads.
+A Workflow step invokes the existing Gemini/tool domain with a 45-second deadline and a 55-second execution lease. Acceptance gives queued work ten minutes to dispatch. Closing chat, changing trips, navigation and lost connections only detach observation. They do not abort execution. An explicit **Dừng** persists cancellation; the worker observes that state and aborts provider work. The same turn-row lock fences cancellation, event append and final proposal publication.
 
-Research tools are read-only. `stage_plan_changes` compiles typed operations against the private snapshot during the tool loop. Invalid operations return focused validation feedback for correction within the remaining budget. Source additions require a researched or canonical URL. At completion, one database statement publishes the answer and its immutable diff, digest, base revision, expiry, citations, and hashed confirmation token together. Interrupted or expired turns cannot publish; incomplete legacy proposals cannot be confirmed. Only the explicit confirmation endpoint can commit.
+A killed worker is not blindly restarted from an unknown provider position. Its expired lease becomes a failed/incomplete turn on reconciliation, and the user can explicitly retry. This preserves the current bounded-provider policy and avoids duplicated provider work. Workflow delivery and outbox retries survive viewer disconnects; they do not imply unlimited model execution or recovery of a provider’s hidden state.
 
-Confirmation requires a same-origin request and rechecks actor ownership, proposal token, status, expiry, and plan revision. The commit claims and applies the proposal in one Serializable transaction, records a receipt, and invalidates the existing itinerary cache after success. Repeated and concurrent confirmation return the stored receipt; serialization/deadlock failures retry at most twice. Revision conflicts apply nothing. The browser refreshes its trip snapshot and revision after confirmation.
+## Event replay
 
-## Provider and retention boundaries
+`GET /api/v1/assistant/runs/:runId/events?after=N` is authenticated and owner-scoped. It returns NDJSON visible events with strictly increasing per-run sequence numbers. Observation lasts up to 20 seconds and reconnects from the last processed cursor. Duplicate events are ignored; gaps cause reconnection. Cancelling the response stream only releases the observer.
 
-Gemini interprets intent and orchestrates bounded tools. Search supplies current web research. Places supplies deterministic place identity, business state, hours, ratings, and available review context. Routes supplies duration, distance, and steps. Provider adapters normalize outputs before they enter the assistant.
+Events include accepted/queued, progress/running, actual `answer-delta`, normalized `evidence`, and completed/failed/cancelled terminal states. Gemini streaming forwards only public model-output text steps. Every model interaction re-sends the system instructions, since `previous_interaction_id` carries history but not those instructions ([Google API behavior](https://ai.google.dev/gemini-api/docs/interactions-overview#server-side-state-management)). Tool payloads, thought steps and hidden reasoning never enter replay. A new model interaction can reset provisional answer text; the final persisted response remains authoritative. Production does not use typing timers or split a finished answer to imitate streaming.
 
-Persist normalized evidence only: provider identifiers, source/Maps URLs, titles, attribution, timestamps, and derived claims. Do not store raw pages, complete provider responses, hidden reasoning, or unrestricted review payloads. Finalize pilot retention/export/deletion policy before access expands beyond owner/admin.
+`assistant_events` persists replay; partial text and evidence also update `assistant_turns`. `append_assistant_event` serializes writes and creates only one terminal event, including reconciliation of a stopped or interrupted worker. Late deltas after termination are rejected. Stored events omit confirmation tokens; the authenticated endpoint rehydrates the current proposal status and token when returning a terminal result. An incomplete response cannot publish an applicable proposal.
 
-## Verification
+`POST /api/v1/assistant/runs/:runId` requests Stop. It checks ownership and same origin. If completion won the transaction race, it returns that completed turn; it cannot undo an already completed reply. `GET /api/v1/assistant/runs` returns up to 100 actor-owned runs from the last 24 hours for background status. The badge uses actor-scoped local storage to remember viewed completions, without changing the selected trip.
 
-Run:
-
-```sh
-pnpm run lint
-pnpm run test:unit
-pnpm run test:e2e
-pnpm run build
-```
-
-The focused browser suite covers staged diffs, explicit confirmation, atomic receipt, reload resume, and same-origin rejection. The responsive audit includes `/v1` and every existing public/admin surface at 320×760, 1440×900, and 1920×1080.
-
-
-## Request identity, recovery, and history
-
-The additive `assistant-recovery` migration adds `assistant_requests` and the `accept_assistant_request` database function. Acceptance takes an actor-scoped transaction advisory lock and checks request identity, hourly quota, and conversation ownership before creating anything. A first submission atomically creates its conversation, turn, and ledger entry. This database function uses the same transaction semantics through Neon HTTP and local PostgreSQL; it avoids introducing a second connection/transaction abstraction for acceptance.
-
-The ledger key is `(authenticated actor, clientTurnId)`. Repeating the same request resolves to its original turn, even if its first acceptance response was lost. The server rejects changed message/trip/conversation inputs. For a request initially submitted without a conversation, retries can use either the original null conversation or the conversation returned by acceptance. Older turns continue to support scoped replay through their original conversation.
-
-Workspace reads and request acceptance reconcile expired running leases and unfinished tool records. Active runs have a 45-second execution deadline and a 55-second persistence lease, within the 60-second HTTP route limit. Disconnects abort providers; the browser recovers persisted state on return. A worker queue is not part of this pilot. A process crash is resolved when the lease expires and the next workspace read or submission reconciles it.
-
-The browser saves pending request identity and input in actor-scoped session storage before sending. On reload or malformed/truncated streaming, it checks persisted status and polls every two seconds while the turn remains running. Navigation, terminal state, or a network failure stops polling. Unknown outcomes offer a same-ID resend; an explicit retry of a terminal failure uses a fresh ID. Session storage must be available to send recoverable requests.
+## History and browser state
 
 `GET /api/v1/assistant/workspace` accepts:
 
-- `trip`: existing trip slug.
-- `conversation`: actor-owned conversation UUID.
-- `request`: actor-scoped client request UUID; when found, selects that request's conversation and returns its full turn in `request.turn`.
-- `before`: opaque `nextCursor` from an earlier response, used with the same conversation.
+- `trip`: trip slug; history defaults to this trip.
+- `conversation`: actor-owned conversation UUID belonging to that trip.
+- `request`: actor-scoped request UUID for recovering uncertain acceptance.
+- `before`: opaque `nextCursor` for earlier turns in the same conversation.
+- `historyBefore`: opaque `historyCursor` for another conversation page.
+- `allTrips=1`: include the actor’s conversations across trips.
 
-Responses retain the existing workspace fields and add `request` (`found` and `turn`) and `nextCursor`. Turns expose `leaseExpiresAt`. Pages contain the newest 60 turns in chronological order; timestamps in cursors preserve PostgreSQL microseconds. The model receives the latest 12 completed turns with evidence and proposal status. Existing evidence markers are normalized across history so older pilot turns that reused `E1` do not collide.
+Conversation pages contain 30 entries; turn pages contain the latest 60 turns in chronological order. Pagination preserves PostgreSQL microseconds and stable UUID tie-breakers. The model receives the latest 12 completed turns with normalized evidence identifiers, including grouped citations.
 
-## Tool and provider limits
+Trip and conversation selections are URL-backed and support Back/Forward. Drafts and last selections are actor-scoped, per-trip session storage. Abort controllers and generation checks prevent late workspace responses from replacing a newer selection. Session storage must be available to send recoverable requests; drafts otherwise remain usable in the current view.
 
-- Eight requested tools per turn, including invalid calls and proposal repairs; at most two independent read-only calls run concurrently.
-- Proposal staging runs after the research calls in the same model response. Evidence is merged in request order, regardless of completion order.
-- Transient network, 429, and server failures receive at most one retry per provider call, within the same deadline. Provider authentication/configuration failures are not retried automatically.
-- Route waypoints are explicit `{address}` or `{placeId}` objects. Departure times without an offset use the trip timezone. Transit dates outside the provider's supported forecast window are reported as unavailable rather than substituted with today's route.
-- Tool audit records contain safe request metadata, completion status, duration, validation diagnostics, and numeric provider usage when returned. They never store complete provider payloads or hidden reasoning. Failed provider-interaction cleanup emits a safe warning.
-- Confirmation expiry remains 30 minutes; the open browser removes the apply control when that time elapses.
+Messages render through `react-markdown` and `remark-gfm`, with raw HTML disabled and unsafe links removed. Grouped markers such as `[E5, E12]` open sources with keyboard focus and restore focus on close. Auto-scroll follows the reply only near the bottom; reading earlier content shows **Có câu trả lời mới**. Enter sends, Shift+Enter inserts a newline, and IME composition never submits.
 
-## Live-provider acceptance
+## Proposal and provider safeguards
 
-Deterministic adapters remain the local default. Set `AGENTIC_V1_REAL_PROVIDERS=true` alongside local admin mode only when intentionally testing real providers against the isolated local database. Ordinary production mode always uses the real adapter; this flag does not enable local authentication outside development.
+Research tools are read-only. Staging compiles typed operations against the canonical snapshot. Invalid arguments return focused validation feedback within the remaining tool budget. At completion, one database statement publishes the answer and immutable proposal, including full diff, digest, revision, expiry, evidence and hashed token. Only the explicit confirmation endpoint may change the itinerary.
 
-After local migrations, run:
+Confirmation rechecks actor ownership, token, turn/proposal status, expiry and plan revision. A Serializable transaction applies all changes and records the receipt. Concurrent/repeated confirmation returns that receipt. Revision conflicts apply nothing. The existing itinerary cache is invalidated and the browser refreshes after success.
+
+Existing limits remain: eight requested tools, at most two concurrent read-only calls, one retry for transient provider failures within the turn deadline, 30 turns per actor per hour, and 30-minute proposal expiry. Search, Places and Routes retain normalized evidence and safe audit metadata; raw pages, full provider responses and hidden reasoning are excluded. Stored conversation text and replay events are private user content. Retention/export/deletion policy must be finalized before access expands beyond admins; no automatic retention purge is introduced here.
+
+## Production rollout (separate from implementation)
+
+The feature remains disabled by default. Configure server-side values through the project’s normal deployment settings:
+
+- `AGENTIC_V1_ENABLED=true` enables assistant routes and admin entries.
+- `GEMINI_API_KEY` and pinned `GEMINI_MODEL` enable Gemini/Search; the model default remains `gemini-3.6-flash`.
+- `GOOGLE_MAPS_PLATFORM_API_KEY` is restricted to Places API (New) and Routes API.
+- `AUTH_SECRET` signs proposal confirmations.
+- `CRON_SECRET` authenticates the existing and assistant retry schedules.
+
+Intentionally run production migrations before enabling the feature. The new migrations add background jobs, event replay and fenced event publication. Deployment does not migrate the database. Verify Workflow support and a plan/scheduler capable of the configured one-minute retry cadence before rollout. A local Workflow run is not a production deployment smoke test.
+
+Package installation retains the repository’s provenance and build-script protections. Compatible attested transitive versions are pinned in `pnpm-workspace.yaml`; no global provenance exception or unrestricted install script permission is added. Reassess those overrides during dependency upgrades.
+
+## Verification
 
 ```sh
+pnpm test
+pnpm run build
 pnpm run test:assistant:live
 ```
 
-This explicit command consumes configured credentials internally and uses the fixed loopback test database. It creates a disposable trip, checks Gemini, grounded Google Search, Places search/details, and Routes, then verifies a grounded proposal, no itinerary writes before confirmation, one explicit application, and receipt replay. It deletes only its disposable trip in `finally`. It prints safe status/diagnostics, never credentials or raw provider errors. Run it separately from E2E suites because both use the local database.
+The live-provider command is intentional and runs separately from E2E because both use the isolated local database. It consumes configured credentials internally, creates a disposable trip, checks Gemini text deltas plus Search/Places/Routes, validates a proposal, confirms once and replays the receipt, then removes that trip. It prints only safe diagnostics. Missing credentials leave live acceptance outstanding; never read or edit `.env` to troubleshoot.
 
-Missing credentials return exit code 2 and leave live acceptance outstanding without provider calls or database writes. Provider or assertion failures return exit code 1. Do not edit or print `.env` to troubleshoot; the user configures missing values.
+Assistant regression suites cover actual local Workflow delivery, two-trip switching, close/reload, late loads, Back/Forward, drafts, history beyond 30 conversations/60 turns, cursor replay, cancellation fencing, duplicate claims, outbox retry, scoped access, Markdown, citations/focus and IME. Existing suites cover stale proposals, atomic publication and confirmation races. The responsive audit covers all public/admin surfaces and assistant/history/companion states at 320×760, 1440×900 and 1920×1080; assistant coverage also includes 900px overflow and expired proposal states.
 
-Verification on 2026-09-05 included a successful live smoke against the isolated local database. This demonstrates the configured provider path; it is not a guarantee of future provider latency or availability. Early smoke runs exposed invalid model operation arguments; focused validation feedback and an exact operation example were added, and the full grounded proposal/confirmation flow then passed.
-
-The focused regression suites are `assistant-harness.test.mjs`, `assistant-recovery-db.spec.mjs`, `assistant-recovery.spec.mjs`, `assistant-v1.spec.mjs`, and `assistant-persistence.spec.mjs`. The responsive audit and expiry-state screenshots cover 320×760, 1440×900, and 1920×1080. Production migration/deployment and broader retention/export/deletion policy remain separate operational work before access expands.
+Controlled live-provider acceptance passed on 2026-09-05, including nonempty Gemini answer deltas before completion, Search/Places/Routes, staging without mutation, explicit confirmation and receipt replay. The first run exposed missing system instructions on tool continuations; that was corrected and covered by a deterministic regression before the successful rerun.

@@ -4,13 +4,13 @@ The frontend uses CSS Modules for feature styling and Radix Dialog for modal beh
 
 ## Why this combination
 
-The app already used CSS custom properties and CSS Modules in `/v1`. Extending that approach preserves the precise route geometry without translating it into utility classes or overriding a component kit's theme. Radix's controlled dialog and composition APIs replace repeated focus traps and document-level Escape handlers while letting each feature retain its HTML and CSS. The initial dialog pilot was compared against screenshots captured before the migration at all three canonical viewports.
+The app already used CSS custom properties and CSS Modules in the original `/v1` assistant. Extending that approach preserves the precise route geometry without translating it into utility classes or overriding a component kit's theme. Radix's controlled dialog and composition APIs replace repeated focus traps and document-level Escape handlers while letting each feature retain its HTML and CSS. The initial dialog pilot was compared against screenshots captured before the migration at all three canonical viewports.
 
 Base UI was the closest alternative. It offers the same unstyled approach, but the Radix pilot satisfied the required composition and dismissal behavior. Tailwind/shadcn would add another styling workflow and require adapting supplied styles; Mantine's larger styled catalog did not address the current app's primary maintenance problem. No second interaction library is needed.
 
 ## Where changes belong
 
-- `src/styles/foundation.css`: shared palette, fonts, reset, focus, shell defaults, and animation tokens. `/v1` aliases shared palette values but retains its existing darker error red.
+- `src/styles/foundation.css`: shared palette, fonts, reset, focus, shell defaults, and animation tokens. The integrated assistant aliases shared palette values and retains its darker error red.
 - `src/styles/*.module.css`: navigation, tracker, contributions, admin shell, schedule editor, invitation management, and trip requests. Responsive rules live with their owning feature.
 - `components/*.module.css`: invitation sheet, confirmation, and notification appearance, including their responsive states.
 - `components/ui/Button`: primary, ghost, and danger button styling. It forwards native props, including `type`, `disabled`, event handlers, and React 19 refs. It deliberately preserves native default submission behavior.

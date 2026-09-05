@@ -2,7 +2,7 @@ import { expect, gotoHealthy, test } from "./fixtures.mjs";
 
 test("assistant persists a turn, stages a complete diff, and applies only after explicit confirmation", async ({ page }) => {
   await gotoHealthy(page, "/v1");
-  await expect(page.getByRole("heading", { level: 2, name: "Hỏi, nghiên cứu, rồi quyết định" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Trợ lý hành trình" })).toBeVisible();
 
   const request = "Cập nhật hoạt động đầu tiên với một ghi chú thử nghiệm";
   await page.getByLabel("Yêu cầu cho trợ lý").fill(request);
@@ -13,12 +13,13 @@ test("assistant persists a turn, stages a complete diff, and applies only after 
   await expect(page.getByRole("button", { name: "Áp dụng 1 thay đổi" })).toBeEnabled();
 
   await page.getByRole("button", { name: "Áp dụng 1 thay đổi" }).click();
-  await expect(page.getByText("Đã áp dụng nguyên tử")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Đã cập nhật lịch")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("link", { name: "Mở lịch hiện tại" })).toBeVisible();
 
   await page.reload();
   await expect(page.getByText(request).last()).toBeVisible();
-  await expect(page.getByText("Đã áp dụng nguyên tử").last()).toBeVisible();
+  await page.getByRole("button", { name: "Xem thay đổi đã áp dụng" }).last().click();
+  await expect(page.getByText("Đã cập nhật lịch").last()).toBeVisible();
 });
 
 test("v1 transport rejects a confirmation request without same-origin browser context", async ({ request }) => {

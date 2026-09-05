@@ -7,6 +7,8 @@ const viewports = [
 ];
 
 const surfaces = [
+  { name: "trip companion", path: "/?chat=1", ready: (page) => page.getByRole("heading", { level: 1, name: "Trợ lý hành trình" }) },
+  { name: "assistant history", path: "/assistant", setup: async (page) => page.getByRole("button", { name: "Lịch sử", exact: true }).click(), ready: (page) => page.getByRole("dialog", { name: "Lịch sử trò chuyện" }) },
   {
     name: "public tracker",
     path: "/",
@@ -50,8 +52,8 @@ const surfaces = [
   },
   {
     name: "agentic assistant",
-    path: "/v1",
-    ready: (page) => page.getByRole("heading", { level: 2, name: "Hỏi, nghiên cứu, rồi quyết định" }),
+    path: "/assistant",
+    ready: (page) => page.getByRole("heading", { level: 1, name: "Trợ lý hành trình" }),
   },
 ];
 
@@ -106,9 +108,9 @@ for (const viewport of viewports) {
           };
         }, { touch: viewport.touch });
 
-        expect(audit.documentWidth, `${surface.name} must not scroll horizontally`).toBe(audit.viewportWidth);
-        expect(audit.clipped, `${surface.name} headings and controls must not clip`).toEqual([]);
-        expect(audit.smallTargets, `${surface.name} mobile controls must be at least 44px`).toEqual([]);
+        expect.soft(audit.documentWidth, `${surface.name} must not scroll horizontally`).toBe(audit.viewportWidth);
+        expect.soft(audit.clipped, `${surface.name} headings and controls must not clip`).toEqual([]);
+        expect.soft(audit.smallTargets, `${surface.name} mobile controls must be at least 44px`).toEqual([]);
       });
     }
   });

@@ -1,9 +1,11 @@
+import { AssistantLauncher } from "./v1/AssistantProvider";
 import adminShellStyles from "../src/styles/admin-shell.module.css";
 import Link from "next/link";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 
 export default function AdminNav({
   active,
+  tripSlug,
   pendingInvitationCount = 0,
   pendingTripRequestCount = 0,
 }) {
@@ -49,6 +51,7 @@ export default function AdminNav({
       >
         Người dùng
       </Link>
+      <AssistantLauncher tripSlug={tripSlug} />
     </nav>
   );
 }

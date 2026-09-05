@@ -17,7 +17,7 @@ export async function readEvents(response, onEvent) {
         (event.type === "progress" && typeof event.label !== "string") ||
         (event.type === "completed" && (event.turn?.id !== event.runId || event.turn?.status !== "completed")) ||
         (event.type === "failed" && (!event.error?.code || event.turn?.id !== event.runId || event.turn?.status !== "failed")) ||
-        !["accepted", "progress", "completed", "failed"].includes(event.type)) {
+        !["accepted", "progress", "answer-delta", "evidence", "completed", "failed"].includes(event.type)) {
       throw new Error("Luồng phản hồi bị gián đoạn; đang kiểm tra trạng thái");
     }
     sequence = event.seq;
