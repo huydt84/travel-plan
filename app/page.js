@@ -15,6 +15,7 @@ export default async function HomePage({ searchParams }) {
   const itinerary = await getCachedItinerary(selectedSlug);
   return (
     <TripTracker
+      key={itinerary.trip.slug}
       initialData={itinerary}
       initialNow={new Date().getTime()}
       initialInvitationOpen={invite === "1"}

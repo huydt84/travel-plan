@@ -56,7 +56,7 @@ const surfaces = [
 ];
 
 for (const viewport of viewports) {
-  test(`${viewport.name} audits every public and admin surface`, async ({ page }) => {
+  test(`${viewport.name} audits every public and admin surface`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
     for (const surface of surfaces) {
@@ -65,6 +65,7 @@ for (const viewport of viewports) {
         await surface.setup?.(page);
         await expect(surface.ready(page)).toBeVisible();
         await page.waitForTimeout(250);
+        await page.screenshot({ path: testInfo.outputPath(`${surface.name.replaceAll(" ", "-")}.png`), fullPage: true });
 
         const audit = await page.evaluate(({ touch }) => {
           const visible = (element) => {
