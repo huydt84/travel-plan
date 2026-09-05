@@ -78,7 +78,7 @@ const api = async (path, options = {}) => {
   return data;
 };
 
-export default function AdminApp({ viewer, initialTrips, initialSelectedSlug, initialPlan, initialSuggestions, pendingInvitationCount = 0 }) {
+export default function AdminApp({ viewer, initialTrips, initialSelectedSlug, initialPlan, initialSuggestions, pendingInvitationCount = 0, pendingTripRequestCount = 0 }) {
   if (!viewer?.email) return <Login />;
   if (!viewer.isAdmin) return <ContributorOnly user={viewer} />;
   return (
@@ -89,6 +89,7 @@ export default function AdminApp({ viewer, initialTrips, initialSelectedSlug, in
       initialPlan={initialPlan}
       initialSuggestions={initialSuggestions}
       pendingInvitationCount={pendingInvitationCount}
+      pendingTripRequestCount={pendingTripRequestCount}
     />
   );
 }
@@ -123,7 +124,7 @@ function ContributorOnly({ user }) {
   );
 }
 
-function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initialSuggestions, pendingInvitationCount }) {
+function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initialSuggestions, pendingInvitationCount, pendingTripRequestCount }) {
   const [trips, setTrips] = useState(initialTrips);
   const [selectedSlug, setSelectedSlug] = useState(initialSelectedSlug);
   const [plan, setPlan] = useState(initialPlan);
@@ -481,7 +482,7 @@ function Dashboard({ user, initialTrips, initialSelectedSlug, initialPlan, initi
       {error && <div className="admin-alert" role="alert">{error}<button onClick={() => setError("")} aria-label="Đóng thông báo"><ActionIcon name="close" /></button></div>}
       {notice && <div className="admin-notice" role="status">{notice}<button onClick={() => setNotice("")} aria-label="Đóng thông báo"><ActionIcon name="close" /></button></div>}
 
-      <AdminNav active="trips" pendingInvitationCount={pendingInvitationCount} />
+      <AdminNav active="trips" pendingInvitationCount={pendingInvitationCount} pendingTripRequestCount={pendingTripRequestCount} />
 
       <div className="admin-grid">
         <aside className="admin-sidebar">

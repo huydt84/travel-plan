@@ -20,7 +20,7 @@ function LoginTime({ value }) {
   return <time dateTime={value}><span>{loginTimeFormatter.format(new Date(value))}</span><small>JST</small></time>;
 }
 
-export default function UserManagementApp({ viewer, users, pendingInvitationCount = 0 }) {
+export default function UserManagementApp({ viewer, users, pendingInvitationCount = 0, pendingTripRequestCount = 0 }) {
   const [userRows, setUserRows] = useState(users);
   const [rolePrompt, setRolePrompt] = useState(null);
   const [busyEmail, setBusyEmail] = useState("");
@@ -60,7 +60,7 @@ export default function UserManagementApp({ viewer, users, pendingInvitationCoun
         <div><Link href="/" className="admin-back">Về lịch</Link><h1>Người dùng</h1><small className="admin-user">{viewer.email}</small></div>
         <button className="admin-ghost" onClick={() => signOut({ redirectTo: "/" })}>Đăng xuất</button>
       </header>
-      <AdminNav active="users" pendingInvitationCount={pendingInvitationCount} />
+      <AdminNav active="users" pendingInvitationCount={pendingInvitationCount} pendingTripRequestCount={pendingTripRequestCount} />
       <section className="admin-users" aria-labelledby="admin-users-title">
         <div className="admin-users-head">
           <div><h2 id="admin-users-title">Hoạt động người dùng</h2><p>{userRows.length} tài khoản Google · quyền admin có hiệu lực từ request kế tiếp.</p></div>

@@ -27,6 +27,12 @@ const relativeTime = (value) => {
 };
 
 const notificationCopy = (notification) => {
+  if (notification.type === "trip_request_fulfilled") {
+    return {
+      title: "Lịch trình cho yêu cầu của bạn đã sẵn sàng",
+      detail: `${notification.actor.name} đã gắn “${notification.trip.title}” với yêu cầu của bạn.`,
+    };
+  }
   if (notification.type === "contribution_visibility_changed") {
     return {
       title: notification.contribution.hidden ? "Nội dung của bạn đã được ẩn" : "Nội dung của bạn đã được hiện lại",
@@ -222,7 +228,7 @@ export default function NotificationCenter() {
             </header>
 
             <div className="notification-panel-tools">
-              <span>Các chuyến bạn đã góp ý</span>
+              <span>Cập nhật dành cho bạn</span>
               <button type="button" disabled={!unreadCount || markingAll} onClick={markAllRead}>
                 {markingAll ? "Đang đánh dấu…" : "Đánh dấu tất cả đã đọc"}
               </button>
@@ -241,14 +247,16 @@ export default function NotificationCenter() {
                 <div className="notification-state is-empty">
                   <span className="notification-empty-node" aria-hidden="true" />
                   <strong>Chưa có cập nhật</strong>
-                  <p>Khi bạn bè góp ý hoặc admin xử lý đề xuất, thông báo sẽ xuất hiện tại đây.</p>
+                  <p>Khi có cập nhật về góp ý hoặc yêu cầu chuyến đi, thông báo sẽ xuất hiện tại đây.</p>
                 </div>
               )}
               {notifications.length > 0 && (
                 <ul className="notification-list">
                   {notifications.map((notification) => {
                     const copy = notificationCopy(notification);
-                    const target = notification.contribution.activityTitle || "Cả chuyến đi";
+                    const target = notification.request
+                      ? notification.request.places.join(" · ")
+                      : notification.contribution.activityTitle || "Cả chuyến đi";
                     return (
                       <li className={notification.readAt ? "is-read" : "is-unread"} key={notification.id}>
                         <button type="button" onClick={() => openNotification(notification)}>

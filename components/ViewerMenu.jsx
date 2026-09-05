@@ -64,6 +64,9 @@ export default function ViewerMenu({ viewer }) {
             <strong>{label}</strong>
             {!localDev && viewer.email && viewer.email !== label && <span>{viewer.email}</span>}
           </div>
+          <Link className="viewer-menu-item" href="/requests" onClick={() => setOpen(false)}>
+            Yêu cầu của tôi
+          </Link>
           {viewer.isAdmin && (
             <Link className={manageClassName} href={ADMIN_ROUTES.trips} onClick={() => setOpen(false)}>
               Quản lý

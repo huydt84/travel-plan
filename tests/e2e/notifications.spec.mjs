@@ -93,7 +93,7 @@ test("contributors receive in-app updates while owner delivery stays email-only"
     await expect(pageB.getByRole("button", { name: "Mở thông báo" })).toBeVisible();
 
     await gotoHealthy(ownerPage, `/?trip=${encodeURIComponent(slug)}`);
-    await expect(ownerPage.locator(".notification-trigger")).toHaveCount(0);
+    await expect(ownerPage.getByRole("button", { name: /Mở thông báo/ })).toBeVisible();
 
     const rejection = await ownerContext.request.patch(`/api/trips/${encodeURIComponent(slug)}/suggestions/${suggestionB.id}`, {
       data: { status: "rejected" },

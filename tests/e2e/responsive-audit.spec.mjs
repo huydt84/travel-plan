@@ -19,9 +19,19 @@ const surfaces = [
     ready: (page) => page.getByRole("dialog", { name: /Rủ bạn đi/ }),
   },
   {
+    name: "member trip requests",
+    path: "/requests",
+    ready: (page) => page.getByRole("heading", { level: 1, name: "Yêu cầu chuyến đi" }),
+  },
+  {
     name: "admin trips",
     path: "/admin/trips",
     ready: (page) => page.getByRole("heading", { level: 1, name: "Quản lý lịch" }),
+  },
+  {
+    name: "admin trip requests",
+    path: "/admin/requests",
+    ready: (page) => page.getByRole("heading", { level: 1, name: "Yêu cầu chuyến đi" }),
   },
   {
     name: "admin invitations",

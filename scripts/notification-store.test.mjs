@@ -58,6 +58,29 @@ test("cursor and limit validation use bounded defaults", () => {
   assert.throws(() => parseNotificationCursor("not-a-cursor"), { code: "NOTIFICATION_CURSOR_INVALID" });
 });
 
+test("request fulfillment notifications map to a plan link without a contribution payload", async () => {
+  const requestRow = {
+    ...row,
+    id: 9,
+    event_type: "trip_request_fulfilled",
+    suggestion_id: null,
+    trip_request_id: 21,
+    request_start_date: "2026-10-10",
+    request_end_date: "2026-10-12",
+    request_places: ["Kamakura", "Enoshima"],
+  };
+  const sql = queuedSql([requestRow], [{ count: 1 }]);
+  const result = await listNotificationRecords(sql, { recipientEmail: "friend@example.com", limit: 30 });
+  assert.equal(result.notifications[0].targetUrl, "/?trip=tokyo-day");
+  assert.equal(result.notifications[0].contribution, null);
+  assert.deepEqual(result.notifications[0].request, {
+    id: "21",
+    startDate: "2026-10-10",
+    endDate: "2026-10-12",
+    places: ["Kamakura", "Enoshima"],
+  });
+});
+
 test("mark read scopes the update to its recipient and is idempotent", async () => {
   const sql = queuedSql([{ id: 8, read_at: "2026-08-13T03:00:00.000Z" }], [{ count: 1 }]);
   const result = await markNotificationRecordRead(sql, {

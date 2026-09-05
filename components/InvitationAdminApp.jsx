@@ -20,7 +20,7 @@ const deliveryErrorLabels = {
 
 const formatTime = (value) => value ? timeFormatter.format(new Date(value)) : "—";
 
-export default function InvitationAdminApp({ viewer, initialPermissions, initialHistory, activeView }) {
+export default function InvitationAdminApp({ viewer, initialPermissions, initialHistory, activeView, pendingTripRequestCount = 0 }) {
   const [permissions, setPermissions] = useState(initialPermissions);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("pending");
@@ -69,7 +69,7 @@ export default function InvitationAdminApp({ viewer, initialPermissions, initial
         <div><Link href="/" className="admin-back">Về lịch</Link><h1>Lời rủ</h1><small className="admin-user">{viewer.email}</small></div>
         <button className="admin-ghost" onClick={() => signOut({ redirectTo: "/" })}>Đăng xuất</button>
       </header>
-      <AdminNav active="invitations" pendingInvitationCount={pendingCount} />
+      <AdminNav active="invitations" pendingInvitationCount={pendingCount} pendingTripRequestCount={pendingTripRequestCount} />
       <nav className="invitation-admin-tabs" aria-label="Nội dung lời rủ">
         <Link href="/admin/invitations" aria-current={activeView === "requests" ? "page" : undefined}>Yêu cầu quyền <span>{pendingCount}</span></Link>
         <Link href="/admin/invitations?view=history" aria-current={activeView === "history" ? "page" : undefined}>Lịch sử gửi <span>{initialHistory.length}</span></Link>

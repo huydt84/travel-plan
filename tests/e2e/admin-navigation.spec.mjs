@@ -4,6 +4,10 @@ test("owner can navigate all admin responsibilities without a full-page failure"
   await gotoHealthy(page, "/admin/trips");
   const adminNav = page.getByRole("navigation", { name: "Khu vực quản lý" });
 
+  await adminNav.getByRole("link", { name: /Yêu cầu/ }).click();
+  await expect(page).toHaveURL(/\/admin\/requests$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Yêu cầu chuyến đi" })).toBeVisible();
+
   await adminNav.getByRole("link", { name: /Lời rủ/ }).click();
   await expect(page).toHaveURL(/\/admin\/invitations$/);
   await expect(page.getByRole("heading", { level: 2, name: "Quyền gửi lời rủ" })).toBeVisible();

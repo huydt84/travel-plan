@@ -461,7 +461,7 @@ export default function TripTracker({ initialData, initialNow, initialInvitation
         </div>
         <div className="viewer-utilities">
           {viewer?.isAdmin && <Link className="admin-link desktop-manage-link" href={ADMIN_ROUTES.trips}>Quản lý</Link>}
-          {viewer && !viewer.isOwner && <NotificationCenter />}
+          {viewer && <NotificationCenter />}
           {viewer ? <ViewerMenu viewer={viewer} /> : (
             <button className="admin-link user-link" type="button" onClick={() => signIn("google", { redirectTo: "/" })}>Đăng nhập</button>
           )}

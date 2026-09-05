@@ -353,6 +353,51 @@ await sql`
     last_participated_at = GREATEST(trip_participants.last_participated_at, EXCLUDED.last_participated_at)
 `;
 
+await sql`CREATE TABLE IF NOT EXISTS trip_requests (
+  id BIGSERIAL PRIMARY KEY,
+  requester_email TEXT NOT NULL REFERENCES users(email) ON UPDATE CASCADE ON DELETE CASCADE,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'declined', 'withdrawn')),
+  decision_reason TEXT NOT NULL DEFAULT '',
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (end_date >= start_date)
+)`;
+
+await sql`CREATE INDEX IF NOT EXISTS trip_requests_requester_created_idx
+  ON trip_requests (requester_email, created_at DESC, id DESC)`;
+await sql`CREATE INDEX IF NOT EXISTS trip_requests_state_created_idx
+  ON trip_requests (state, created_at DESC, id DESC)`;
+
+await sql`CREATE TABLE IF NOT EXISTS trip_request_places (
+  request_id BIGINT NOT NULL REFERENCES trip_requests(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK (position >= 0),
+  name TEXT NOT NULL,
+  PRIMARY KEY (request_id, position)
+)`;
+
+await sql`CREATE TABLE IF NOT EXISTS trip_request_sources (
+  request_id BIGINT NOT NULL REFERENCES trip_requests(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK (position >= 0),
+  label TEXT,
+  url TEXT NOT NULL,
+  PRIMARY KEY (request_id, position)
+)`;
+
+await sql`CREATE TABLE IF NOT EXISTS trip_request_fulfillments (
+  request_id BIGINT PRIMARY KEY REFERENCES trip_requests(id) ON DELETE CASCADE,
+  trip_id BIGINT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  attached_by TEXT NOT NULL,
+  attached_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`;
+
+await sql`CREATE INDEX IF NOT EXISTS trip_request_fulfillments_trip_idx
+  ON trip_request_fulfillments (trip_id, attached_at DESC)`;
+
 await sql`CREATE TABLE IF NOT EXISTS notifications (
   id BIGSERIAL PRIMARY KEY,
   recipient_email TEXT NOT NULL REFERENCES users(email) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -368,12 +413,23 @@ await sql`CREATE TABLE IF NOT EXISTS notifications (
 )`;
 
 await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS visibility_value TEXT`;
+await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS trip_request_id BIGINT`;
+await sql`ALTER TABLE notifications ALTER COLUMN suggestion_id DROP NOT NULL`;
+await sql`ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_trip_request_fkey`;
+await sql`ALTER TABLE notifications ADD CONSTRAINT notifications_trip_request_fkey
+  FOREIGN KEY (trip_request_id) REFERENCES trip_requests(id) ON DELETE CASCADE`;
 await sql`ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_event_type_check`;
 await sql`ALTER TABLE notifications ADD CONSTRAINT notifications_event_type_check
-  CHECK (event_type IN ('contribution_created', 'contribution_status_changed', 'contribution_visibility_changed'))`;
+  CHECK (event_type IN ('contribution_created', 'contribution_status_changed', 'contribution_visibility_changed', 'trip_request_fulfilled'))`;
 await sql`ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_visibility_value_check`;
 await sql`ALTER TABLE notifications ADD CONSTRAINT notifications_visibility_value_check
   CHECK (visibility_value IS NULL OR visibility_value IN ('hidden', 'visible'))`;
+await sql`ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_context_check`;
+await sql`ALTER TABLE notifications ADD CONSTRAINT notifications_context_check CHECK (
+  (event_type = 'trip_request_fulfilled' AND trip_request_id IS NOT NULL AND suggestion_id IS NULL)
+  OR
+  (event_type <> 'trip_request_fulfilled' AND trip_request_id IS NULL AND suggestion_id IS NOT NULL)
+)`;
 
 await sql`CREATE INDEX IF NOT EXISTS notifications_recipient_created_idx
   ON notifications (recipient_email, created_at DESC, id DESC)`;
@@ -381,6 +437,10 @@ await sql`CREATE INDEX IF NOT EXISTS notifications_recipient_created_idx
 await sql`CREATE INDEX IF NOT EXISTS notifications_recipient_unread_idx
   ON notifications (recipient_email, created_at DESC, id DESC)
   WHERE read_at IS NULL`;
+
+await sql`CREATE UNIQUE INDEX IF NOT EXISTS notifications_trip_request_fulfilled_idx
+  ON notifications (trip_request_id, trip_id, event_type)
+  WHERE event_type = 'trip_request_fulfilled'`;
 
 await sql`CREATE TABLE IF NOT EXISTS admin_notification_outbox (
   id BIGSERIAL PRIMARY KEY,
