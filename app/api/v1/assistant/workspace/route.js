@@ -10,6 +10,8 @@ export async function GET(request) {
     const url = new URL(request.url);
     const workspace = await getDefaultTravelAssistant().loadWorkspace({
       actor,
+      clientTurnId: url.searchParams.get("request"),
+      before: url.searchParams.get("before"),
       tripSlug: url.searchParams.get("trip"),
       conversationId: url.searchParams.get("conversation"),
     });

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { readEvents } from "./stream.mjs";
 import styles from "./assistant.module.css";
 import { formatTripDateRange } from "../../lib/trip-dates.mjs";
 
@@ -20,33 +21,12 @@ const apiJson = async (path, options = {}) => {
   return data;
 };
 
-const readEvents = async (response, onEvent) => {
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    const error = new Error(data.error || `Request failed (${response.status})`);
-    error.code = data.code;
-    throw error;
-  }
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error("Trình duyệt không hỗ trợ luồng phản hồi");
-  const decoder = new TextDecoder();
-  let pending = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    pending += decoder.decode(value || new Uint8Array(), { stream: !done });
-    const lines = pending.split("\n");
-    pending = lines.pop() || "";
-    for (const line of lines) if (line.trim()) onEvent(JSON.parse(line));
-    if (done) break;
-  }
-  if (pending.trim()) onEvent(JSON.parse(pending));
-};
-
 const formatCheckedAt = (value) => value
   ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(value))
   : "Không rõ";
 
 const fieldLabels = {
+  startDate: "Ngày bắt đầu", endDate: "Ngày kết thúc",
   start: "Bắt đầu", end: "Kết thúc", displayEnd: "Giờ hiển thị", type: "Loại",
   icon: "Biểu tượng", title: "Tên", detail: "Chi tiết", refs: "Nguồn", branchId: "Nhánh", key: "Mã ổn định",
 };
@@ -68,6 +48,76 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
   const [selectedTurnId, setSelectedTurnId] = useState(initialWorkspace.turns?.at(-1)?.id || null);
   const [mobilePanel, setMobilePanel] = useState(null);
   const composerRef = useRef(null);
+  const [pendingRequest, setPendingRequest] = useState(null);
+  const streaming = useRef(false);
+  const streamController = useRef(null);
+  const recoveryKey = `assistant-pending:${viewer.email}`;
+
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (!active) return;
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(recoveryKey) || "null");
+        if (saved?.clientTurnId && saved?.tripSlug && saved?.message) setPendingRequest(saved);
+        else {
+          const running = initialWorkspace.turns?.find((turn) => turn.status === "running");
+          if (running) setPendingRequest({ clientTurnId: running.clientTurnId, tripSlug: initialWorkspace.selectedTripSlug,
+            conversationId: initialWorkspace.selectedConversation?.id, message: running.input });
+        }
+      } catch { sessionStorage.removeItem(recoveryKey); }
+    });
+    return () => { active = false; streamController.current?.abort(); };
+  }, [recoveryKey, initialWorkspace]);
+
+  useEffect(() => {
+    if (!pendingRequest || streaming.current) return;
+    let active = true, timer;
+    const controller = new AbortController();
+    const reconcile = async () => {
+      try {
+        const params = new URLSearchParams({ request: pendingRequest.clientTurnId, trip: pendingRequest.tripSlug });
+        if (pendingRequest.conversationId) params.set("conversation", pendingRequest.conversationId);
+        const next = await apiJson(`/api/v1/assistant/workspace?${params}`, { signal: controller.signal });
+        if (!active) return;
+        if (!next.request?.found) {
+          setTurns((current) => [...current.filter((turn) => turn.clientTurnId !== pendingRequest.clientTurnId && turn.id !== pendingRequest.clientTurnId),
+            { id: pendingRequest.clientTurnId, input: pendingRequest.message, status: "uncertain", request: pendingRequest }]);
+          setError("Chưa xác định được trạng thái. Kiểm tra và gửi lại sẽ dùng cùng mã yêu cầu.");
+          setPendingRequest(null); setBusy(false); setProgress("");
+          return;
+        }
+        setWorkspace(next); setTurns(next.turns.some((turn) => turn.id === next.request.turn.id) ? next.turns : [...next.turns, next.request.turn]); setSelectedTurnId(next.request.turn.id);
+        if (next.request.turn.status === "running") {
+          setError(""); setBusy(true); setProgress("Đang khôi phục yêu cầu đang xử lý");
+          timer = setTimeout(reconcile, 2000);
+        } else {
+          sessionStorage.removeItem(recoveryKey);
+          setPendingRequest(null); setBusy(false); setProgress("");
+          setError(next.request.turn.status === "failed" ? "Yêu cầu chưa hoàn tất. Bạn có thể thử lại." : "");
+          if (next.turns.find((turn) => turn.id === next.request.turn.id)?.changeSet) setInspector("changes");
+        }
+      } catch (failure) {
+        if (!active) return;
+        setError(failure.message); setBusy(false); setProgress("");
+        setTurns((current) => [...current.filter((turn) => turn.clientTurnId !== pendingRequest.clientTurnId && turn.id !== pendingRequest.clientTurnId),
+          { id: pendingRequest.clientTurnId, input: pendingRequest.message, status: "uncertain", request: pendingRequest }]);
+        setPendingRequest(null);
+      }
+    };
+    void reconcile();
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
+  }, [pendingRequest, recoveryKey]);
+
+  useEffect(() => {
+    const expiries = turns.filter((turn) => turn.changeSet?.status === "staged").map((turn) => Date.parse(turn.changeSet.expiresAt));
+    if (!expiries.length) return;
+    const timer = setTimeout(() => setTurns((current) => current.map((turn) =>
+      turn.changeSet?.status === "staged" && Date.parse(turn.changeSet.expiresAt) <= Date.now()
+        ? { ...turn, changeSet: { ...turn.changeSet, status: "expired", confirmationToken: null } } : turn)),
+      Math.max(0, Math.min(...expiries) - Date.now()));
+    return () => clearTimeout(timer);
+  }, [turns]);
   const selectedTurn = turns.find((turn) => turn.id === selectedTurnId) || turns.at(-1) || null;
   const activeChangeSet = selectedTurn?.changeSet || null;
   const selectedKeys = new Set(activeChangeSet?.preview?.changes?.map((change) => change.targetKey) || []);
@@ -79,17 +129,19 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
 
   const routeItems = useMemo(() => workspace.snapshot?.itinerary || [], [workspace.snapshot]);
 
-  const loadWorkspace = async ({ trip = workspace.selectedTripSlug, conversation = null } = {}) => {
+  const loadWorkspace = async ({ trip = workspace.selectedTripSlug, conversation = null, older = false } = {}) => {
+    setPendingRequest(null);
     setError("");
     setBusy(true);
     try {
       const params = new URLSearchParams();
+      if (older && workspace.nextCursor) params.set("before", workspace.nextCursor);
       if (trip) params.set("trip", trip);
       if (conversation) params.set("conversation", conversation);
       const next = await apiJson(`/api/v1/assistant/workspace?${params}`);
       setWorkspace(next);
-      setTurns(next.turns || []);
-      setSelectedTurnId(next.turns?.at(-1)?.id || null);
+      setTurns((current) => older ? [...next.turns, ...current] : next.turns || []);
+      if (!older) setSelectedTurnId(next.turns?.at(-1)?.id || null);
     } catch (loadError) {
       setError(loadError.message);
     } finally {
@@ -98,6 +150,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
   };
 
   const beginConversation = async () => {
+    setPendingRequest(null);
     setTurns([]);
     setSelectedTurnId(null);
     setWorkspace((current) => ({ ...current, selectedConversation: null }));
@@ -106,48 +159,50 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 
-  const submitTurn = async (event) => {
-    event.preventDefault();
-    const input = message.trim();
-    if (!input || busy || !workspace.selectedTripSlug) return;
-    const clientTurnId = crypto.randomUUID();
-    const optimistic = { id: clientTurnId, input, output: null, citations: [], status: "running", changeSet: null };
-    setTurns((current) => [...current, optimistic]);
-    setSelectedTurnId(clientTurnId);
-    setMessage("");
-    setError("");
-    setProgress("Đang tiếp nhận yêu cầu");
-    setBusy(true);
+  const sendTurn = async (input, existingRequest = null) => {
+    if (!input || busy || streaming.current || !workspace.selectedTripSlug) return;
+    const request = existingRequest || { conversationId: workspace.selectedConversation?.id || null,
+      tripSlug: workspace.selectedTripSlug, clientTurnId: crypto.randomUUID(), message: input };
+    const { clientTurnId, tripSlug, ...body } = request;
+    // Save before sending: the acceptance response itself can be lost.
+    try { sessionStorage.setItem(recoveryKey, JSON.stringify(request)); }
+    catch { setError("Không lưu được trạng thái khôi phục trong trình duyệt. Hãy bật lưu trữ phiên rồi thử lại."); return; }
+    streaming.current = true;
+    streamController.current = new AbortController();
+    setPendingRequest(request);
+    setTurns((current) => [...current.filter((turn) => turn.id !== clientTurnId),
+      { id: clientTurnId, clientTurnId, input, output: null, citations: [], status: "running", changeSet: null }]);
+    setSelectedTurnId(clientTurnId); setMessage(""); setError(""); setProgress("Đang tiếp nhận yêu cầu"); setBusy(true);
+    let definitiveFailure = false;
     try {
-      const response = await fetch(`/api/v1/trips/${encodeURIComponent(workspace.selectedTripSlug)}/assistant/turns`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ conversationId: workspace.selectedConversation?.id || null, clientTurnId, message: input }),
+      const response = await fetch(`/api/v1/trips/${encodeURIComponent(tripSlug)}/assistant/turns`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...body, clientTurnId }), signal: streamController.current.signal,
       });
       await readEvents(response, (streamEvent) => {
-        if (streamEvent.type === "accepted") {
-          setWorkspace((current) => ({
-            ...current,
-            selectedConversation: current.selectedConversation || { id: streamEvent.conversationId, tripSlug: current.selectedTripSlug, title: input },
-          }));
-        }
+        if (streamEvent.type === "accepted") setWorkspace((current) => ({ ...current,
+          selectedConversation: { id: streamEvent.conversationId, tripSlug, title: input } }));
         if (streamEvent.type === "progress") setProgress(streamEvent.label);
-        if (streamEvent.type === "completed") {
+        if (["completed", "failed"].includes(streamEvent.type) && streamEvent.turn) {
           setTurns((current) => current.map((turn) => turn.id === clientTurnId ? streamEvent.turn : turn));
           setSelectedTurnId(streamEvent.turn.id);
           if (streamEvent.turn.changeSet) setInspector("changes");
-          setProgress("");
         }
-        if (streamEvent.type === "failed") throw Object.assign(new Error(streamEvent.error.message), { code: streamEvent.error.code });
       });
-    } catch (turnError) {
-      setTurns((current) => current.filter((turn) => turn.id !== clientTurnId));
-      setError(turnError.message);
-      setProgress("");
+    } catch (failure) {
+      setError(failure.message);
+      definitiveFailure = failure.definitive && !["TURN_IN_PROGRESS", "ASSISTANT_UNAVAILABLE"].includes(failure.code);
+      if (definitiveFailure) {
+        sessionStorage.removeItem(recoveryKey);
+        setTurns((current) => current.map((turn) => turn.id === clientTurnId ? { ...turn, status: "failed", errorCode: failure.code } : turn));
+      }
     } finally {
-      setBusy(false);
+      streaming.current = false;
+      setBusy(false); setProgress("");
+      setPendingRequest(definitiveFailure ? null : { ...request });
     }
   };
+  const submitTurn = (event) => { event.preventDefault(); void sendTurn(message.trim()); };
 
   const confirmProposal = async () => {
     if (!activeChangeSet?.confirmationToken || busy) return;
@@ -162,6 +217,8 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
       setTurns((current) => current.map((turn) => turn.id === selectedTurn.id
         ? { ...turn, changeSet: { ...turn.changeSet, status: "applied", receipt, confirmationToken: null } }
         : turn));
+      await loadWorkspace({ conversation: workspace.selectedConversation?.id });
+      setSelectedTurnId(selectedTurn.id);
       setProgress("");
     } catch (commitError) {
       setError(commitError.message);
@@ -171,7 +228,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
           : turn));
       }
     } finally {
-      setBusy(false);
+      setBusy(false); setProgress("");
     }
   };
 
@@ -228,6 +285,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
           </div>
 
           <div className={styles.turnList} aria-live="polite">
+            {workspace.nextCursor && <button type="button" className={styles.reviewButton} disabled={busy} onClick={() => loadWorkspace({ conversation: workspace.selectedConversation?.id, older: true })}>Xem trao đổi trước</button>}
             {!turns.length && (
               <div className={styles.firstRun}>
                 <h3>Bắt đầu từ lịch đang có</h3>
@@ -248,7 +306,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
                 onFocus={() => setSelectedTurnId(turn.id)}
                 onClick={() => setSelectedTurnId(turn.id)}
                 onKeyDown={(event) => {
-                  if (["Enter", " "].includes(event.key)) {
+                  if (event.target === event.currentTarget && ["Enter", " "].includes(event.key)) {
                     event.preventDefault();
                     setSelectedTurnId(turn.id);
                   }
@@ -257,9 +315,19 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
                 <div className={styles.userMessage}><span>Bạn</span><p>{turn.input}</p></div>
                 {turn.status === "running" ? (
                   <div className={styles.skeleton} aria-label="Đang tạo câu trả lời"><i /><i /><i /></div>
+                ) : ["failed", "uncertain"].includes(turn.status) ? (
+                  <div className={styles.assistantMessage}>
+                    <p>{turn.status === "uncertain" ? "Chưa xác định được yêu cầu đã hoàn tất hay chưa." : "Yêu cầu chưa hoàn tất. Lịch chưa được thay đổi bởi yêu cầu này."}</p>
+                    <button className={styles.reviewButton} type="button" disabled={busy} onClick={() => void sendTurn(turn.input, turn.status === "uncertain" ? turn.request : null)}>
+                      {turn.status === "uncertain" ? "Kiểm tra và gửi lại" : "Thử lại yêu cầu"}
+                    </button>
+                  </div>
                 ) : (
                   <div className={styles.assistantMessage}>
-                    <span>Trợ lý</span><p>{turn.output}</p>
+                    <span>Trợ lý</span><p>{(turn.output || "").split(/(\[E\d+\])/g).map((part, index) => {
+                      const citation = turn.citations?.find((item) => `[${item.id}]` === part);
+                      return citation ? <a key={index} href={`#evidence-${citation.id}`} onClick={() => { setSelectedTurnId(turn.id); setInspector("evidence"); setMobilePanel("inspector"); }}>{part}</a> : part;
+                    })}</p>
                     {turn.citations?.length > 0 && <div className={styles.citationRow}>{turn.citations.map((citation) => <a key={citation.id} href={citation.url} target="_blank" rel="noreferrer">[{citation.id}] {citation.title}</a>)}</div>}
                     {turn.changeSet && <button className={styles.reviewButton} data-status={turn.changeSet.status} type="button" onClick={() => { setSelectedTurnId(turn.id); setInspector("changes"); setMobilePanel("inspector"); }}>
                       {turn.changeSet.status === "applied"
@@ -277,7 +345,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
           {(progress || error) && <div className={error ? styles.errorBanner : styles.progressBanner} role={error ? "alert" : "status"}>{error || progress}</div>}
           <form className={styles.composer} onSubmit={submitTurn}>
             <label htmlFor="assistant-message">Yêu cầu cho trợ lý</label>
-            <textarea ref={composerRef} id="assistant-message" rows="3" value={message} disabled={busy} onChange={(event) => setMessage(event.target.value)} placeholder="Ví dụ: Kiểm tra giờ mở cửa rồi đề xuất dời hoạt động này…" />
+            <textarea ref={composerRef} id="assistant-message" rows="3" maxLength={4000} value={message} disabled={busy} onChange={(event) => setMessage(event.target.value)} placeholder="Ví dụ: Kiểm tra giờ mở cửa rồi đề xuất dời hoạt động này…" />
             <div><span>Enter để xuống dòng · câu trả lời không tự sửa lịch</span><button className={styles.primaryButton} type="submit" disabled={busy || !message.trim()}>{busy ? "Đang làm việc…" : "Gửi yêu cầu"}</button></div>
           </form>
         </section>
@@ -287,7 +355,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
             <button role="tab" aria-selected={inspector === "evidence"} onClick={() => setInspector("evidence")}>Bằng chứng</button>
             <button role="tab" aria-selected={inspector === "changes"} onClick={() => setInspector("changes")}>Thay đổi {activeChangeSet ? `(${activeChangeSet.preview.changes.length})` : ""}</button>
           </div>
-          {inspector === "evidence" ? <EvidencePanel citations={selectedTurn?.citations || []} /> : <ChangePanel changeSet={activeChangeSet} busy={busy} onConfirm={confirmProposal} onRegenerate={() => { setMobilePanel(null); setMessage("Tạo lại đề xuất từ lịch mới nhất và giải thích mọi thay đổi"); composerRef.current?.focus(); }} />}
+          {inspector === "evidence" ? <EvidencePanel citations={selectedTurn?.citations || []} /> : <ChangePanel changeSet={activeChangeSet} busy={busy} onConfirm={confirmProposal} onRegenerate={() => { setMobilePanel(null); setMessage(`Tạo lại đề xuất từ lịch mới nhất cho yêu cầu: ${selectedTurn?.input || ""}\nĐề xuất trước (${activeChangeSet?.id}, ${activeChangeSet?.status}): ${JSON.stringify(activeChangeSet?.preview.changes.map(({ kind, targetKey, after }) => ({ kind, targetKey, after }))) || ""}`.slice(0, 4000)); composerRef.current?.focus(); }} />}
         </aside>
       </div>
     </main>
@@ -297,7 +365,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer }) {
 function EvidencePanel({ citations }) {
   if (!citations.length) return <div className={styles.inspectorEmpty}><h3>Chưa có bằng chứng ngoài</h3><p>Nguồn web, dữ liệu địa điểm và tuyến đường sẽ xuất hiện ở đây, kèm thời điểm kiểm tra.</p></div>;
   return <div className={styles.evidenceList}>{citations.map((citation) => (
-    <article key={citation.id}>
+    <article key={citation.id} id={`evidence-${citation.id}`}>
       <span>{citation.id} · {citation.kind === "route" ? "TUYẾN" : citation.kind === "place" ? "GOOGLE MAPS" : "NGUỒN"}</span>
       <h3>{citation.title}</h3>
       <p>{citation.publisher || citation.host || "Nguồn bên ngoài"}</p>

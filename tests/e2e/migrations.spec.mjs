@@ -1,10 +1,12 @@
 import pg from "pg";
-import { mkdtemp, writeFile, rm, cp } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, cp, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runMigrations } from "../../scripts/migration-runner.mjs";
 import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
 import { expect, test } from "./fixtures.mjs";
+
+const migrationCount = (await readdir(new URL("../../migrations", import.meta.url))).filter((name) => /^\d+.*\.mjs$/.test(name)).length;
 
 const env = { NODE_ENV: "development", LOCAL_ADMIN_BYPASS: "true" };
 async function isolatedSchema(run) {
@@ -23,7 +25,7 @@ async function isolatedSchema(run) {
 
 test("fresh schema, legacy adoption, and reruns preserve data and enforce constraints", async () => {
   await isolatedSchema(async (db, migrate) => {
-    expect(await migrate()).toHaveLength(5);
+    expect(await migrate()).toHaveLength(migrationCount);
     expect((await db.query("SELECT * FROM trips")).rows).toEqual([]);
     const { rows: [trip] } = await db.query(`INSERT INTO trips (slug,title,trip_date,end_date,timezone,location)
       VALUES ('kept','Edited title','2032-01-01','2032-01-02','Asia/Tokyo','Edited location') RETURNING *`);
@@ -43,7 +45,7 @@ test("fresh schema, legacy adoption, and reruns preserve data and enforce constr
     // A current installation predating the ledger must be adopted without seeding.
     await db.query("DELETE FROM users");
     await db.query("DROP TABLE pgmigrations");
-    expect(await migrate()).toHaveLength(5);
+    expect(await migrate()).toHaveLength(migrationCount);
     expect((await db.query("SELECT email,name FROM users")).rows).toEqual([{ email: "member@example.com", name: "Member" }]);
     const before = (await db.query("SELECT * FROM trips")).rows;
     expect(before[0]).toMatchObject({ title: "Edited title", location: "Edited location" });
@@ -53,7 +55,7 @@ test("fresh schema, legacy adoption, and reruns preserve data and enforce constr
     await db.query("DELETE FROM activities");
     expect((await db.query("SELECT activity_id,body FROM suggestions")).rows).toEqual([{ activity_id: null, body: "Preserve me" }]);
     expect((await db.query("SELECT * FROM trip_participants")).rows).toHaveLength(1);
-    for (const table of ["invitation_permissions", "invitation_deliveries", "invitation_batches", "trip_request_places", "trip_request_sources", "trip_request_fulfillments", "admin_notification_outbox", "assistant_change_sets"]) {
+    for (const table of ["invitation_permissions", "invitation_deliveries", "invitation_batches", "trip_request_places", "trip_request_sources", "trip_request_fulfillments", "admin_notification_outbox", "assistant_change_sets", "assistant_requests"]) {
       expect((await db.query(`SELECT * FROM ${table}`)).rows).toEqual([]);
     }
   });
@@ -70,7 +72,7 @@ test("old single-day schedules acquire dates, stable keys, and contributor ident
         UNIQUE(trip_id,sort_order));
       INSERT INTO activities (trip_id,sort_order,start_time,end_time,type,icon,title,detail)
       VALUES (1,0,'09:00','10:00','Visit','x','Same title',''),(1,1,'11:00','12:00','Visit','x','Same title','');`);
-    expect(await migrate()).toHaveLength(5);
+    expect(await migrate()).toHaveLength(migrationCount);
     expect((await db.query("SELECT item_key,TO_CHAR(start_date,'YYYY-MM-DD') AS date FROM activities ORDER BY sort_order")).rows)
       .toEqual([{ item_key: "same-title", date: "2030-01-01" }, { item_key: "same-title-2", date: "2030-01-01" }]);
   });
@@ -82,11 +84,11 @@ test("a failed migration rolls back its DDL and ledger entry and can be retried"
     await cp(new URL("../../migrations", import.meta.url), dir, { recursive: true });
     await isolatedSchema(async (db, migrate) => {
       await migrate();
-      const file = join(dir, "1788566400005_failure.mjs");
+      const file = join(dir, "1788652800001_failure.mjs");
       await writeFile(file, "export async function up(pgm) { await pgm.db.query('CREATE TABLE rollback_probe (id INTEGER)'); await pgm.db.query('SELECT * FROM retry_dependency'); }");
       await expect(migrate({ dir })).rejects.toThrow();
       expect((await db.query("SELECT to_regclass('rollback_probe') AS name")).rows[0].name).toBeNull();
-      expect((await db.query("SELECT * FROM pgmigrations")).rows).toHaveLength(5);
+      expect((await db.query("SELECT * FROM pgmigrations")).rows).toHaveLength(migrationCount);
       await db.query("CREATE TABLE retry_dependency (id INTEGER)");
       expect(await migrate({ dir })).toHaveLength(1);
       expect((await db.query("SELECT to_regclass('rollback_probe') AS name")).rows[0].name).toBe("rollback_probe");
