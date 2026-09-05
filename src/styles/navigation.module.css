@@ -1,0 +1,360 @@
+.trip-bar {
+  composes: trip-bar from global;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(146px, auto);
+  align-items: stretch;
+  min-height: 66px;
+  margin-bottom: 18px;
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+}
+.product-mark {
+  composes: product-mark from global;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 18px;
+  border-right: 1px solid var(--navy);
+  font: 700 23px/1 var(--display);
+  letter-spacing: 0.015em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.product-mark :global(.type-icon) {
+  width: 27px;
+  height: 27px;
+  color: var(--green);
+  stroke-width: 2;
+}
+.trip-context {
+  composes: trip-context from global;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 12px 8px 18px;
+  border-right: 1px solid var(--navy);
+}
+.trip-picker {
+  composes: trip-picker from global;
+  display: grid;
+  align-content: center;
+  min-width: 0;
+}
+.trip-picker-control {
+  composes: trip-picker-control from global;
+  position: relative;
+  display: grid;
+  width: min(100%, 560px);
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  background: white;
+  transition:
+    border-color 160ms ease-out,
+    background-color 160ms ease-out;
+}
+.trip-picker-control:hover {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+.trip-picker-control:focus-within {
+  overflow: visible;
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+.trip-picker-control:has(select:focus-visible) {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+}
+.trip-picker select {
+  position: relative;
+  z-index: 1;
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 76px 8px 11px;
+  overflow: hidden;
+  border: 0;
+  outline: 0;
+  appearance: none;
+  color: var(--navy);
+  background: transparent;
+  font: 600 20px/1.1 var(--display);
+  text-overflow: ellipsis;
+}
+.trip-picker-affordance {
+  composes: trip-picker-affordance from global;
+  z-index: 2;
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  justify-self: end;
+  gap: 5px;
+  padding: 0 10px;
+  color: var(--paper-bright);
+  background: var(--navy);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: background-color 160ms ease-out;
+}
+.trip-picker-affordance :global(.action-icon) {
+  width: 14px;
+  height: 14px;
+}
+.trip-picker-control:hover .trip-picker-affordance,
+.trip-picker-control:focus-within .trip-picker-affordance {
+  background: var(--green-dark);
+}
+.trip-picker-control:active .trip-picker-affordance {
+  background: var(--navy);
+}
+.trip-picker small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewer-utilities {
+  composes: viewer-utilities from global;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 12px;
+  border-right: 1px solid var(--navy);
+}
+.admin-link {
+  composes: admin-link from global;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid var(--navy);
+  border-radius: 4px;
+  color: var(--navy);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.admin-link:hover {
+  color: white;
+  background: var(--navy);
+}
+.invite-link {
+  composes: invite-link from global;
+  min-height: 44px;
+  flex: none;
+  color: var(--green-dark);
+  border-color: var(--green);
+  white-space: nowrap;
+}
+.invite-link:hover {
+  color: white;
+  background: var(--green);
+}
+.viewer-menu {
+  composes: viewer-menu from global;
+  position: relative;
+  min-width: 0;
+}
+.viewer-menu-trigger {
+  composes: viewer-menu-trigger from global;
+  max-width: 190px;
+}
+.viewer-menu-trigger :global(.action-icon) {
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+.viewer-name {
+  composes: viewer-name from global;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-link img {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+.user-avatar {
+  composes: user-avatar from global;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--paper-bright);
+  background: var(--green);
+  font-size: 9px;
+}
+.viewer-menu-panel {
+  composes: viewer-menu-panel from global;
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 7px);
+  right: 0;
+  display: grid;
+  width: min(280px, calc(100vw - 40px));
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+}
+.viewer-menu-identity {
+  composes: viewer-menu-identity from global;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--navy);
+}
+.viewer-menu-identity strong,
+.viewer-menu-identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewer-menu-identity strong {
+  font: 600 15px/1.1 var(--display);
+}
+.viewer-menu-identity span {
+  color: var(--muted);
+  font-size: 9px;
+}
+.viewer-menu-item {
+  composes: viewer-menu-item from global;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--navy);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+}
+.viewer-menu-item:last-child {
+  border-bottom: 0;
+}
+.viewer-menu-item:hover {
+  color: var(--paper-bright);
+  background: var(--navy);
+}
+.mobile-manage-link {
+  composes: mobile-manage-link from global;
+  display: none;
+}
+@media (max-width: 900px) {
+  .trip-bar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .product-mark span {
+    display: none;
+  }
+  .product-mark {
+    padding-inline: 14px;
+  }
+  .trip-context {
+    gap: 8px;
+    padding-left: 12px;
+  }
+  .viewer-utilities {
+    border-right: 0;
+  }
+  .viewer-menu-trigger {
+    min-width: 44px;
+    padding-inline: 10px;
+  }
+  .viewer-menu-trigger .viewer-name {
+    display: none;
+  }
+}
+@media (max-width: 680px) {
+  .trip-bar {
+    grid-template-columns: 88px minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    margin-bottom: 10px;
+  }
+  .product-mark {
+    grid-column: 1;
+    grid-row: 1;
+    justify-content: center;
+    padding: 10px;
+  }
+  .trip-context {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  .trip-picker select {
+    padding-right: 44px;
+    font-size: 17px;
+  }
+  .trip-picker-affordance {
+    padding-inline: 9px;
+  }
+  .trip-picker-affordance > span {
+    display: none;
+  }
+  .trip-picker small {
+    font-size: 8px;
+  }
+  .trip-context .invite-link {
+    align-self: stretch;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px;
+  }
+  .trip-context .invite-link :global(.action-icon) {
+    display: none;
+  }
+  .viewer-utilities {
+    grid-column: 3;
+    grid-row: 2;
+    align-self: stretch;
+    padding: 4px 5px;
+    border-top: 1px solid var(--navy);
+  }
+  .mobile-manage-link {
+    display: flex;
+  }
+  .viewer-menu-trigger {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    padding: 8px;
+  }
+  .viewer-menu-panel {
+    width: min(280px, calc(100vw - 20px));
+  }
+  .user-link > span:not(.user-avatar) {
+    display: none;
+  }
+  .admin-link {
+    padding: 8px;
+  }
+}
+
+.user-link {
+  composes: user-link from global;
+}

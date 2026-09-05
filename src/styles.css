@@ -1,13 +1,4 @@
-/* Ordered global entry point. Keep feature rules before responsive overrides. */
+/* Global foundation only. Components import their own feature CSS Modules. */
 @import "./styles/foundation.css";
-@import "./styles/navigation.css";
-@import "./styles/notifications.css";
-@import "./styles/tracker.css";
-@import "./styles/contributions.css";
-@import "./styles/invitation-sheet.css";
-@import "./styles/admin-shell.css";
-@import "./styles/trip-requests.css";
-@import "./styles/invitation-management.css";
-@import "./styles/schedule-editor.css";
 @import "./styles/feedback.css";
 @import "./styles/responsive.css";

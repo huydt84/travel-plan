@@ -170,3 +170,80 @@ test("visibility notifications open the hidden drawer and remain idempotent", as
     await ownerContext.close();
   }
 });
+
+
+test("deletion confirmation contains keyboard focus, blocks pending dismissal, and recovers from errors", async ({ page, request, runtimeHealth }) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await gotoHealthy(page, "/");
+  const slug = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+  const created = await request.post(`/api/trips/${slug}/suggestions`, {
+    data: { activityId: null, kind: "comment", body: `Confirmation behavior ${Date.now()}` },
+  });
+  expect(created.status()).toBe(201);
+  const contribution = await created.json();
+  try {
+    await page.reload();
+    const row = page.locator(`#contribution-${contribution.id}`);
+    await row.getByRole("button", { name: /Thêm thao tác/ }).click();
+    await row.getByRole("menuitem", { name: "Xoá vĩnh viễn" }).click();
+    const confirmation = page.getByRole("alertdialog");
+    await expect(
+      confirmation.getByRole("button", { name: "Huỷ", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(
+      confirmation.getByRole("button", { name: "Xoá vĩnh viễn" }),
+    ).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(
+      confirmation.getByRole("button", { name: "Huỷ", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(confirmation).toHaveCount(0);
+
+    await row.getByRole("button", { name: /Thêm thao tác/ }).click();
+    await row.getByRole("menuitem", { name: "Xoá vĩnh viễn" }).click();
+    let release;
+    const pendingResponse = new Promise((resolve) => {
+      release = resolve;
+    });
+    await page.route(
+      `**/api/trips/${slug}/suggestions/${contribution.id}`,
+      async (route) => {
+        if (route.request().method() !== "DELETE") return route.continue();
+        await pendingResponse;
+        await route.fulfill({ status: 409, json: { error: "Thử lại sau" } });
+      },
+    );
+    try {
+      await confirmation
+        .getByRole("button", { name: "Xoá vĩnh viễn" })
+        .click();
+      await expect(
+        confirmation.getByRole("button", { name: "Huỷ", exact: true }),
+      ).toBeDisabled();
+      await page.keyboard.press("Escape");
+      await page.mouse.click(2, 2);
+      await expect(confirmation).toBeVisible();
+    } finally {
+      release();
+    }
+    await expect(confirmation.getByRole("alert")).toContainText(
+      "Thử lại sau",
+    );
+    await expect(
+      confirmation.getByRole("button", { name: "Xoá vĩnh viễn" }),
+    ).toBeEnabled();
+    await page.keyboard.press("Escape");
+    await expect(confirmation).toHaveCount(0);
+    // Chromium logs the intentional conflict used to exercise retry behavior.
+    runtimeHealth.splice(
+      0,
+      runtimeHealth.length,
+      ...runtimeHealth.filter((message) => !message.includes("409")),
+    );
+  } finally {
+    await page.goto("about:blank");
+    expect((await request.delete(`/api/trips/${slug}/suggestions/${contribution.id}`)).status()).toBe(204);
+  }
+});

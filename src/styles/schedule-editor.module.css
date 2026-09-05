@@ -1,0 +1,1465 @@
+.admin-day-rail {
+  composes: admin-day-rail from global;
+  display: flex;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+  scrollbar-color: var(--green) var(--paper-deep);
+  scrollbar-width: thin;
+}
+.admin-day-rail button {
+  display: grid;
+  flex: 0 0 150px;
+  gap: 4px;
+  min-height: 72px;
+  padding: 10px 13px;
+  border: 0;
+  border-right: 1px solid var(--navy);
+  color: var(--navy);
+  background: transparent;
+  text-align: left;
+}
+.admin-day-rail button:last-child {
+  border-right: 0;
+}
+.admin-day-rail button:hover {
+  background: var(--yellow-soft);
+}
+.admin-day-rail button span {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.admin-day-rail button strong {
+  font: 600 18px/1 var(--display);
+  text-transform: uppercase;
+}
+.admin-day-rail button small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.admin-login-card h1 {
+  margin: 8px 0 0;
+  font: 700 clamp(44px, 6vw, 72px) / 0.9 var(--display);
+  letter-spacing: -0.025em;
+  text-transform: uppercase;
+}
+.admin-login-card {
+  composes: admin-login-card from global;
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+}
+.plan-summary {
+  composes: plan-summary from global;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 28px;
+  border-bottom: 2px solid var(--navy);
+}
+.plan-summary h2 {
+  margin: 0;
+  font: 700 clamp(36px, 5vw, 55px) / 0.95 var(--display);
+}
+.plan-summary p {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+.plan-slug {
+  composes: plan-slug from global;
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 10px;
+  padding: 5px 7px;
+  overflow-wrap: anywhere;
+  color: var(--green-dark);
+  background: var(--paper-deep);
+  font:
+    700 10px/1.35 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.admin-actions,
+.admin-row-actions {
+  display: flex;
+  gap: 7px;
+}
+.admin-sources {
+  composes: admin-sources from global;
+  margin-top: 34px;
+}
+.source-heading {
+  composes: source-heading from global;
+  margin-bottom: 0;
+}
+.admin-source-list {
+  composes: admin-source-list from global;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.admin-source-item {
+  composes: admin-source-item from global;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--navy);
+}
+.admin-source-item:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+.admin-source-item:hover {
+  background: var(--yellow-soft);
+}
+.admin-source-item:global(.is-editing) {
+  background: var(--green-soft);
+}
+.admin-source-number {
+  composes: admin-source-number from global;
+  font: 700 24px/1 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+.admin-source-link {
+  composes: admin-source-link from global;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  color: var(--navy);
+  text-decoration: none;
+}
+.admin-source-link:hover {
+  color: var(--green-dark);
+}
+.admin-source-copy {
+  composes: admin-source-copy from global;
+  min-width: 0;
+}
+.admin-source-copy strong,
+.admin-source-copy small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.admin-source-copy strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+.admin-source-copy small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.admin-source-link :global(.action-icon) {
+  width: 17px;
+  height: 17px;
+}
+.admin-source-actions {
+  composes: admin-source-actions from global;
+  display: flex;
+  gap: 6px;
+}
+.admin-source-actions :global(.admin-ghost),
+.admin-source-actions :global(.admin-danger) {
+  padding: 7px 8px;
+  font-size: 9px;
+}
+.source-form {
+  composes: source-form from global;
+  margin: 0;
+  border-top: 0;
+}
+.schedule-heading {
+  composes: schedule-heading from global;
+  margin: 34px 0 0;
+}
+.schedule-heading-actions {
+  composes: schedule-heading-actions from global;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.schedule-create-editor {
+  composes: schedule-create-editor from global;
+  margin: 0 0 18px;
+}
+.admin-schedule-list {
+  composes: admin-schedule-list from global;
+  position: relative;
+}
+.admin-schedule-list::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 72px;
+  width: 6px;
+  background: var(--green);
+}
+.admin-schedule-item {
+  composes: admin-schedule-item from global;
+  position: relative;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: start;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.admin-schedule-item::before {
+  content: "";
+  position: absolute;
+  top: 27px;
+  left: 62px;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  border: 4px solid var(--green);
+  border-radius: 50%;
+  background: var(--paper-bright);
+}
+.admin-schedule-item:global(.is-editing) {
+  border-bottom-color: var(--green);
+}
+.admin-schedule-item:global(.is-editing)::before {
+  background: var(--green);
+  box-shadow: inset 0 0 0 3px var(--paper-bright);
+}
+.admin-schedule-time small,
+.admin-schedule-time strong,
+.admin-schedule-time span {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+.admin-schedule-time small {
+  margin-bottom: 5px;
+  color: var(--green-dark);
+  font-size: 8px;
+  font-weight: 700;
+}
+.admin-schedule-time strong {
+  font: 600 17px/1 var(--display);
+}
+.admin-schedule-time span {
+  margin-top: 4px;
+  color: var(--muted);
+  font: 500 12px/1 var(--display);
+}
+.admin-day-rail {
+  margin: 0 0 18px;
+  border-width: 1px;
+}
+.admin-day-rail button {
+  flex-basis: 142px;
+  min-height: 68px;
+}
+.admin-day-divider {
+  composes: admin-day-divider from global;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 28px 0 8px;
+  padding: 12px 14px 12px 88px;
+  border-block: 1px solid var(--navy);
+  background: var(--yellow-soft);
+}
+.admin-day-divider span {
+  color: var(--green-dark);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.admin-day-divider h3 {
+  margin: 4px 0 0;
+  font: 600 22px/1 var(--display);
+  text-transform: uppercase;
+}
+.trip-shift-option {
+  composes: trip-shift-option from global;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  padding: 13px 14px;
+  border: 1px solid var(--green);
+  background: var(--green-soft);
+}
+.trip-shift-option input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--green);
+}
+.trip-shift-option span,
+.trip-shift-option strong,
+.trip-shift-option small {
+  display: block;
+}
+.trip-shift-option strong {
+  font-size: 11px;
+}
+.trip-shift-option small {
+  margin-top: 4px;
+  color: var(--green-dark);
+  font-size: 9px;
+  font-weight: 400;
+}
+.form-guidance,
+.overnight-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--navy);
+  color: var(--navy-soft);
+  background: var(--paper);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.overnight-note {
+  composes: overnight-note from global;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-color: var(--green);
+  color: var(--green-dark);
+  background: var(--green-soft);
+}
+.overnight-note :global(.action-icon) {
+  flex: none;
+}
+.admin-schedule-copy > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--green-dark);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.admin-schedule-copy h3 {
+  margin: 5px 0;
+  font: 600 24px/1.05 var(--display);
+}
+.admin-schedule-copy p {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--navy-soft);
+  font-size: 10px;
+  line-height: 1.55;
+}
+.admin-row-actions :global(.admin-ghost),
+.admin-row-actions :global(.admin-danger) {
+  padding: 8px 9px;
+  font-size: 9px;
+}
+.admin-editor {
+  composes: admin-editor from global;
+  margin-bottom: 24px;
+  padding: 20px;
+  border: 2px solid var(--green);
+  background: var(--green-soft);
+  clip-path: polygon(
+    0 10px,
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%
+  );
+}
+.admin-route-segment {
+  composes: admin-route-segment from global;
+  position: relative;
+}
+.admin-branch-entry {
+  composes: admin-branch-entry from global;
+  display: flex;
+  justify-content: flex-end;
+  margin: 8px 0 8px 90px;
+}
+.branch-create-editor {
+  composes: branch-create-editor from global;
+  margin-left: 90px;
+  border-color: var(--navy);
+  background: var(--yellow-soft);
+}
+.admin-branch-group {
+  composes: admin-branch-group from global;
+  position: relative;
+  margin: 4px 0 28px 90px;
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+  clip-path: polygon(
+    0 12px,
+    12px 0,
+    100% 0,
+    100% calc(100% - 12px),
+    calc(100% - 12px) 100%,
+    0 100%
+  );
+}
+.admin-branch-group::before {
+  content: "";
+  position: absolute;
+  top: -26px;
+  left: -20px;
+  width: 20px;
+  height: 48px;
+  border-bottom: 6px solid var(--green);
+  border-left: 6px solid var(--green);
+  transform: skewY(-28deg);
+}
+.admin-trip-start-junction {
+  composes: admin-trip-start-junction from global;
+  position: relative;
+  margin-bottom: 32px;
+}
+.admin-trip-start-junction::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 72px;
+  width: 6px;
+  height: 32px;
+  background: var(--green);
+}
+.admin-trip-start-junction .admin-branch-group:global(.is-trip-start) {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+.admin-branch-group:global(.is-trip-start)::before {
+  display: none;
+}
+.admin-branch-head {
+  composes: admin-branch-head from global;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  background: var(--yellow-soft);
+}
+.admin-branch-head span,
+.admin-branch-option-head span {
+  color: var(--green-dark);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.admin-branch-head h3 {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+  font: 600 26px/1 var(--display);
+}
+.admin-branch-head p,
+.admin-branch-option-head p {
+  margin: 0;
+  color: var(--navy-soft);
+  font-size: 10px;
+}
+.admin-branch-options {
+  composes: admin-branch-options from global;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(330px, 100%), 1fr));
+  align-items: start;
+  gap: 12px;
+  padding: 12px;
+}
+.admin-branch-option {
+  composes: admin-branch-option from global;
+  min-width: 0;
+  border: 1px solid var(--navy);
+  background: var(--paper);
+}
+.admin-branch-option:has(.schedule-inline-editor) {
+  grid-column: 1 / -1;
+}
+.admin-branch-option:global(.is-selected) {
+  border: 2px solid var(--green);
+  background: var(--green-soft);
+}
+.admin-branch-option-head {
+  composes: admin-branch-option-head from global;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.admin-branch-option-head .admin-row-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.admin-branch-option-head h4 {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+  font: 600 23px/1 var(--display);
+}
+.branch-option-add,
+.branch-option-edit {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  align-items: end;
+  gap: 10px;
+  margin: 14px;
+  padding: 14px;
+  border: 1px solid var(--navy);
+  background: var(--paper-bright);
+}
+.branch-option-add label,
+.branch-option-edit label {
+  display: grid;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 700;
+}
+.branch-option-add input,
+.branch-option-edit input {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+}
+.admin-branch-activities {
+  composes: admin-branch-activities from global;
+  margin: 0 16px;
+}
+.admin-branch-activities .admin-schedule-item {
+  grid-template-columns: 42px minmax(0, 1fr);
+  column-gap: 20px;
+  row-gap: 8px;
+  padding-block: 14px;
+}
+.admin-branch-activities .admin-row-actions {
+  grid-column: 2;
+  justify-self: start;
+}
+.admin-branch-activities > article::before {
+  left: 45px;
+  width: 14px;
+  height: 14px;
+  border-width: 3px;
+}
+.admin-branch-activities .schedule-inline-editor {
+  margin-left: 0;
+}
+.admin-branch-option > .schedule-inline-editor {
+  margin: 12px 16px 16px;
+}
+.branch-add-activity {
+  composes: branch-add-activity from global;
+  margin: 8px 16px 12px;
+}
+.admin-branch-unwrap {
+  composes: admin-branch-unwrap from global;
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--navy);
+  background: var(--paper-deep);
+}
+.admin-branch-unwrap label {
+  display: grid;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+}
+.admin-branch-unwrap select {
+  min-width: 180px;
+  padding: 8px 10px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  background: white;
+}
+.schedule-inline-editor {
+  composes: schedule-inline-editor from global;
+  z-index: 2;
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 2px 0 14px 86px;
+}
+.schedule-editor-head h2 {
+  max-width: min(72ch, 80%);
+  overflow-wrap: anywhere;
+}
+.schedule-editor-head h2:focus {
+  outline: 3px solid var(--yellow);
+  outline-offset: 4px;
+}
+.admin-form {
+  composes: admin-form from global;
+  display: grid;
+  gap: 17px;
+}
+.schedule-editor {
+  composes: schedule-editor from global;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.7fr);
+  align-items: start;
+  column-gap: 18px;
+}
+.schedule-editor > .schedule-editor-head,
+.schedule-editor > .schedule-form-error,
+.schedule-editor > .schedule-editor-actions {
+  grid-column: 1 / -1;
+}
+.schedule-editor > .schedule-form-grid {
+  grid-column: 1;
+}
+.schedule-editor > .source-picker {
+  grid-column: 2;
+  grid-row: 2;
+}
+.form-grid {
+  composes: form-grid from global;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.schedule-form-grid {
+  composes: schedule-form-grid from global;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.schedule-form-grid .schedule-date-field,
+.schedule-form-grid .schedule-time-field {
+  grid-column: span 3;
+}
+.schedule-form-grid .schedule-display-field {
+  grid-column: span 2;
+}
+.schedule-form-grid .schedule-type-field,
+.schedule-form-grid .schedule-icon-field {
+  grid-column: span 3;
+}
+.form-grid label,
+.admin-form > label {
+  display: grid;
+  gap: 6px;
+  color: var(--navy);
+  font-size: 9px;
+  font-weight: 700;
+}
+.field-optional {
+  composes: field-optional from global;
+  margin-left: 5px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 400;
+  text-transform: none;
+}
+.form-grid label:global(.wide) {
+  grid-column: 1 / -1;
+}
+.form-grid input,
+.form-grid textarea,
+.admin-form > label input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  outline: 0;
+  color: var(--navy);
+  background: white;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.form-grid label,
+.form-grid input,
+.form-grid textarea,
+.form-grid select {
+  min-width: 0;
+}
+.form-grid select {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  outline: 0;
+  color: var(--navy);
+  background: white;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.form-grid input:focus,
+.form-grid textarea:focus,
+.form-grid select:focus,
+.admin-form > label input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0, 143, 104, 0.15);
+}
+.schedule-time-field input {
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.form-grid label small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.source-picker {
+  composes: source-picker from global;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.source-picker > legend {
+  margin-bottom: 7px;
+  color: var(--navy);
+  font-size: 9px;
+  font-weight: 700;
+}
+.source-picker-frame {
+  composes: source-picker-frame from global;
+  overflow: hidden;
+  border: 1px solid var(--navy);
+  background: var(--paper-bright);
+}
+.source-picker-head {
+  composes: source-picker-head from global;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.source-picker-head p {
+  margin: 0;
+  color: var(--navy-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.source-picker-head :global(.admin-ghost) {
+  flex: 0 0 auto;
+}
+.source-picker-list {
+  composes: source-picker-list from global;
+  max-height: 258px;
+  overflow-y: auto;
+  scrollbar-color: var(--green) var(--paper-deep);
+  scrollbar-width: thin;
+}
+.source-option {
+  composes: source-option from global;
+  display: grid;
+  grid-template-columns: 20px 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.source-option:last-child {
+  border-bottom: 0;
+}
+.source-option:hover {
+  background: var(--paper);
+}
+.source-option:has(input:checked) {
+  background: var(--yellow-soft);
+}
+.source-option input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--green);
+}
+.source-option input:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+}
+.source-option-number {
+  composes: source-option-number from global;
+  color: var(--green-dark);
+  font: 700 24px/1 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+.source-option-copy {
+  composes: source-option-copy from global;
+  min-width: 0;
+}
+.source-option-copy strong,
+.source-option-copy small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.source-option-copy strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+.source-option-copy small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.source-inline-form {
+  composes: source-inline-form from global;
+  display: grid;
+  gap: 12px;
+  padding: 14px 12px;
+  border-top: 1px solid var(--navy);
+  background: var(--green-soft);
+}
+.source-inline-head {
+  composes: source-inline-head from global;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.source-inline-head > strong {
+  font: 600 24px/1 var(--display);
+}
+.source-inline-fields {
+  composes: source-inline-fields from global;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.source-inline-fields label {
+  display: grid;
+  gap: 6px;
+  color: var(--navy);
+  font-size: 9px;
+  font-weight: 700;
+}
+.source-inline-fields input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  outline: 0;
+  color: var(--navy);
+  background: white;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.source-inline-fields input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0, 143, 104, 0.15);
+}
+.source-inline-fields small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.source-inline-form > :global(.admin-primary) {
+  justify-self: start;
+}
+.source-created-notice {
+  composes: source-created-notice from global;
+  margin: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--green);
+  color: var(--green-dark);
+  background: var(--green-soft);
+  font-size: 12px;
+}
+.schedule-form-error {
+  composes: schedule-form-error from global;
+  padding: 10px 12px;
+  border: 1px solid var(--red);
+  background: var(--red-soft);
+}
+.schedule-editor-actions {
+  composes: schedule-editor-actions from global;
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 -8px -8px;
+  padding: 12px 8px 8px;
+  border-top: 1px solid var(--green);
+  background: var(--green-soft);
+}
+.discard-dialog {
+  composes: discard-dialog from global;
+  width: min(100%, 480px);
+  padding: 24px;
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+  clip-path: polygon(
+    0 14px,
+    14px 0,
+    100% 0,
+    100% calc(100% - 14px),
+    calc(100% - 14px) 100%,
+    0 100%
+  );
+}
+.discard-dialog h2 {
+  margin: 0;
+  font: 700 35px/0.95 var(--display);
+  text-transform: uppercase;
+}
+.discard-dialog p {
+  margin: 14px 0 0;
+  color: var(--navy-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.discard-dialog-actions {
+  composes: discard-dialog-actions from global;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.admin-empty {
+  composes: admin-empty from global;
+  color: var(--muted);
+  font-size: 11px;
+}
+.admin-empty.large {
+  display: grid;
+  min-height: 380px;
+  place-items: center;
+}
+.admin-plan-skeleton {
+  composes: admin-plan-skeleton from global;
+  display: grid;
+  gap: 12px;
+  min-height: 430px;
+  align-content: start;
+}
+.admin-plan-skeleton > span,
+.admin-plan-skeleton > strong,
+.admin-plan-skeleton > div > span {
+  display: block;
+  background: var(--paper-deep);
+  animation: var(--skeleton-animation);
+}
+.admin-plan-skeleton > span:first-child {
+  width: 80px;
+  height: 10px;
+}
+.admin-plan-skeleton > strong {
+  width: min(75%, 430px);
+  height: 42px;
+}
+.admin-plan-skeleton > span:nth-child(3) {
+  width: min(55%, 310px);
+  height: 12px;
+}
+.admin-plan-skeleton > div {
+  display: grid;
+  gap: 10px;
+  margin-top: 35px;
+}
+.admin-plan-skeleton > div > span {
+  height: 82px;
+}
+.admin-login-shell {
+  composes: admin-login-shell from global;
+  display: grid;
+  place-items: center;
+}
+.admin-login-card {
+  width: min(100%, 520px);
+  padding: clamp(28px, 6vw, 46px);
+  clip-path: polygon(
+    0 16px,
+    16px 0,
+    100% 0,
+    100% calc(100% - 16px),
+    calc(100% - 16px) 100%,
+    0 100%
+  );
+}
+.admin-login-card > p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.admin-login-card code {
+  padding: 2px 4px;
+  background: var(--paper-deep);
+  font-size: 10px;
+}
+.google-login {
+  composes: google-login from global;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 22px;
+  padding: 13px 16px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  color: var(--navy);
+  background: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+.google-login:hover {
+  color: white;
+  background: var(--navy);
+}
+.contributor-link {
+  composes: contributor-link from global;
+  text-decoration: none;
+}
+.contributor-logout {
+  composes: contributor-logout from global;
+  width: 100%;
+  margin-top: 9px;
+}
+.suggestion-admin-heading {
+  composes: suggestion-admin-heading from global;
+  margin: 46px 0 0;
+  padding-top: 28px;
+  border-top: 2px solid var(--navy);
+}
+.suggestion-admin-heading p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+.admin-suggestion-filters {
+  composes: admin-suggestion-filters from global;
+  display: flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--navy);
+}
+.admin-suggestion-filters button {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 0;
+  color: var(--navy);
+  background: transparent;
+  font-size: 9px;
+  font-weight: 700;
+}
+.admin-suggestion-filters button + button {
+  border-left: 1px solid var(--navy);
+}
+.admin-suggestion-filters button[aria-pressed="true"] {
+  color: var(--paper-bright);
+  background: var(--navy);
+}
+.admin-suggestion-filters span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 5px;
+  padding-inline: 4px;
+  color: var(--navy);
+  background: var(--yellow);
+  font-size: 8px;
+}
+.admin-suggestion-list {
+  composes: admin-suggestion-list from global;
+  display: grid;
+}
+.admin-suggestion-item {
+  composes: admin-suggestion-item from global;
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.admin-suggestion-item:global(.is-hidden) {
+  color: var(--navy-soft);
+  background: var(--paper);
+}
+.admin-suggestion-meta > * {
+  display: block;
+}
+.admin-suggestion-meta > span {
+  color: var(--red);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.admin-suggestion-meta strong {
+  margin-top: 6px;
+  font-size: 10px;
+}
+.admin-suggestion-meta small {
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 8px;
+}
+.admin-suggestion-meta em {
+  margin-top: 8px;
+  color: var(--navy-soft);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.admin-suggestion-copy small {
+  color: var(--green-dark);
+  font-size: 9px;
+  font-weight: 700;
+}
+.admin-suggestion-copy p {
+  margin: 6px 0 0;
+  color: var(--navy);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+.admin-suggestion-controls {
+  composes: admin-suggestion-controls from global;
+  display: grid;
+  gap: 7px;
+  min-width: 110px;
+}
+.admin-suggestion-controls select {
+  padding: 8px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  color: var(--navy);
+  background: white;
+  font-size: 9px;
+  font-weight: 600;
+}
+.admin-suggestion-controls :global(.admin-ghost),
+.admin-suggestion-controls :global(.admin-danger) {
+  padding: 8px;
+  font-size: 9px;
+}
+.admin-suggestion-menu {
+  composes: admin-suggestion-menu from global;
+  position: relative;
+}
+.admin-suggestion-menu > :global(.admin-ghost) {
+  width: 100%;
+}
+.admin-suggestion-menu > div {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 5px);
+  right: 0;
+  width: max-content;
+  min-width: 132px;
+  border: 1px solid var(--red);
+  background: var(--paper-bright);
+}
+.admin-suggestion-menu > div button {
+  width: 100%;
+  border: 0;
+}
+@media (max-width: 900px) {
+  .schedule-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .schedule-editor > .schedule-form-grid,
+  .schedule-editor > .source-picker {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+@media (max-width: 680px) {
+  .admin-day-rail button {
+    flex-basis: 132px;
+    min-height: 82px;
+  }
+  .admin-day-rail button strong {
+    overflow-wrap: anywhere;
+    font-size: 14px;
+    line-height: 1.05;
+  }
+  .admin-day-divider {
+    align-items: flex-start;
+    margin-top: 22px;
+    padding: 12px;
+  }
+  .admin-day-divider h3 {
+    font-size: 18px;
+  }
+  .admin-day-divider :global(.admin-ghost) {
+    flex: none;
+  }
+  .plan-summary {
+    display: grid;
+  }
+  .admin-schedule-list::before {
+    left: 57px;
+  }
+  .admin-schedule-item {
+    grid-template-columns: 43px minmax(0, 1fr);
+    gap: 28px;
+  }
+  .admin-schedule-item::before {
+    left: 47px;
+  }
+  .admin-branch-entry {
+    margin-left: 72px;
+  }
+  .branch-create-editor,
+  .admin-branch-group {
+    margin-left: 0;
+  }
+  .admin-branch-group::before {
+    top: -26px;
+    left: 57px;
+    width: 20px;
+    height: 26px;
+    transform: none;
+  }
+  .admin-trip-start-junction::after {
+    left: 57px;
+  }
+  .admin-branch-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .admin-branch-options {
+    display: block;
+  }
+  .admin-branch-option + .admin-branch-option {
+    margin-top: 12px;
+  }
+  .admin-branch-option-head {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .branch-option-add,
+  .branch-option-edit {
+    grid-template-columns: 1fr;
+  }
+  .admin-branch-activities {
+    margin-inline: 10px;
+  }
+  .admin-branch-activities .admin-schedule-item {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 20px;
+  }
+  .admin-branch-activities > article::before {
+    left: 45px;
+  }
+  .admin-branch-unwrap {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .admin-row-actions {
+    grid-column: 2;
+  }
+  .admin-branch-group :global(.admin-primary),
+  .admin-branch-group :global(.admin-ghost),
+  .admin-branch-group :global(.admin-danger) {
+    min-height: 44px;
+  }
+  .admin-branch-group .admin-row-actions :global(.admin-ghost),
+  .admin-branch-group .admin-row-actions :global(.admin-danger) {
+    min-width: 44px;
+  }
+  .admin-branch-option-head .admin-row-actions {
+    grid-column: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+  .admin-branch-option-head .admin-row-actions > button {
+    width: 100%;
+  }
+  .admin-branch-unwrap select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .schedule-inline-editor {
+    margin-left: 0;
+  }
+  .admin-branch-option > .schedule-inline-editor {
+    margin: 8px;
+    padding: 14px 12px;
+  }
+  .schedule-editor-head {
+    align-items: flex-start;
+  }
+  .schedule-editor-head h2 {
+    max-width: calc(100% - 76px);
+  }
+  .suggestion-admin-heading {
+    display: grid;
+    align-items: stretch;
+  }
+  .admin-suggestion-filters {
+    width: 100%;
+  }
+  .admin-suggestion-filters button {
+    flex: 1;
+    min-height: 44px;
+  }
+  .admin-suggestion-item {
+    grid-template-columns: 1fr;
+    padding-inline: 6px;
+  }
+  .admin-suggestion-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .admin-suggestion-controls select {
+    grid-column: 1 / -1;
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .admin-suggestion-controls > :global(.admin-ghost),
+  .admin-suggestion-menu > :global(.admin-ghost) {
+    min-height: 44px;
+  }
+  .admin-source-list {
+    grid-template-columns: 1fr;
+  }
+  .admin-source-item:nth-child(odd) {
+    border-right: 0;
+  }
+  .admin-source-item {
+    grid-template-columns: 38px minmax(0, 1fr);
+    align-items: start;
+  }
+  .admin-source-link,
+  .admin-source-actions {
+    grid-column: 2;
+  }
+  .admin-source-actions {
+    flex-wrap: wrap;
+  }
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .form-grid label:global(.wide) {
+    grid-column: auto;
+  }
+  .schedule-form-grid > label.schedule-field {
+    grid-column: 1 / -1;
+  }
+  .form-grid input,
+  .form-grid textarea,
+  .form-grid select,
+  .admin-form > label input,
+  .source-inline-fields input {
+    font-size: 16px;
+  }
+  .source-picker-head {
+    display: grid;
+  }
+  .source-picker-head :global(.admin-ghost) {
+    justify-self: start;
+  }
+  .source-inline-fields {
+    grid-template-columns: 1fr;
+  }
+  .source-option {
+    grid-template-columns: 20px 30px minmax(0, 1fr);
+    padding-inline: 9px;
+  }
+  .schedule-editor-actions {
+    bottom: max(0px, env(safe-area-inset-bottom));
+  }
+  .discard-dialog-actions {
+    display: grid;
+  }
+  .discard-dialog-actions :global(.admin-primary),
+  .discard-dialog-actions :global(.admin-danger) {
+    width: 100%;
+  }
+  .schedule-heading {
+    align-items: flex-end;
+  }
+  .schedule-heading-actions {
+    display: grid;
+    width: min(100%, 160px);
+  }
+  .schedule-heading-actions > button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+@media (max-width: 380px) {
+  .admin-branch-options {
+    padding: 8px;
+  }
+  .admin-branch-activities {
+    margin-inline: 8px;
+  }
+}
+
+.admin-actions {
+  composes: admin-actions from global;
+}
+
+.admin-row-actions {
+  composes: admin-row-actions from global;
+}
+
+.admin-schedule-time {
+  composes: admin-schedule-time from global;
+}
+
+.form-guidance {
+  composes: form-guidance from global;
+}
+
+.admin-schedule-copy {
+  composes: admin-schedule-copy from global;
+}
+
+.branch-option-add {
+  composes: branch-option-add from global;
+}
+
+.branch-option-edit {
+  composes: branch-option-edit from global;
+}
+
+.schedule-editor-head {
+  composes: schedule-editor-head from global;
+}
+
+.schedule-date-field {
+  composes: schedule-date-field from global;
+}
+
+.schedule-time-field {
+  composes: schedule-time-field from global;
+}
+
+.schedule-display-field {
+  composes: schedule-display-field from global;
+}
+
+.schedule-type-field {
+  composes: schedule-type-field from global;
+}
+
+.schedule-icon-field {
+  composes: schedule-icon-field from global;
+}
+
+.large {
+  composes: large from global;
+}
+
+.admin-suggestion-meta {
+  composes: admin-suggestion-meta from global;
+}
+
+.admin-suggestion-copy {
+  composes: admin-suggestion-copy from global;
+}
+
+.schedule-field {
+  composes: schedule-field from global;
+}

@@ -46,17 +46,14 @@ intervals and citation references before persistence.
 
 ## Styles
 
-`src/styles.css` is the single ordered entry point imported by the root layout.
-Feature rules live in `src/styles/`: foundation, navigation, notifications,
-tracker, contributions, invitations, admin shell, trip requests and schedule
-editor. Invitation management includes permission/history/user audit tables.
-`feedback.css` contains common error presentation and animations.
+`src/styles.css` imports shared foundation, feedback, and cross-feature shell
+rules. Feature styles use CSS Modules, with responsive rules beside their
+owning feature. Shared buttons, footers, and modal behavior live in
+`components/ui/`; dialogs use the app-owned Radix adapter.
 
-`responsive.css` is deliberately last: it owns the shared breakpoint overrides.
-Preserving this cascade avoids route-dependent import order. Edit a feature's
-base file and its responsive overrides together. Do not add global stylesheet
-imports to individual components. The request queue uses content-sized grid rows
-so long phone titles cannot overflow into another request.
+See [UI styling and interaction ownership](ui-styling.md) for module boundaries,
+compatibility classes, dismissal policies, and the visual regression workflow.
+Do not rely on feature import order to resolve competing styles.
 
 ## Versioned database migrations
 

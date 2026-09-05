@@ -1,0 +1,1483 @@
+.admin-invitations-shell {
+  composes: admin-invitations-shell from global;
+  width: min(100% - 40px, 1180px);
+}
+.invitation-admin-tabs {
+  composes: invitation-admin-tabs from global;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 20px;
+  border: 1px solid var(--navy);
+  background: var(--paper-bright);
+}
+.invitation-admin-tabs a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  color: var(--navy);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.invitation-admin-tabs a + a {
+  border-left: 1px solid var(--navy);
+}
+.invitation-admin-tabs a[aria-current="page"] {
+  color: var(--paper-bright);
+  background: var(--navy);
+}
+.invitation-admin-tabs span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 5px;
+  color: var(--navy);
+  background: var(--yellow);
+  font-size: 9px;
+}
+.permission-board {
+  composes: permission-board from global;
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+}
+.permission-board-head {
+  composes: permission-board-head from global;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--navy);
+}
+.permission-board-head h2 {
+  margin: 0;
+  font: 700 38px/0.95 var(--display);
+  text-transform: uppercase;
+}
+.permission-board-head p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.permission-board-head > strong {
+  flex: 0 0 auto;
+  padding: 9px 11px;
+  color: var(--navy);
+  background: var(--yellow);
+  font: 600 15px/1 var(--display);
+  text-transform: uppercase;
+}
+.permission-controls {
+  composes: permission-controls from global;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 170px auto;
+  gap: 14px;
+  align-items: end;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--navy);
+  background: var(--paper);
+}
+.permission-controls label {
+  display: grid;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.permission-controls input,
+.permission-controls select {
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  outline: 0;
+  color: var(--navy);
+  background: white;
+  font-size: 12px;
+  text-transform: none;
+}
+.permission-controls input:focus,
+.permission-controls select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0, 143, 104, 0.15);
+}
+.permission-controls p {
+  margin: 0 0 11px;
+  color: var(--green-dark);
+  font-size: 10px;
+  font-weight: 700;
+}
+.permission-list {
+  composes: permission-list from global;
+  display: grid;
+}
+.permission-row {
+  composes: permission-row from global;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(180px, 0.8fr) 130px auto;
+  gap: 16px;
+  align-items: center;
+  padding: 17px 18px 17px 28px;
+  border-bottom: 1px solid var(--line);
+}
+.permission-row:last-child {
+  border-bottom: 0;
+}
+.permission-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 11px;
+  width: 6px;
+  background: var(--line);
+}
+.permission-row:global(.is-pending)::before {
+  background: var(--yellow);
+}
+.permission-row:global(.is-approved)::before {
+  background: var(--green);
+}
+.permission-row:global(.is-denied)::before,
+.permission-row:global(.is-revoked)::before {
+  background: var(--red);
+}
+.permission-person strong,
+.permission-person span,
+.permission-trip strong,
+.permission-trip small,
+.permission-state span,
+.permission-state time {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.permission-person strong {
+  font-size: 12px;
+}
+.permission-person span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.permission-trip small {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.permission-trip strong {
+  margin-top: 5px;
+  font: 600 18px/1.05 var(--display);
+}
+.permission-state span {
+  display: inline-block;
+  padding: 6px 7px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.permission-row:global(.is-pending) .permission-state span {
+  color: var(--navy);
+  background: var(--yellow-soft);
+}
+.permission-row:global(.is-approved) .permission-state span {
+  color: var(--green-dark);
+  background: var(--green-soft);
+}
+.permission-row:global(.is-denied) .permission-state span,
+.permission-row:global(.is-revoked) .permission-state span {
+  color: var(--red);
+  background: var(--red-soft);
+}
+.permission-state time {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 8px;
+}
+.permission-actions {
+  composes: permission-actions from global;
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+.permission-actions button {
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 9px;
+}
+.permission-reason {
+  composes: permission-reason from global;
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  padding: 9px 11px;
+  border: 1px solid var(--red);
+  color: #8e3028;
+  background: var(--red-soft);
+  font-size: 10px;
+}
+.permission-decision {
+  composes: permission-decision from global;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--red);
+  background: var(--red-soft);
+}
+.permission-decision label {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  color: #8e3028;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.permission-decision textarea {
+  width: 100%;
+  padding: 9px 10px 20px;
+  border: 1px solid var(--red);
+  border-radius: 3px;
+  outline: 0;
+  color: var(--navy);
+  background: white;
+  font-size: 12px;
+  line-height: 1.45;
+  text-transform: none;
+  resize: vertical;
+}
+.permission-decision label span {
+  position: absolute;
+  right: 8px;
+  bottom: 5px;
+  color: var(--muted);
+  font-size: 8px;
+}
+.permission-decision > div {
+  display: flex;
+  align-items: end;
+  gap: 7px;
+}
+.permission-global-error,
+.permission-empty {
+  margin: 0;
+  padding: 15px 22px;
+}
+.permission-global-error {
+  composes: permission-global-error from global;
+  border-bottom: 1px solid var(--red);
+  color: #8e3028;
+  background: var(--red-soft);
+  font-size: 10px;
+}
+.permission-empty {
+  composes: permission-empty from global;
+  color: var(--muted);
+  font-size: 11px;
+}
+.admin-users-shell {
+  composes: admin-users-shell from global;
+  width: min(100% - 40px, 1120px);
+}
+.admin-invitations {
+  composes: admin-invitations from global;
+  margin-bottom: 20px;
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+}
+.admin-invitations-head {
+  composes: admin-invitations-head from global;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px;
+  border-bottom: 2px solid var(--navy);
+}
+.admin-invitations-head h2 {
+  max-width: 14ch;
+  margin: 0;
+  font: 700 clamp(38px, 5vw, 54px) / 0.9 var(--display);
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.admin-invitations-head p {
+  max-width: 68ch;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.admin-invitations-head > strong {
+  flex: 0 0 auto;
+  padding: 11px 13px;
+  color: var(--paper-bright);
+  background: var(--green);
+  font: 600 16px/1 var(--display);
+  text-transform: uppercase;
+}
+.invitation-form {
+  composes: invitation-form from global;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+}
+.invitation-message {
+  composes: invitation-message from global;
+  grid-column: 1 / -1;
+  margin: 0;
+  border-width: 0 0 1px;
+}
+.invitation-trip-picker {
+  composes: invitation-trip-picker from global;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  grid-template-rows: auto auto;
+  gap: 7px 24px;
+  padding: 18px 22px;
+  border-bottom: 2px solid var(--navy);
+  background: var(--paper);
+}
+.invitation-trip-picker > label {
+  grid-column: 1;
+  color: var(--navy);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.invitation-trip-picker > select {
+  grid-column: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 34px 10px 11px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  outline: 0;
+  color: var(--navy);
+  background: var(--paper-bright);
+  font: 600 12px/1.35 var(--body);
+}
+.invitation-trip-picker > select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0, 143, 104, 0.15);
+}
+.invitation-trip-picker > select:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.invitation-trip-preview {
+  composes: invitation-trip-preview from global;
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: stretch;
+  display: grid;
+  align-content: center;
+  padding: 12px 15px;
+  border: 1px solid var(--navy);
+  background: var(--yellow-soft);
+}
+.invitation-trip-preview strong,
+.invitation-trip-preview span {
+  display: block;
+}
+.invitation-trip-preview strong {
+  font: 600 20px/1.05 var(--display);
+  text-transform: uppercase;
+}
+.invitation-trip-preview span {
+  margin-top: 5px;
+  color: var(--navy-soft);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.invitation-trip-preview p {
+  margin: 9px 0 0;
+  color: var(--green-dark);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.invitation-trip-empty {
+  composes: invitation-trip-empty from global;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--red);
+  color: #8e3028;
+  background: var(--red-soft);
+  font-size: 11px;
+}
+.invitation-compose {
+  composes: invitation-compose from global;
+  min-width: 0;
+  padding: 24px 22px;
+  border-right: 1px solid var(--navy);
+}
+.invitation-compose h3,
+.invitation-directory legend {
+  margin: 0 0 17px;
+  padding: 0;
+  font: 600 27px/1 var(--display);
+  text-transform: uppercase;
+}
+.invitation-compose > label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--navy);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.invitation-email-row {
+  composes: invitation-email-row from global;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.invitation-email-row input {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--navy);
+  border-right: 0;
+  border-radius: 3px 0 0 3px;
+  outline: 0;
+  color: var(--navy);
+  background: white;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.invitation-email-row input:focus {
+  position: relative;
+  z-index: 1;
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0, 143, 104, 0.15);
+}
+.invitation-email-row :global(.admin-ghost) {
+  border-radius: 0 3px 3px 0;
+}
+.invitation-compose > p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.invitation-manifest {
+  composes: invitation-manifest from global;
+  margin-top: 22px;
+  border: 1px solid var(--navy);
+  background: var(--paper);
+}
+.invitation-manifest-head {
+  composes: invitation-manifest-head from global;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.invitation-manifest h4 {
+  margin: 0;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.invitation-manifest-head span {
+  color: var(--green-dark);
+  font: 700 11px/1 var(--body);
+}
+.invitation-manifest ul {
+  max-height: 194px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  scrollbar-color: var(--green) var(--paper-deep);
+  scrollbar-width: thin;
+}
+.invitation-manifest li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 9px 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-bright);
+}
+.invitation-manifest li:last-child {
+  border-bottom: 0;
+}
+.invitation-manifest li span {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.invitation-manifest li button {
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid var(--red);
+  border-radius: 3px;
+  color: var(--red);
+  background: var(--red-soft);
+  font-size: 9px;
+  font-weight: 700;
+}
+.invitation-manifest li button:hover {
+  color: white;
+  background: var(--red);
+}
+.invitation-manifest li button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.invitation-manifest > p {
+  margin: 0;
+  padding: 17px 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.invitation-directory {
+  composes: invitation-directory from global;
+  min-width: 0;
+  margin: 0;
+  padding: 24px 22px;
+  border: 0;
+}
+.invitation-directory legend {
+  float: left;
+  width: 100%;
+}
+.invitation-directory-head {
+  composes: invitation-directory-head from global;
+  clear: both;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.invitation-directory-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+.invitation-directory-head :global(.admin-ghost) {
+  flex: 0 0 auto;
+  padding: 7px 9px;
+  font-size: 9px;
+}
+.invitation-directory-list {
+  composes: invitation-directory-list from global;
+  max-height: 253px;
+  overflow-y: auto;
+  border: 1px solid var(--navy);
+  scrollbar-color: var(--green) var(--paper-deep);
+  scrollbar-width: thin;
+}
+.invitation-user-option {
+  composes: invitation-user-option from global;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 11px;
+  align-items: center;
+  min-height: 56px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+.invitation-user-option:last-child {
+  border-bottom: 0;
+}
+.invitation-user-option:hover {
+  background: var(--paper);
+}
+.invitation-user-option:has(input:checked) {
+  background: var(--yellow-soft);
+}
+.invitation-user-option input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--green);
+}
+.invitation-user-option input:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+}
+.invitation-user-option strong,
+.invitation-user-option small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.invitation-user-option strong {
+  color: var(--navy);
+  font-size: 11px;
+}
+.invitation-user-option small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.invitation-directory-empty {
+  composes: invitation-directory-empty from global;
+  margin: 0;
+  padding: 17px 12px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.invitation-directory:disabled {
+  opacity: 0.65;
+}
+.invitation-draft {
+  composes: invitation-draft from global;
+  grid-column: 1 / -1;
+  padding: 22px;
+  border-top: 2px solid var(--navy);
+  background: var(--paper-bright);
+}
+.invitation-draft-head {
+  composes: invitation-draft-head from global;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+.invitation-draft-head h3 {
+  margin: 0;
+  font: 600 30px/1 var(--display);
+  text-transform: uppercase;
+}
+.invitation-draft-head p {
+  max-width: 64ch;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.invitation-draft-head > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.invitation-draft-head span {
+  color: var(--green-dark);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.invitation-draft-head :global(.admin-ghost) {
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 9px;
+}
+.invitation-draft > label,
+.invitation-draft-label-row label {
+  display: block;
+  color: var(--navy);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.invitation-draft > input,
+.invitation-draft > textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  outline: 0;
+  color: var(--navy);
+  background: white;
+}
+.invitation-draft > input {
+  min-height: 44px;
+  margin-top: 7px;
+  padding: 11px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.invitation-draft > textarea {
+  min-height: 270px;
+  margin-top: 7px;
+  padding: 14px;
+  resize: vertical;
+  font: 400 12px/1.65 var(--body);
+  tab-size: 2;
+}
+.invitation-draft > input:focus,
+.invitation-draft > textarea:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0, 143, 104, 0.15);
+}
+.invitation-draft > input:disabled,
+.invitation-draft > textarea:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.invitation-draft-label-row {
+  composes: invitation-draft-label-row from global;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+.invitation-draft-label-row span {
+  color: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.invitation-draft-error {
+  composes: invitation-draft-error from global;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--red);
+  color: #8e3028;
+  background: var(--red-soft);
+  font-size: 11px;
+}
+.invitation-dispatch {
+  composes: invitation-dispatch from global;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 18px 14px 22px;
+  border-top: 2px solid var(--navy);
+  background: var(--yellow-soft);
+}
+.invitation-dispatch p {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0;
+}
+.invitation-dispatch strong {
+  font: 600 20px/1 var(--display);
+  text-transform: uppercase;
+}
+.invitation-dispatch span {
+  color: var(--navy-soft);
+  font-size: 10px;
+}
+.invitation-dispatch :global(.admin-primary) {
+  flex: 0 0 auto;
+  min-width: 132px;
+}
+.admin-invitation-history {
+  composes: admin-invitation-history from global;
+  margin-bottom: 20px;
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+}
+.invitation-history-head {
+  composes: invitation-history-head from global;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--navy);
+}
+.invitation-history-head h2 {
+  margin: 0;
+  font: 700 35px/0.95 var(--display);
+  text-transform: uppercase;
+}
+.invitation-history-head p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.invitation-history-head > strong {
+  flex: 0 0 auto;
+  padding: 9px 11px;
+  color: var(--paper-bright);
+  background: var(--navy);
+  font: 600 15px/1 var(--display);
+  text-transform: uppercase;
+}
+.invitation-history-controls {
+  composes: invitation-history-controls from global;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 180px auto;
+  gap: 14px;
+  align-items: end;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--navy);
+  background: var(--paper);
+}
+.invitation-history-controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--navy);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.invitation-history-controls input,
+.invitation-history-controls select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  outline: 0;
+  color: var(--navy);
+  background: white;
+  font-size: 12px;
+  text-transform: none;
+}
+.invitation-history-controls input:focus,
+.invitation-history-controls select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0, 143, 104, 0.15);
+}
+.invitation-history-controls p {
+  margin: 0 0 11px;
+  color: var(--green-dark);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.invitation-history-table-wrap {
+  composes: invitation-history-table-wrap from global;
+  overflow-x: auto;
+}
+.invitation-history-table {
+  composes: invitation-history-table from global;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.invitation-history-table th,
+.invitation-history-table td {
+  padding: 13px 14px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.invitation-history-table th:last-child,
+.invitation-history-table td:last-child {
+  border-right: 0;
+}
+.invitation-history-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.invitation-history-table th {
+  color: var(--navy);
+  background: var(--paper);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.invitation-history-table th:nth-child(1) {
+  width: 21%;
+}
+.invitation-history-table th:nth-child(2) {
+  width: 20%;
+}
+.invitation-history-table th:nth-child(3) {
+  width: 25%;
+}
+.invitation-history-table th:nth-child(4) {
+  width: 12%;
+}
+.invitation-history-table th:nth-child(5) {
+  width: 22%;
+}
+.invitation-history-table td {
+  overflow-wrap: anywhere;
+  color: var(--navy-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.invitation-history-table td strong {
+  color: var(--navy);
+  font-size: 11px;
+}
+.invitation-history-table td a {
+  color: var(--green-dark);
+  font-weight: 700;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.invitation-history-table td a:hover {
+  color: var(--navy);
+  background: var(--yellow-soft);
+}
+.invitation-history-subject {
+  composes: invitation-history-subject from global;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.invitation-history-status {
+  composes: invitation-history-status from global;
+  display: inline-block;
+  padding: 6px 8px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.invitation-history-status:global(.is-sent) {
+  color: var(--green-dark);
+  background: var(--green-soft);
+}
+.invitation-history-status:global(.is-failed) {
+  color: color-mix(in srgb, var(--red) 62%, var(--navy));
+  background: var(--red-soft);
+}
+.invitation-history-table time {
+  display: grid;
+  gap: 4px;
+  color: var(--navy);
+  font: 600 19px/1 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+.invitation-history-table time small {
+  color: var(--green-dark);
+  font: 700 9px/1 var(--body);
+  letter-spacing: 0.05em;
+}
+.invitation-history-empty {
+  composes: invitation-history-empty from global;
+  margin: 0;
+  padding: 22px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.admin-users {
+  composes: admin-users from global;
+  border: 2px solid var(--navy);
+  background: var(--paper-bright);
+}
+.admin-users-head {
+  composes: admin-users-head from global;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--navy);
+}
+.admin-users-head h2 {
+  margin: 0;
+  font: 700 35px/0.95 var(--display);
+  text-transform: uppercase;
+}
+.admin-users-head p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.admin-users-table-wrap {
+  composes: admin-users-table-wrap from global;
+  overflow-x: auto;
+}
+.admin-users-table {
+  composes: admin-users-table from global;
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.admin-users-table th,
+.admin-users-table td {
+  padding: 13px 18px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+.admin-users-table th:last-child,
+.admin-users-table td:last-child {
+  border-right: 0;
+}
+.admin-users-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.admin-users-table th {
+  color: var(--navy);
+  background: var(--paper);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.admin-users-table td {
+  overflow-wrap: anywhere;
+  color: var(--navy-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.admin-users-table td strong {
+  color: var(--navy);
+  font-size: 12px;
+}
+.admin-users-table time {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--navy);
+  font: 600 24px/1 var(--display);
+  font-variant-numeric: tabular-nums;
+}
+.admin-users-table time small {
+  color: var(--green-dark);
+  font: 700 9px/1 var(--body);
+  letter-spacing: 0.05em;
+}
+.admin-users-table td:last-child time {
+  color: var(--green-dark);
+}
+.admin-users-table td:nth-child(4) time {
+  color: var(--green-dark);
+}
+.admin-users-table th:nth-child(1) {
+  width: 17%;
+}
+.admin-users-table th:nth-child(2) {
+  width: 24%;
+}
+.admin-users-table th:nth-child(3),
+.admin-users-table th:nth-child(4) {
+  width: 21%;
+}
+.admin-users-table th:nth-child(5) {
+  width: 17%;
+}
+.admin-user-role-cell {
+  composes: admin-user-role-cell from global;
+  position: relative;
+}
+.user-role-control select {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 30px 8px 9px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  color: var(--navy);
+  background: white;
+  font-size: 10px;
+  font-weight: 700;
+}
+.user-role-control select:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0, 143, 104, 0.15);
+  outline: 0;
+}
+.user-role-control select:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.user-role-badge {
+  composes: user-role-badge from global;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 9px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  color: var(--navy);
+  background: var(--paper);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.user-role-badge:global(.is-admin) {
+  border-color: var(--green-dark);
+  color: var(--green-dark);
+  background: var(--green-soft);
+}
+.user-role-badge:global(.is-owner) {
+  color: var(--paper-bright);
+  background: var(--navy);
+}
+.user-role-badge small {
+  color: inherit;
+  font-size: 8px;
+  font-weight: 400;
+}
+.user-role-error {
+  composes: user-role-error from global;
+  margin: 7px 0 0;
+  color: var(--red);
+  font-size: 9px;
+  line-height: 1.45;
+}
+.admin-users-empty {
+  composes: admin-users-empty from global;
+  margin: 0;
+  padding: 18px 22px;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .permission-row {
+    grid-template-columns: minmax(170px, 1fr) minmax(155px, 0.8fr) 118px;
+  }
+  .permission-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-left: 0;
+  }
+}
+@media (max-width: 680px) {
+  .admin-invitations-shell {
+    width: min(100% - 20px, 1180px);
+  }
+  .invitation-admin-tabs {
+    margin-bottom: 10px;
+  }
+  .permission-board-head {
+    align-items: flex-start;
+    padding: 17px 14px;
+  }
+  .permission-board-head h2 {
+    font-size: 31px;
+  }
+  .permission-board-head > strong {
+    padding: 7px 8px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .permission-controls {
+    grid-template-columns: minmax(0, 1fr) 132px;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .permission-controls input,
+  .permission-controls select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .permission-controls p {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .permission-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 13px;
+    padding: 17px 14px 17px 28px;
+  }
+  .permission-row::before {
+    left: 9px;
+  }
+  .permission-person,
+  .permission-trip,
+  .permission-state {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    align-items: baseline;
+    gap: 8px;
+  }
+  .permission-person::before {
+    content: "Người dùng";
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .permission-trip::before {
+    content: "Chuyến yêu cầu";
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .permission-state::before {
+    content: "Trạng thái";
+    color: var(--muted);
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .permission-person span,
+  .permission-trip small,
+  .permission-state time {
+    grid-column: 2;
+  }
+  .permission-actions {
+    grid-column: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .permission-actions button {
+    min-height: 44px;
+  }
+  .permission-reason,
+  .permission-decision {
+    grid-column: auto;
+  }
+  .permission-decision {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+  .permission-decision > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .permission-decision button {
+    min-height: 44px;
+  }
+  .admin-invitations-head {
+    position: relative;
+    display: block;
+    padding-inline: 14px;
+  }
+  .admin-invitations-head h2 {
+    padding-right: 132px;
+  }
+  .admin-invitations-head > strong {
+    position: absolute;
+    top: 22px;
+    right: 14px;
+    white-space: nowrap;
+  }
+  .invitation-form {
+    grid-template-columns: 1fr;
+  }
+  .invitation-trip-picker {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 7px;
+    padding-inline: 14px;
+  }
+  .invitation-trip-picker > label,
+  .invitation-trip-picker > select,
+  .invitation-trip-preview {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .invitation-trip-preview {
+    margin-top: 5px;
+  }
+  .invitation-compose {
+    padding-inline: 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--navy);
+  }
+  .invitation-directory {
+    padding-inline: 14px;
+  }
+  .invitation-draft {
+    grid-column: auto;
+    padding-inline: 14px;
+  }
+  .invitation-draft-head {
+    align-items: stretch;
+    display: grid;
+    gap: 12px;
+  }
+  .invitation-draft-head > div:last-child {
+    align-items: stretch;
+    justify-content: space-between;
+  }
+  .invitation-draft-head span {
+    align-self: center;
+    white-space: normal;
+  }
+  .invitation-draft > textarea {
+    min-height: 330px;
+  }
+  .invitation-dispatch {
+    grid-column: auto;
+    align-items: stretch;
+    padding-inline: 14px;
+  }
+  .invitation-dispatch p {
+    display: grid;
+    gap: 5px;
+  }
+  .invitation-history-head {
+    padding-inline: 14px;
+  }
+  .invitation-history-head > strong {
+    align-self: flex-start;
+    white-space: nowrap;
+  }
+  .invitation-history-controls {
+    grid-template-columns: 1fr 130px;
+    padding-inline: 14px;
+  }
+  .invitation-history-controls input,
+  .invitation-history-controls select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .invitation-history-controls p {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .invitation-history-table,
+  .invitation-history-table tbody,
+  .invitation-history-table tr,
+  .invitation-history-table td {
+    display: block;
+  }
+  .invitation-history-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .invitation-history-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 120px;
+    border-bottom: 1px solid var(--navy);
+  }
+  .invitation-history-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .invitation-history-table td {
+    min-width: 0;
+    padding: 11px 14px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .invitation-history-table td:nth-child(even) {
+    border-right: 0;
+  }
+  .invitation-history-table td:nth-child(3) {
+    grid-column: 1 / -1;
+    border-right: 0;
+  }
+  .invitation-history-table td:nth-child(4),
+  .invitation-history-table td:nth-child(5) {
+    border-bottom: 0;
+  }
+  .invitation-history-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .invitation-history-empty {
+    padding-inline: 14px;
+  }
+  .admin-users-head {
+    padding-inline: 14px;
+  }
+  .admin-users-table,
+  .admin-users-table tbody,
+  .admin-users-table tr,
+  .admin-users-table td {
+    display: block;
+  }
+  .admin-users-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .admin-users-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--navy);
+  }
+  .admin-users-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .admin-users-table td {
+    min-width: 0;
+    padding: 12px 14px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .admin-users-table td:nth-child(even) {
+    border-right: 0;
+  }
+  .admin-users-table td:nth-child(4) {
+    border-bottom: 1px solid var(--line);
+  }
+  .admin-users-table td:nth-child(5) {
+    grid-column: 1 / -1;
+    border-right: 0;
+    border-bottom: 0;
+  }
+  .admin-users-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .admin-users-table time {
+    display: block;
+  }
+  .admin-users-table time small {
+    display: block;
+    margin-top: 5px;
+    white-space: nowrap;
+  }
+  .user-role-control select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .admin-users-empty {
+    padding-inline: 14px;
+  }
+}
+@media (max-width: 380px) {
+  .permission-controls,
+  .invitation-history-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.permission-person {
+  composes: permission-person from global;
+}
+
+.permission-trip {
+  composes: permission-trip from global;
+}
+
+.permission-state {
+  composes: permission-state from global;
+}
+
+.user-role-control {
+  composes: user-role-control from global;
+}

@@ -90,6 +90,9 @@ test("contributors receive in-app updates while owner delivery stays email-only"
     const readAllBox = await readAllButton.boundingBox();
     expect(readAllBox.height).toBeGreaterThanOrEqual(44);
     await readAllButton.click();
+    await expect(readAllButton).toBeDisabled();
+    // The modal hides the background from the accessibility tree until closed.
+    await pageB.keyboard.press("Escape");
     await expect(pageB.getByRole("button", { name: "Mở thông báo" })).toBeVisible();
 
     await gotoHealthy(ownerPage, `/?trip=${encodeURIComponent(slug)}`);

@@ -22,6 +22,29 @@ for (const viewport of [{ name: "phone", width: 320, height: 760 }, { name: "mac
     await page.screenshot({ path: testInfo.outputPath("completed-feedback.png"), fullPage: true });
   });
 
+  test(`${viewport.name} active descriptions preserve production typography and alignment`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.clock.install({ time: new Date("2026-08-09T05:00:30.000Z") });
+    const description = "Di chuyển vào khu nhà hàng và chọn phương án dinner theo kết quả gọi lúc 11:00. Nếu cả Red Lobster và TGI FRIDAYS đều không nhận reservation, walk-in hỏi bàn sau drone #1; The Oven là backup cuối.";
+    await page.route("**/api/itinerary?slug=*", async (route) => {
+      const response = await route.fetch();
+      const itinerary = await response.json();
+      itinerary.itinerary[0].detail = description;
+      await route.fulfill({ response, json: itinerary });
+    });
+    await gotoHealthy(page, "/?trip=kamakura-2026-08-09");
+    const detail = page.locator(viewport.width === 320 ? ".mobile-foldout-detail" : ".now-detail");
+    await expect(detail).toBeVisible();
+    await expect(detail).toHaveText(description);
+    await expect(detail).toHaveCSS("font-size", viewport.width === 320 ? "11px" : "13px");
+    await expect(detail).toHaveCSS("color", "rgb(50, 68, 90)");
+    await expect(detail).toHaveCSS("margin-left", viewport.width === 320 ? "0px" : "76px");
+    const bounds = await detail.boundingBox();
+    if (viewport.width === 320) expect(bounds.height).toBeLessThan(140);
+    else expect(bounds.width).toBeLessThan(530);
+    await detail.screenshot({ path: testInfo.outputPath("active-description.png") });
+  });
+
   test(`${viewport.name} schedule nodes align and request rows contain their text`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await gotoHealthy(page, "/admin/trips");

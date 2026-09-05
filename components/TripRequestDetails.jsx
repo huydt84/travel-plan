@@ -1,3 +1,4 @@
+import tripRequestsStyles from "../src/styles/trip-requests.module.css";
 import Link from "next/link";
 import { ActionIcon } from "./Icons";
 
@@ -16,66 +17,104 @@ const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
   timeZone: "UTC",
 });
 
-export const formatRequestDate = (value) => dateFormatter.format(new Date(`${value}T00:00:00Z`));
-export const formatRequestRange = (request) => request.startDate === request.endDate
-  ? formatRequestDate(request.startDate)
-  : `${formatRequestDate(request.startDate)} — ${formatRequestDate(request.endDate)}`;
+export const formatRequestDate = (value) =>
+  dateFormatter.format(new Date(`${value}T00:00:00Z`));
+export const formatRequestRange = (request) =>
+  request.startDate === request.endDate
+    ? formatRequestDate(request.startDate)
+    : `${formatRequestDate(request.startDate)} — ${formatRequestDate(request.endDate)}`;
 
 export default function TripRequestDetails({ request, admin = false }) {
   return (
-    <div className="request-detail-body">
-      <div className="request-date-board">
+    <div className={tripRequestsStyles["request-detail-body"]}>
+      <div className={tripRequestsStyles["request-date-board"]}>
         <span>Thời gian mong muốn</span>
         <strong>{formatRequestRange(request)}</strong>
       </div>
 
-      <section className="request-route" aria-labelledby={`request-${request.id}-places`}>
-        <h3 id={`request-${request.id}-places`}>{request.places.length} điểm muốn đi</h3>
-        <ol>{request.places.map((place, index) => (
-          <li key={`${place}-${index}`}><span aria-hidden="true" /><b>{place}</b></li>
-        ))}</ol>
+      <section
+        className={tripRequestsStyles["request-route"]}
+        aria-labelledby={`request-${request.id}-places`}
+      >
+        <h3 id={`request-${request.id}-places`}>
+          {request.places.length} điểm muốn đi
+        </h3>
+        <ol>
+          {request.places.map((place, index) => (
+            <li key={`${place}-${index}`}>
+              <span aria-hidden="true" />
+              <b>{place}</b>
+            </li>
+          ))}
+        </ol>
       </section>
 
       {request.notes && (
-        <section className="request-notes">
+        <section className={tripRequestsStyles["request-notes"]}>
           <h3>Ghi chú cho người lên lịch</h3>
           <p>{request.notes}</p>
         </section>
       )}
 
-      <section className="request-sources" aria-labelledby={`request-${request.id}-sources`}>
+      <section
+        className={tripRequestsStyles["request-sources"]}
+        aria-labelledby={`request-${request.id}-sources`}
+      >
         <h3 id={`request-${request.id}-sources`}>Nguồn tham khảo</h3>
-        {request.sources.length ? <ol>{request.sources.map((source, index) => (
-          <li key={`${source.url}-${index}`}>
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <a href={source.url} target="_blank" rel="noreferrer">
-              <b>{source.label || new URL(source.url).hostname}</b>
-              <small>{new URL(source.url).hostname}</small>
-              <ActionIcon name="external" />
-            </a>
-          </li>
-        ))}</ol> : <p>Chưa có liên kết tham khảo.</p>}
+        {request.sources.length ? (
+          <ol>
+            {request.sources.map((source, index) => (
+              <li key={`${source.url}-${index}`}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <a href={source.url} target="_blank" rel="noreferrer">
+                  <b>{source.label || new URL(source.url).hostname}</b>
+                  <small>{new URL(source.url).hostname}</small>
+                  <ActionIcon name="external" />
+                </a>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>Chưa có liên kết tham khảo.</p>
+        )}
       </section>
 
       {request.state === "declined" && (
-        <div className="request-decision" role="note">
+        <div className={tripRequestsStyles["request-decision"]} role="note">
           <strong>Yêu cầu chưa thể thực hiện</strong>
           <p>{request.decisionReason || "Admin chưa ghi thêm lý do."}</p>
         </div>
       )}
 
       {request.trip && (
-        <div className="request-fulfillment">
-          <div><span>Lịch trình đã sẵn sàng</span><strong>{request.trip.title}</strong></div>
-          <Link href={`/?trip=${encodeURIComponent(request.trip.slug)}`}>Xem lịch trình <ActionIcon name="right" /></Link>
+        <div className={tripRequestsStyles["request-fulfillment"]}>
+          <div>
+            <span>Lịch trình đã sẵn sàng</span>
+            <strong>{request.trip.title}</strong>
+          </div>
+          <Link href={`/?trip=${encodeURIComponent(request.trip.slug)}`}>
+            Xem lịch trình <ActionIcon name="right" />
+          </Link>
         </div>
       )}
 
       {admin && (
-        <dl className="request-audit">
-          <div><dt>Người yêu cầu</dt><dd>{request.requester.name}<small>{request.requester.email}</small></dd></div>
-          <div><dt>Mã yêu cầu</dt><dd>#{request.id}</dd></div>
-          <div><dt>Trạng thái</dt><dd>{requestStateLabels[request.state]}</dd></div>
+        <dl className={tripRequestsStyles["request-audit"]}>
+          <div>
+            <dt>Người yêu cầu</dt>
+            <dd>
+              {request.requester.name}
+              <small>{request.requester.email}</small>
+            </dd>
+          </div>
+          <div>
+            <dt>Mã yêu cầu</dt>
+            <dd>#{request.id}</dd>
+          </div>
+          <div>
+            <dt>Trạng thái</dt>
+            <dd>{requestStateLabels[request.state]}</dd>
+          </div>
         </dl>
       )}
     </div>

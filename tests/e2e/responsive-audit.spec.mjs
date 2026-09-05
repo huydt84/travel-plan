@@ -64,6 +64,9 @@ for (const viewport of viewports) {
         await gotoHealthy(page, surface.path);
         await surface.setup?.(page);
         await expect(surface.ready(page)).toBeVisible();
+        if (surface.name === "public tracker" && viewport.touch) {
+          await expect(page.locator(".desktop-manage-link")).toBeHidden();
+        }
         await page.waitForTimeout(250);
         await page.screenshot({ path: testInfo.outputPath(`${surface.name.replaceAll(" ", "-")}.png`), fullPage: true });
 

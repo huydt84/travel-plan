@@ -1,0 +1,18 @@
+/* Feature classes override these defaults without depending on import order. */
+:where(.footer) {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 26px 2px 8px;
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 680px) {
+  :where(.footer) {
+    flex-direction: column;
+  }
+}

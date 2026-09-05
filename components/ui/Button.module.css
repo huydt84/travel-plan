@@ -1,0 +1,46 @@
+.button {
+  padding: 10px 14px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.primary {
+  border: 1px solid var(--green-dark);
+  color: white;
+  background: var(--green-dark);
+}
+.primary:hover {
+  border-color: var(--navy);
+  background: var(--navy);
+}
+.primary:global(.small) {
+  padding: 8px 10px;
+  font-size: 9px;
+}
+.primary:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.ghost {
+  border: 1px solid var(--navy);
+  color: var(--navy);
+  background: transparent;
+}
+.ghost:hover {
+  color: white;
+  background: var(--navy);
+}
+.danger {
+  border: 1px solid var(--red);
+  color: var(--red);
+  background: var(--red-soft);
+}
+.danger:hover {
+  color: white;
+  background: var(--red);
+}
+.ghost:disabled,
+.danger:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
