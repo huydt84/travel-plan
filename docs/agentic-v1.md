@@ -7,10 +7,10 @@
 The pilot is off by default. Local admin mode uses the deterministic model adapter, so it does not call external providers:
 
 ```sh
-npm run db:up:local
-npm run db:migrate:local
-npm run db:seed:local
-AGENTIC_V1_ENABLED=true APP_URL=http://127.0.0.1:3000 npm run dev:admin
+pnpm run db:up:local
+pnpm run db:migrate:local
+pnpm run db:seed:local
+AGENTIC_V1_ENABLED=true APP_URL=http://127.0.0.1:3000 pnpm run dev:admin
 ```
 
 Open `http://127.0.0.1:3000/v1`.
@@ -25,7 +25,7 @@ Configure server-side values without exposing them to the browser:
 - `GOOGLE_MAPS_PLATFORM_API_KEY` is a separate, API-restricted key for Places API (New) and Routes API.
 - `AUTH_SECRET` signs proposal confirmation tokens.
 
-Run `npm run db:migrate` intentionally before enabling the production pilot. Deployment alone does not migrate the database.
+Run `pnpm run db:migrate` intentionally before enabling the production pilot. Deployment alone does not migrate the database.
 
 ## Module boundary
 
@@ -54,10 +54,10 @@ Persist normalized evidence only: provider identifiers, source/Maps URLs, titles
 Run:
 
 ```sh
-npm run lint
-npm run test:unit
-npm run test:e2e
-npm run build
+pnpm run lint
+pnpm run test:unit
+pnpm run test:e2e
+pnpm run build
 ```
 
 The focused browser suite covers staged diffs, explicit confirmation, atomic receipt, reload resume, and same-origin rejection. The responsive audit includes `/v1` and every existing public/admin surface at 320×760, 1440×900, and 1920×1080.

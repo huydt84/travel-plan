@@ -10,7 +10,7 @@ const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const fileArg = args.find((arg) => !arg.startsWith("--"));
 if (!fileArg) {
-  console.error("Usage: npm run trip:import -- <trip.json> [--apply]");
+  console.error("Usage: pnpm run trip:import <trip.json> [--apply]");
   process.exit(1);
 }
 const localAdmin = resolveLocalAdminMode();
@@ -101,7 +101,7 @@ for (const item of updated) console.log(`  ~ ${item.startDate} ${item.start} ${i
 for (const item of removed) console.log(`  - ${item.startDate} ${item.start} ${item.title}`);
 
 if (!apply) {
-  console.log(`No database changes made. Apply with: npm run trip:import -- ${fileArg} --apply`);
+  console.log(`No database changes made. Apply with: pnpm run trip:import ${fileArg} --apply`);
   await sql.end();
   process.exit(0);
 }

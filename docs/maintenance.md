@@ -70,8 +70,8 @@ idempotent DDL and the historical data backfills. They do not insert seed trips
 or overwrite trip metadata. `migrations/support.mjs` is frozen historical code;
 it must not import evolving application validation or repositories.
 
-- Use `npm run db:migrate:local` for the isolated Docker database.
-- Use `npm run db:migrate` intentionally for the configured production database.
+- Use `pnpm run db:migrate:local` for the isolated Docker database.
+- Use `pnpm run db:migrate` intentionally for the configured production database.
 - Add a new `<timestamp>_<description>.mjs` file for future changes. Never edit an
   applied migration or manually remove its ledger entry.
 - Export `async function up(pgm)` and use the migration builder or `pgm.db.query`
@@ -82,13 +82,13 @@ it must not import evolving application validation or repositories.
   private query values. Never log connection strings or raw driver errors.
 - `AUTH_OWNER_EMAIL` is needed when legacy invitation/outbox rows lack an owner.
   Local mode supplies its local owner. A missing required owner aborts adoption.
-- `npm run db:seed[:local]` is separate and optional. It inserts the seed trip in
+- `pnpm run db:seed[:local]` is separate and optional. It inserts the seed trip in
   one transaction, or leaves an existing slug completely unchanged, including
   an intentionally empty schedule. Later schedule changes use the importer.
 
 ## Verification
 
-Run `npm test` and `npm run build` from the repository, with Docker running and
+Run `pnpm test` and `pnpm run build` from the repository, with Docker running and
 local migrations applied. Unit tests check validation, authorization, transport,
 Google consent and invitation workflow behavior. The Neon adapter test uses the
 real installed client with a mocked HTTP transport to verify template and batch

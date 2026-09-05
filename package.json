@@ -7,7 +7,7 @@
     "dev:admin": "LOCAL_ADMIN_BYPASS=true next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start",
-    "test": "npm run lint && npm run test:unit && npm run test:e2e",
+    "test": "pnpm run lint && pnpm run test:unit && pnpm run test:e2e",
     "lint": "eslint . --max-warnings=0",
     "test:unit": "node --test scripts/*.test.mjs",
     "test:e2e": "NO_COLOR= FORCE_COLOR= playwright test",
@@ -38,5 +38,10 @@
     "@playwright/test": "^1.62.1",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.0"
+  },
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22.13.0",
+    "pnpm": "11.19.0"
   }
 }

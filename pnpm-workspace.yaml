@@ -1,0 +1,19 @@
+# Wait one day before accepting newly published versions.
+minimumReleaseAge: 1440
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
+# Accepted existing locked releases; keep these exceptions version-specific.
+trustPolicyExclude:
+  - next-auth@5.0.0-beta.32
+  - eslint-import-resolver-typescript@3.10.1
+  - semver@6.3.1
+strictDepBuilds: true
+# Explicit installation keeps running a script from fetching new dependencies.
+verifyDepsBeforeRun: error
+# These packages ship usable artifacts; their install hooks are unnecessary.
+# New packages with install scripts fail until reviewed here.
+allowBuilds:
+  '@google/genai': false
+  fsevents: false
+  protobufjs: false
+  unrs-resolver: false

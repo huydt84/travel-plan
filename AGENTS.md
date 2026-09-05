@@ -12,7 +12,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - When the user asks Codex to add or replace a trip schedule, convert their natural-language text, table, or image into the format in `examples/trip-import.example.json`.
 - Keep a schedule item's optional `key` stable across later edits. If omitted, the importer derives it from the title.
-- Run `npm run trip:import -- <file>` first and review the preview. Run the same command with `--apply` only when the user has asked to make the schedule change.
+- Run `pnpm run trip:import <file>` first and review the preview. Run the same command with `--apply` only when the user has asked to make the schedule change.
 - The importer reads `.env`, validates all fields and citation references, and commits the whole import in one Neon transaction. Do not read or print secret values.
 - Schedule data changes in Neon appear on the live site without a Vercel redeploy.
 
@@ -24,12 +24,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Access a remote database only through a repository script that reads its required environment variables internally. Never expand, interpolate, echo, or place a secret value directly in a shell command.
 - If a command truly requires a literal secret value, ask the user to enter the value and run that command themselves. Never ask the user to paste the secret into chat.
 
+## Package management
+
+- Use pnpm 11.19.0 for all project commands; use `pnpm exec` for installed tools and `pnpm dlx` for one-off tools. Do not use raw npm or npx.
+- Install with `pnpm install --frozen-lockfile`. Keep the pinned package manager, `pnpm-lock.yaml`, and `pnpm-workspace.yaml` security settings in sync. Review dependency scripts before granting narrowly scoped build permissions; never disable protections just to make installation succeed.
+
 ## Local development
 
 - Run project commands directly from the repository. Do not introduce sandbox-specific cache paths, socket allowlists, temporary project copies, or escalation steps.
-- Codex may start `npm run dev` in a persistent session, inspect the exact process listening on port 3000, stop a confirmed travel-plan process, and restart it after changes.
+- Codex may start `pnpm run dev` in a persistent session, inspect the exact process listening on port 3000, stop a confirmed travel-plan process, and restart it after changes.
 - Test the local app at `http://127.0.0.1:3000`. Keep the development server running while using the in-app Browser, and rely on Fast Refresh or reload the page after changes.
-- Manage the isolated Rancher database with `npm run db:up:local`, `npm run db:migrate:local`, and `npm run db:down:local`.
+- Manage the isolated Rancher database with `pnpm run db:up:local`, `pnpm run db:migrate:local`, and `pnpm run db:down:local`.
 
 ## Engineering decision quality
 
@@ -52,17 +57,17 @@ Use this runbook for a production deploy from Codex desktop.
 1. Run the normal checks in the repository:
 
    ```sh
-   rtk npm test
-   rtk npm run build
+   rtk pnpm test
+   rtk pnpm run build
    ```
 
 2. Deploy the linked project directly with the Vercel CLI:
 
    ```sh
-   rtk npx vercel --prod --yes
+   rtk pnpm dlx vercel --prod --yes
    ```
 
-   Do not inspect or print environment values. If authentication has expired, ask the user to complete `npx vercel login` once, then retry the deploy.
+   Do not inspect or print environment values. If authentication has expired, ask the user to complete `pnpm dlx vercel login` once, then retry the deploy.
 
 3. Smoke-check the production alias and expected admin hierarchy:
 
@@ -75,4 +80,4 @@ Use this runbook for a production deploy from Codex desktop.
 
    `/` should be `200`, `/admin` should be `404`, and the trips/users routes should be `200`.
 
-Database migrations are separate from deployment. Run `npm run db:migrate` only for an intentional schema change; schedule data changes in Neon do not require a Vercel redeploy.
+Database migrations are separate from deployment. Run `pnpm run db:migrate` only for an intentional schema change; schedule data changes in Neon do not require a Vercel redeploy.
