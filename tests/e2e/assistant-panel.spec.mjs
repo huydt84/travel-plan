@@ -29,6 +29,8 @@ for (const width of [1440, 1920]) {
     const panel = page.getByRole("complementary", { name: "Trợ lý cho chuyến đi hiện tại" });
     const divider = page.getByRole("separator", { name: "Độ rộng trợ lý" });
     await expect(divider).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" })).toBeEnabled();
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {}))));
     const initial = (await panel.boundingBox()).width;
     const edge = await divider.boundingBox();
     await page.mouse.move(edge.x + edge.width / 2, 300);
@@ -39,6 +41,10 @@ for (const width of [1440, 1920]) {
     await expect.poll(async () => (await panel.boundingBox()).width).toBe(initial + 120);
     const tracker = page.locator(".trip-bar");
     expect((await tracker.boundingBox()).x + (await tracker.boundingBox()).width).toBeLessThanOrEqual(width - initial - 120 + 1);
+    await page.getByRole("link", { name: "Mở rộng", exact: true }).click();
+    await page.getByRole("link", { name: "Thu nhỏ", exact: true }).click();
+    await expect.poll(async () => (await panel.boundingBox()).width).toBe(initial + 120);
+    await page.evaluate(() => Promise.all(document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {}))));
     const resizedEdge = await divider.boundingBox();
     await page.mouse.move(resizedEdge.x + resizedEdge.width / 2, 300);
     await page.mouse.down();

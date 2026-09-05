@@ -25,6 +25,7 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
       await route.fulfill({ response, json: workspace });
     });
     const capture = async (name) => {
+      await page.evaluate(() => Promise.all(document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {}))));
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
       await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: false });
     };
@@ -41,6 +42,7 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
     await page.getByRole("button", { name: /Chuẩn bị chuyến đi Odaiba/ }).click();
     await expect(page.getByRole("heading", { name: "Thời gian di chuyển" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Thời gian di chuyển" }).locator("..")).toHaveCSS("font-size", "16px");
+    if (await page.getByRole("button", { name: "Lịch sử", exact: true }).getAttribute("aria-expanded") === "true") await page.getByRole("button", { name: "Lịch sử", exact: true }).click();
     await capture("response");
     await page.getByRole("button", { name: "Nguồn · 1" }).click();
     await expect(page.getByRole("dialog", { name: "Nguồn tham khảo" })).toBeVisible();
@@ -52,7 +54,7 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
     await capture("proposal");
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Lịch sử", exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Lịch sử trò chuyện" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Lịch sử trò chuyện" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Chuẩn bị chuyến đi Odaiba/ })).toBeVisible();
     await capture("history");
     await page.keyboard.press("Escape");

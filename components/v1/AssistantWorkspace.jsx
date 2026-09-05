@@ -1,22 +1,34 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, ViewTransition } from "react";
 import { useRouter } from "next/navigation";
 import Dialog, { DialogTitle } from "../ui/Dialog";
+import { useAssistantNavigation } from "./AssistantProvider";
 import { useConversation } from "./useConversation";
 import { apiJson } from "./transport.mjs";
 import MessageContent from "./MessageContent";
 import Composer from "./Composer";
 import AssistantIcon from "./AssistantIcon";
-import ConversationHistory from "./ConversationHistory";
+import HistorySidebar from "./HistorySidebar";
 import { EvidencePanel, ChangePanel } from "./ProposalReview";
 import styles from "./assistant.module.css";
 
 export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug, companion = false, onClose, onTripChange }) {
   const chat = useConversation({ initialWorkspace, viewer, tripSlug, onTripChange });
   const router = useRouter();
+  const assistantNavigation = useAssistantNavigation();
   const { setTurns } = chat;
   const [panel, setPanel] = useState(null), [selectedId, setSelectedId] = useState(null), [applying, setApplying] = useState(false);
+  const [frame, setFrame] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyWide, setHistoryWide] = useState(false);
+  const historyTrigger = useRef(null);
+  useEffect(() => {
+    if (!frame) return;
+    const observer = new ResizeObserver(([entry]) => setHistoryWide(entry.contentRect.width >= 900));
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, [frame]);
   const [newResponse, setNewResponse] = useState(false);
   const listRef = useRef(null), nearEnd = useRef(true), olderAnchor = useRef(null), focusCitation = useRef(null), citationFocus = useRef(null);
   const retryFocus = useRef(null);
@@ -62,15 +74,28 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
       if (["PLAN_CONFLICT", "PROPOSAL_EXPIRED"].includes(failure.code)) chat.setTurns((items) => items.map((turn) => turn.id === selected.id ? { ...turn, changeSet: { ...turn.changeSet, status: failure.code === "PLAN_CONFLICT" ? "conflicted" : "expired", confirmationToken: null } } : turn));
     } finally { setApplying(false); }
   };
-  return <section className={`${styles.shell} ${companion ? styles.companion : ""}`} aria-label="Trợ lý hành trình">
+  const companionHref = `/?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}&chat=1${chat.workspace?.selectedConversation ? `&conversation=${chat.workspace.selectedConversation.id}` : ""}`;
+  const historyProps = {
+    open: historyOpen, container: frame, triggerRef: historyTrigger,
+    onClose: () => setHistoryOpen(false), onNew: chat.newConversation, onSelect: chat.selectConversation,
+    conversations: chat.workspace?.conversations || [], selectedId: chat.workspace?.selectedConversation?.id,
+    onMore: () => chat.history(true), hasMore: !!chat.workspace?.historyCursor,
+    loading: chat.historyLoading, error: chat.historyError, onRetry: () => chat.history(),
+  };
+  const content = <section ref={setFrame} data-history-open={historyOpen && historyWide || undefined} className={`${styles.shell} ${companion ? styles.companion : ""}`} aria-label="Trợ lý hành trình">
+    <div className={styles.historySlot}>
+      {historyWide && <HistorySidebar {...historyProps} wide />}
+    </div>
+    <div className={styles.workspaceMain} onKeyDown={(event) => { if (historyOpen && event.key === "Escape") { event.stopPropagation(); setHistoryOpen(false); historyTrigger.current?.focus(); } }}>
     <header className={styles.topbar}>
       <div className={styles.headingGroup}>
-        {!companion && <Link href={`/?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}`} className={styles.iconButton} aria-label="Lịch trình" title="Lịch trình"><AssistantIcon name="back" /></Link>}
+        <button ref={historyTrigger} className={styles.iconButton} type="button" onClick={() => { setHistoryOpen(!historyOpen); if (!historyOpen) void chat.history(); }} aria-label="Lịch sử" title="Lịch sử" aria-expanded={historyOpen} aria-controls="assistant-history"><AssistantIcon name="history" /></button>
         <h1>Trợ lý hành trình</h1>
       </div>
       <div className={styles.headerActions}>
-        {!companion && <Link className={styles.iconButton} href={`/?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}&chat=1${chat.workspace?.selectedConversation ? `&conversation=${chat.workspace.selectedConversation.id}` : ""}`} aria-label="Thu nhỏ" title="Thu nhỏ về lịch trình"><AssistantIcon name="collapse" /></Link>}
-        {companion && <Link className={styles.iconButton} href={`/assistant?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}${chat.workspace?.selectedConversation ? `&conversation=${chat.workspace.selectedConversation.id}` : ""}`} aria-label="Mở rộng" title="Mở rộng"><AssistantIcon name="expand" /></Link>}
+        {!companion && <Link href={`/?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}`} className={styles.iconButton} aria-label="Lịch trình" title="Lịch trình"><AssistantIcon name="back" /></Link>}
+        {!companion && <Link className={styles.iconButton} href={companionHref} onNavigate={() => assistantNavigation?.prepareCompanion(companionHref)} transitionTypes={["assistant-ui"]} aria-label="Thu nhỏ" title="Thu nhỏ về lịch trình"><AssistantIcon name="collapse" /></Link>}
+        {companion && <Link className={styles.iconButton} href={`/assistant?trip=${encodeURIComponent(chat.workspace?.selectedTripSlug || tripSlug || "")}${chat.workspace?.selectedConversation ? `&conversation=${chat.workspace.selectedConversation.id}` : ""}`} transitionTypes={["assistant-ui"]} aria-label="Mở rộng" title="Mở rộng"><AssistantIcon name="expand" /></Link>}
         {onClose && <button className={styles.iconButton} type="button" onClick={onClose} aria-label="Đóng" title="Đóng"><AssistantIcon name="close" /></button>}
       </div>
       <div className={styles.toolbar}>
@@ -79,7 +104,6 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
         </select></label>
       </div>
       <div className={styles.conversationActions}>
-        <button className={styles.iconButton} type="button" disabled={chat.loading} onClick={() => { setPanel("history"); void chat.history(); }} aria-label="Lịch sử" title="Lịch sử"><AssistantIcon name="history" /></button>
         <button className={styles.iconButton} type="button" disabled={chat.loading || chat.submitting} onClick={chat.newConversation} aria-label="Trò chuyện mới" title="Trò chuyện mới"><AssistantIcon name="new" /></button>
       </div>
     </header>
@@ -120,9 +144,11 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     {newResponse && <button className={styles.newResponse} onClick={() => { nearEnd.current = true; listRef.current.scrollTop = listRef.current.scrollHeight; setNewResponse(false); }}>Có câu trả lời mới</button>}
     <Composer message={chat.message} setMessage={chat.setMessage} onSubmit={chat.submit} onStop={chat.stop} running={running} disabled={chat.submitting || chat.loading || !chat.workspace?.selectedTripSlug} />
     </div>
-    {panel && <Dialog onClose={() => setPanel(null)} pending={applying} overlayClassName={styles.overlay} initialFocusRef={citationFocus}><section className={styles.inspection}><header><DialogTitle>{panel === "history" ? "Lịch sử trò chuyện" : panel === "evidence" ? "Nguồn tham khảo" : "Xem lại thay đổi"}</DialogTitle><button className={styles.iconButton} disabled={applying} onClick={() => setPanel(null)} aria-label="Đóng" title="Đóng"><AssistantIcon name="close" /></button></header>
-      {panel === "history" ? <ConversationHistory conversations={chat.workspace?.conversations || []} selectedId={chat.workspace?.selectedConversation?.id} allTrips={chat.allTrips} onFilter={(all) => chat.history(false, all)} onMore={() => chat.history(true)} hasMore={!!chat.workspace?.historyCursor} onNew={() => { setPanel(null); chat.newConversation(); }} onSelect={(conversation) => { setPanel(null); chat.selectConversation(conversation); }} />
-        : panel === "evidence" ? <EvidencePanel focusId={focusCitation.current} focusRef={citationFocus} citations={selected?.citations || []} /> : <ChangePanel changeSet={changeSet} busy={applying} onConfirm={confirm} onRegenerate={() => { setPanel(null); chat.setMessage(`Tạo lại đề xuất từ lịch mới nhất: ${selected.input}`); }} />}
+    </div>
+    {!historyWide && <HistorySidebar {...historyProps} wide={false} />}
+    {panel && <Dialog onClose={() => setPanel(null)} pending={applying} overlayClassName={styles.overlay} initialFocusRef={citationFocus}><section className={styles.inspection}><header><DialogTitle>{panel === "evidence" ? "Nguồn tham khảo" : "Xem lại thay đổi"}</DialogTitle><button className={styles.iconButton} disabled={applying} onClick={() => setPanel(null)} aria-label="Đóng" title="Đóng"><AssistantIcon name="close" /></button></header>
+      {panel === "evidence" ? <EvidencePanel focusId={focusCitation.current} focusRef={citationFocus} citations={selected?.citations || []} /> : <ChangePanel changeSet={changeSet} busy={applying} onConfirm={confirm} onRegenerate={() => { setPanel(null); chat.setMessage(`Tạo lại đề xuất từ lịch mới nhất: ${selected.input}`); }} />}
     </section></Dialog>}
   </section>;
+  return companion ? content : <ViewTransition name="trip-assistant" default="none" share="assistant-morph" enter="assistant-enter" exit="assistant-exit">{content}</ViewTransition>;
 }

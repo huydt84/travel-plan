@@ -1,12 +1,12 @@
 import styles from "./assistant.module.css";
-export default function ConversationHistory({ conversations, selectedId, allTrips, onFilter, onSelect, onNew, onMore, hasMore }) {
+export default function ConversationHistory({ conversations, selectedId, onSelect, onMore, hasMore, loading, error, onRetry }) {
   return <div className={styles.history}>
-    <div className={styles.historyActions}><button className={styles.primaryButton} onClick={onNew}>Cuộc trò chuyện mới</button>
-      <label><input type="checkbox" checked={allTrips} onChange={(event) => onFilter(event.target.checked)} /> Tất cả chuyến đi</label></div>
+    {error && <div role="alert"><p>{error}</p><button className={styles.secondaryButton} onClick={onRetry}>Thử lại</button></div>}
+    {loading && <p role="status">Đang tải hội thoại…</p>}
     <nav aria-label="Lịch sử trò chuyện">{conversations.map((conversation) => <button key={conversation.id} type="button" aria-current={conversation.id === selectedId ? "page" : undefined} onClick={() => onSelect(conversation)}>
       <strong>{conversation.title}</strong><span>{conversation.tripTitle}</span><small>{conversation.status === "running" ? "Đang trả lời" : new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(new Date(conversation.updatedAt))}</small>
     </button>)}</nav>
-    {!conversations.length && <p>Chưa có cuộc trò chuyện. Bắt đầu bằng một câu hỏi về chuyến đi.</p>}
-    {hasMore && <button className={styles.secondaryButton} onClick={onMore}>Xem thêm cuộc trò chuyện</button>}
+    {!loading && !error && !conversations.length && <p>Chưa có cuộc trò chuyện. Bắt đầu bằng một câu hỏi về chuyến đi.</p>}
+    {hasMore && <button className={styles.secondaryButton} disabled={loading} onClick={onMore}>Xem thêm cuộc trò chuyện</button>}
   </div>;
 }

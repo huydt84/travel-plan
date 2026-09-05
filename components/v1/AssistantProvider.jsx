@@ -1,5 +1,5 @@
 "use client";
-import { createContext, Suspense, useContext, useEffect, useState } from "react";
+import { createContext, Suspense, useContext, useEffect, useState, useRef, startTransition, addTransitionType, ViewTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Dialog, { DialogTitle } from "../ui/Dialog";
@@ -8,12 +8,20 @@ import { apiJson } from "./transport.mjs";
 import styles from "./companion.module.css";
 const Workspace = dynamic(() => import("./AssistantWorkspace"), { loading: () => <p role="status">Đang mở trợ lý…</p> });
 const AssistantContext = createContext(null);
+export const useAssistantNavigation = () => useContext(AssistantContext);
 // Isolate URL suspension from the existing page. The tracker must never be
 // duplicated or hidden while Next resolves the assistant's query parameters.
 function AssistantLocation({ onChange }) {
   const pathname = usePathname(), params = useSearchParams();
   const query = params.toString();
-  useEffect(() => { onChange({ pathname, query }); }, [pathname, query, onChange]);
+  const previousMode = useRef(null);
+  useEffect(() => {
+    const mode = `${pathname}:${new URLSearchParams(query).get("chat") === "1"}`;
+    if (previousMode.current !== mode) {
+      startTransition(() => { addTransitionType("assistant-ui"); onChange({ pathname, query }); });
+    } else onChange({ pathname, query });
+    previousMode.current = mode;
+  }, [pathname, query, onChange]);
   return null;
 }
 export function AssistantLauncher({ tripSlug }) {
@@ -26,11 +34,19 @@ export function AssistantLauncher({ tripSlug }) {
 }
 export default function AssistantProvider({ viewer, children }) {
   const router = useRouter();
-  const [{ pathname, query }, setLocation] = useState({ pathname: "", query: "" });
+  const pathname = usePathname();
+  const [{ query }, setLocation] = useState({ pathname: "", query: "" });
   const params = new URLSearchParams(query);
   const enabled = !!viewer?.isAdmin;
   const visible = enabled && params.get("chat") === "1" && pathname !== "/assistant";
   const [count, setCount] = useState(0);
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    if (!closing) return;
+    const timer = setTimeout(() => setClosing(false), 180);
+    return () => clearTimeout(timer);
+  }, [closing]);
+  const present = visible || (closing && pathname !== "/assistant");
   const { width, mobile, dragging, separatorProps } = useCompanionWidth();
   const panelStyle = { "--assistant-panel-width": `${width}px` };
   useEffect(() => {
@@ -59,20 +75,25 @@ export default function AssistantProvider({ viewer, children }) {
     return () => { active = false; controller.abort(); clearInterval(timer); window.removeEventListener("assistant-completed", refresh); };
   }, [enabled, viewer?.email, visible, pathname]);
   const open = (trip) => {
+    setClosing(false);
     const query = new URLSearchParams(); if (trip || params.get("trip")) query.set("trip", trip || params.get("trip")); query.set("chat", "1");
-    router.push(`/?${query}`, { scroll: false });
+    router.push(`/?${query}`, { scroll: false, transitionTypes: ["assistant-ui"] });
   };
   const close = () => {
     const url = new URL(window.location.href); url.searchParams.delete("chat"); url.searchParams.delete("conversation");
     window.history.replaceState({}, "", url);
+    setClosing(true);
+    setLocation({ pathname, query: url.searchParams.toString() });
     // Next native history integration updates useSearchParams without remounting the tracker.
   };
   const switchTrip = (trip) => router.push(`/?trip=${encodeURIComponent(trip)}&chat=1`, { scroll: false });
-  const workspace = visible ? <Workspace viewer={viewer} tripSlug={params.get("trip")} companion onClose={close} onTripChange={switchTrip} /> : null;
-  return <AssistantContext.Provider value={{ enabled, count, open }}>
+  const workspace = present ? <Workspace viewer={viewer} tripSlug={params.get("trip")} companion onClose={close} onTripChange={switchTrip} /> : null;
+  // Prime the companion query before the route commits so both modes share one snapshot.
+  const prepareCompanion = (href) => setLocation({ pathname: "/", query: new URL(href, window.location.origin).searchParams.toString() });
+  return <AssistantContext.Provider value={{ enabled, count, open, prepareCompanion }}>
     <Suspense fallback={null}><AssistantLocation onChange={setLocation} /></Suspense>
-    <div className={visible && !mobile ? styles.withCompanion : undefined} style={panelStyle} data-resizing={dragging || undefined}>{children}</div>
-    {visible && (mobile ? <Dialog onClose={close} overlayClassName={styles.mobileOverlay}><div className={styles.mobilePanel}><DialogTitle asChild><span className="sr-only">Trợ lý hành trình</span></DialogTitle>{workspace}</div></Dialog>
-      : <aside id="trip-companion-panel" className={styles.panel} style={panelStyle} data-resizing={dragging || undefined} aria-label="Trợ lý cho chuyến đi hiện tại"><div className={styles.resizeHandle} {...separatorProps} />{workspace}</aside>)}
+    <ViewTransition name="assistant-itinerary" default="none" update={{ "assistant-ui": "assistant-layout" }}><div className={`${styles.pageLayout} ${visible && !mobile ? styles.withCompanion : ""}`} style={panelStyle} data-resizing={dragging || undefined} data-closing={closing && !visible || undefined}>{children}</div></ViewTransition>
+    {present && <ViewTransition name="trip-assistant" default="none" share="assistant-morph" enter="assistant-enter" exit="assistant-exit">{mobile ? <Dialog portal={false} onClose={close} overlayClassName={styles.mobileOverlay}><div className={styles.mobilePanel} data-closing={closing && !visible || undefined} onAnimationEnd={(event) => { if (event.target === event.currentTarget && !visible) setClosing(false); }}><DialogTitle asChild><span className="sr-only">Trợ lý hành trình</span></DialogTitle>{workspace}</div></Dialog>
+      : <aside id="trip-companion-panel" className={styles.panel} style={panelStyle} data-resizing={dragging || undefined} aria-label="Trợ lý cho chuyến đi hiện tại" data-closing={closing && !visible || undefined} onAnimationEnd={(event) => { if (event.target === event.currentTarget && !visible) setClosing(false); }}><div className={styles.resizeHandle} {...separatorProps} />{workspace}</aside>}</ViewTransition>}
   </AssistantContext.Provider>;
 }

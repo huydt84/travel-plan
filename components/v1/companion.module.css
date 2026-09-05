@@ -3,8 +3,8 @@
 .launcher span { padding: 3px 5px; background: var(--green-dark); color: var(--paper-bright); border-radius: 3px; }
 .panel { position: fixed; inset: 0 0 0 auto; width: var(--assistant-panel-width, 480px); z-index: 30; border-left: 1px solid var(--navy); background: var(--paper); }
 .withCompanion { margin-right: var(--assistant-panel-width, 480px); container-type: inline-size; }
-.mobileOverlay { position: fixed; inset: 0; z-index: 50; background: var(--paper); }
-.mobilePanel { width: 100%; height: 100dvh; }
+.mobileOverlay { position: fixed; inset: 0; z-index: 50; }
+.mobilePanel { width: 100%; height: 100dvh; background: var(--paper); }
 
 @media (max-width: 1199px) { .withCompanion { margin-right: 0; } }
 
@@ -65,4 +65,15 @@
   .withCompanion :global(.station-stage)::before, .withCompanion :global(.station-stage)::after { display: none; }
   .withCompanion :global(.route-overview) { border-top: 1px solid var(--navy); }
   .withCompanion :global(.route-stops) { height: auto; max-height: 400px; }
+}
+
+.pageLayout { margin-right: 0; }
+.pageLayout.withCompanion { margin-right: var(--assistant-panel-width, 480px); }
+
+.panel[data-closing], .mobilePanel[data-closing] { animation: panel-close 160ms ease-in both; pointer-events: none; }
+.pageLayout[data-closing] { transition: margin-right 160ms ease-in; }
+@keyframes panel-close { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .panel[data-closing], .mobilePanel[data-closing] { animation-duration: 1ms; }
+  .pageLayout[data-closing] { transition: none; }
 }

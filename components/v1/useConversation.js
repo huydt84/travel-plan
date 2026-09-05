@@ -14,7 +14,8 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
   const sending = useRef(false);
   const [progress, setProgress] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [allTrips, setAllTrips] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
   const generation = useRef(0), loadController = useRef(null), streamController = useRef(null);
   const historyGeneration = useRef(0);
   useEffect(() => {
@@ -33,6 +34,8 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
   const setMessage = (value) => { setMessageState(value); persist(`draft:${workspace?.selectedTripSlug}`, value); };
   const syncUrl = useCallback((trip, conversation, replace = false) => {
     const url = new URL(window.location.href);
+    // A load finishing during the closing animation must not reopen the companion.
+    if (url.pathname !== "/assistant" && url.searchParams.get("chat") !== "1") return;
     url.searchParams.set("trip", trip);
     if (conversation) url.searchParams.set("conversation", conversation); else url.searchParams.delete("conversation");
     if (url.pathname !== "/assistant") url.searchParams.set("chat", "1");
@@ -64,7 +67,7 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
     const controller = new AbortController(); loadController.current = controller;
     setLoading(true); setError(""); setProgress(""); setDisconnected(null); setSubmissionFailure(null);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ allTrips: "1" });
       if (trip) params.set("trip", trip);
       if (conversation && conversation !== "new") params.set("conversation", conversation);
       let pending;
@@ -77,7 +80,7 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
         if (!pending?.retryOfTurnId && read(`draft:${trip}`) === pending?.message) persist(`draft:${trip}`, "");
       } else if (pending) setSubmissionFailure({ body: pending, trip, message: "Chưa xác nhận được yêu cầu. Hãy thử lại." });
       if (conversation === "new") { next.selectedConversation = null; next.turns = []; next.nextCursor = null; }
-      setWorkspace(next); setTurns(next.turns); setAllTrips(false);
+      setWorkspace(next); setTurns(next.turns);
       setMessageState(read(`draft:${next.selectedTripSlug}`));
       if (navigation) syncUrl(next.selectedTripSlug, next.selectedConversation?.id, replace);
       const running = next.turns.find((turn) => turn.status === "running");
@@ -184,17 +187,19 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
       window.dispatchEvent(new Event("assistant-completed"));
     } catch (failure) { if (generation.current === token) setError(failure.message); }
   };
-  const history = async (more = false, all = allTrips) => {
+  const history = async (more = false) => {
     const token = generation.current;
     const request = ++historyGeneration.current;
-    const params = new URLSearchParams({ trip: workspace.selectedTripSlug, allTrips: all ? "1" : "0" });
+    const params = new URLSearchParams({ trip: workspace.selectedTripSlug, allTrips: "1" });
+    setHistoryLoading(true); setHistoryError("");
     if (more && workspace.historyCursor) params.set("historyBefore", workspace.historyCursor);
     try {
       const next = await apiJson(`/api/v1/assistant/workspace?${params}`);
       if (token !== generation.current || request !== historyGeneration.current) return;
-      setAllTrips(all); setWorkspace((current) => ({ ...current, historyCursor: next.historyCursor,
+      setWorkspace((current) => ({ ...current, historyCursor: next.historyCursor,
         conversations: more ? [...current.conversations, ...next.conversations.filter((item) => !current.conversations.some((old) => old.id === item.id))] : next.conversations }));
-    } catch (failure) { if (token === generation.current) setError(failure.message); }
+    } catch (failure) { if (token === generation.current && request === historyGeneration.current) setHistoryError(failure.message); }
+    finally { if (request === historyGeneration.current) setHistoryLoading(false); }
   };
   const older = async () => {
     const token = generation.current;
@@ -204,7 +209,7 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
       setTurns((current) => [...next.turns.filter((item) => !current.some((old) => old.id === item.id)), ...current]);
     } catch (failure) { if (token === generation.current) setError(failure.message); }
   };
-  return { workspace, turns, setTurns, message, setMessage, loading, error, setError, progress, submitting, allTrips,
+  return { workspace, turns, setTurns, message, setMessage, loading, error, setError, progress, submitting, historyLoading, historyError,
     load, selectTrip, selectConversation, newConversation, submit, send, stop, history, older,
     retry, retrying, submissionFailure, retrySubmission, disconnected, reconnect };
 }

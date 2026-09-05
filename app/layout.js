@@ -2,6 +2,7 @@ import AssistantProvider from "../components/v1/AssistantProvider";
 import { getViewer } from "../lib/auth";
 import { resolveAgenticV1Config } from "../lib/v1/config.mjs";
 import "../src/styles.css";
+import "../components/v1/assistant-motion.css";
 import { Barlow_Condensed, Noto_Sans } from "next/font/google";
 import ActivityHeartbeat from "../components/ActivityHeartbeat";
 

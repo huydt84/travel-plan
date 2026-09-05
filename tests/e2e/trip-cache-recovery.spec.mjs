@@ -36,7 +36,7 @@ test(`home recovers a deleted cached trip at ${viewport.width}`, async ({ page, 
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
     await page.screenshot({ path: testInfo.outputPath("recovered-companion.png") });
     await page.getByRole("button", { name: "Lịch sử", exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Lịch sử trò chuyện" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Lịch sử trò chuyện" })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("recovered-history.png") });
   } finally {
     await sql`DELETE FROM trips WHERE slug=${slug}`;

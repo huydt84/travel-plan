@@ -15,51 +15,48 @@ export default function Dialog({
   overlayClassName,
   initialFocusRef,
   restoreFocusRef,
+  portal = true,
   children,
   ...contentProps
 }) {
   const returnFocusRef = useRef(null);
 
+  const content = (
+    <Primitive.Overlay className={overlayClassName}>
+      <Primitive.Content
+        asChild
+        aria-describedby={undefined}
+        {...contentProps}
+        onOpenAutoFocus={(event) => {
+          returnFocusRef.current = document.activeElement;
+          if (initialFocusRef?.current) {
+            event.preventDefault();
+            initialFocusRef.current.focus();
+          }
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          if (
+            restoreFocusRef?.current !== false &&
+            returnFocusRef.current?.isConnected
+          ) {
+            returnFocusRef.current.focus();
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          if (pending) event.preventDefault();
+        }}
+        onPointerDownOutside={(event) => {
+          if (pending) event.preventDefault();
+        }}
+      >
+        {children}
+      </Primitive.Content>
+    </Primitive.Overlay>
+  );
   return (
-    <Primitive.Root
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen && !pending) onClose();
-      }}
-    >
-      <Primitive.Portal>
-        <Primitive.Overlay className={overlayClassName}>
-          <Primitive.Content
-            asChild
-            aria-describedby={undefined}
-            {...contentProps}
-            onOpenAutoFocus={(event) => {
-              returnFocusRef.current = document.activeElement;
-              if (initialFocusRef?.current) {
-                event.preventDefault();
-                initialFocusRef.current.focus();
-              }
-            }}
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              if (
-                restoreFocusRef?.current !== false &&
-                returnFocusRef.current?.isConnected
-              ) {
-                returnFocusRef.current.focus();
-              }
-            }}
-            onEscapeKeyDown={(event) => {
-              if (pending) event.preventDefault();
-            }}
-            onPointerDownOutside={(event) => {
-              if (pending) event.preventDefault();
-            }}
-          >
-            {children}
-          </Primitive.Content>
-        </Primitive.Overlay>
-      </Primitive.Portal>
+    <Primitive.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !pending) onClose(); }}>
+      {portal ? <Primitive.Portal>{content}</Primitive.Portal> : content}
     </Primitive.Root>
   );
 }

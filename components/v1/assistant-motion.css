@@ -1,0 +1,28 @@
+/* Only the assistant participates; unrelated page navigation stays immediate. */
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-group(root) { animation: none; }
+::view-transition-group(.assistant-morph) { animation-duration: 280ms; animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+::view-transition-old(.assistant-morph) { animation: none; opacity: 0; }
+::view-transition-new(.assistant-morph) { animation: none; }
+::view-transition-new(.assistant-enter) { animation: assistant-panel-in 220ms cubic-bezier(.16, 1, .3, 1) both; }
+::view-transition-old(.assistant-exit) { animation: assistant-panel-out 160ms ease-in both; }
+@keyframes assistant-panel-in { from { transform: translateX(100%); opacity: .7; } to { transform: translateX(0); opacity: 1; } }
+@keyframes assistant-panel-out { to { transform: translateX(100%); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(.assistant-morph), ::view-transition-new(.assistant-enter), ::view-transition-old(.assistant-exit) { animation-duration: 1ms; }
+}
+
+::view-transition-group(.assistant-layout) { animation-duration: 220ms; animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+::view-transition-old(.assistant-layout) { animation: none; opacity: 0; }
+::view-transition-new(.assistant-layout) { animation: none; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(.assistant-layout) { animation-duration: 1ms; } }
+
+:root:active-view-transition-type(assistant-ui)::view-transition { pointer-events: none; }
+::view-transition-group(.assistant-enter) { animation-duration: 220ms; }
+::view-transition-group(.assistant-exit) { animation-duration: 160ms; }
+@media (prefers-reduced-motion: reduce) {
+  :root:active-view-transition-type(assistant-ui)::view-transition-group(*),
+  :root:active-view-transition-type(assistant-ui)::view-transition-old(*),
+  :root:active-view-transition-type(assistant-ui)::view-transition-new(*) { animation-duration: 1ms; animation-delay: 0ms; }
+}

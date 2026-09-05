@@ -127,7 +127,7 @@ test("conversation and turn pagination reach old history without losing scroll p
   try {
     await f.sql`INSERT INTO assistant_conversations(id,owner_email,trip_id,title,created_at,updated_at)
       SELECT gen_random_uuid(),${ownerEmail},${f.trips[0].id},'History ' || i,
-        NOW()-i*INTERVAL '1 minute',NOW()-i*INTERVAL '1 minute' FROM generate_series(1,35) i`;
+        NOW()+INTERVAL '1 day'-i*INTERVAL '1 minute',NOW()+INTERVAL '1 day'-i*INTERVAL '1 minute' FROM generate_series(1,35) i`;
     const [conversation] = await f.sql`SELECT id FROM assistant_conversations WHERE trip_id=${f.trips[0].id} AND title='History 35'`;
     await f.sql`INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,output_text,status,created_at,completed_at)
       SELECT gen_random_uuid(),${conversation.id},gen_random_uuid(),
@@ -187,13 +187,15 @@ test("Back and Forward cancel obsolete trip loads and preserve each draft", asyn
     const selector = page.getByRole("combobox", { name: "Chuyến đi", exact: true });
     await expect(input).toBeEnabled(); await input.fill("Tokyo draft");
     await selector.selectOption(f.trips[1].slug);
+    await expect(selector).toHaveValue(f.trips[1].slug);
     await expect(input).toHaveValue(""); await input.fill("Kyoto draft");
+    await expect.poll(() => page.evaluate((slug) => sessionStorage.getItem(`assistant:local-admin@localhost.invalid:draft:${slug}`), f.trips[1].slug)).toBe("Kyoto draft");
     await selector.selectOption(f.trips[0].slug);
     await expect(input).toHaveValue("Tokyo draft");
     let started;
     const held = new Promise((resolve) => { release = resolve; });
     const intercepted = new Promise((resolve) => { started = resolve; });
-    await page.route(`**/api/v1/assistant/workspace?trip=${f.trips[1].slug}*`, async (route) => {
+    await page.route((url) => url.pathname === "/api/v1/assistant/workspace" && url.searchParams.get("trip") === f.trips[1].slug, async (route) => {
       const response = await route.fetch(); started(); await held;
       await route.fulfill({ response }).catch(() => {});
     });

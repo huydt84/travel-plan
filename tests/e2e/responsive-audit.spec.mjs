@@ -8,7 +8,7 @@ const viewports = [
 
 const surfaces = [
   { name: "trip companion", path: "/?chat=1", ready: (page) => page.getByRole("heading", { level: 1, name: "Trợ lý hành trình" }) },
-  { name: "assistant history", path: "/assistant", setup: async (page) => page.getByRole("button", { name: "Lịch sử", exact: true }).click(), ready: (page) => page.getByRole("dialog", { name: "Lịch sử trò chuyện" }) },
+  { name: "assistant history", path: "/assistant", setup: async (page) => page.getByRole("button", { name: "Lịch sử", exact: true }).click(), ready: (page) => page.getByRole("navigation", { name: "Lịch sử trò chuyện" }) },
   {
     name: "public tracker",
     path: "/",
@@ -90,6 +90,7 @@ for (const viewport of viewports) {
 
         const audit = await page.evaluate(({ touch }) => {
           const visible = (element) => {
+            if (element.closest("[inert], [aria-hidden=\"true\"], .sr-only")) return false;
             const rect = element.getBoundingClientRect();
             const style = getComputedStyle(element);
             const rendered = typeof element.checkVisibility !== "function" || element.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
