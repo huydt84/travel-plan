@@ -1,3 +1,5 @@
+"use client";
+import { useLocale } from "../LocaleProvider";
 import contributionsStyles from "../../src/styles/contributions.module.css";
 
 import Button from "../ui/Button";
@@ -11,6 +13,7 @@ import Dialog, { DialogTitle } from "../ui/Dialog";
 const NOTIFICATION_NAVIGATION_EVENT = "travel-plan:notification-navigation";
 
 export function useContributions({ tripSlug, viewer, announce }) {
+  const { t } = useLocale();
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionTarget, setSuggestionTarget] = useState(null);
   const [suggestionError, setSuggestionError] = useState("");
@@ -50,7 +53,7 @@ export function useContributions({ tripSlug, viewer, announce }) {
           body,
         }),
       },
-      "Không gửi được góp ý",
+      t("trackerExtra.sendError"),
     );
     setSuggestions((current) => [result, ...current]);
     setSuggestionTarget(null);
@@ -74,7 +77,7 @@ export function useContributions({ tripSlug, viewer, announce }) {
       announce(message);
       return true;
     } catch (error) {
-      setSuggestionAction({ id: suggestion.id, error: error.message });
+      setSuggestionAction({ id: suggestion.id, error: error.message || fallback });
       return false;
     }
   };
@@ -84,18 +87,18 @@ export function useContributions({ tripSlug, viewer, announce }) {
       suggestion,
       { status: suggestion.status === "resolved" ? "open" : "resolved" },
       suggestion.status === "resolved"
-        ? "Đã mở lại bình luận."
-        : "Đã đánh dấu bình luận là đã xử lý.",
-      "Không cập nhật được góp ý",
+        ? t("trackerExtra.reopened")
+        : t("trackerExtra.resolvedNotice"),
+      t("trackerExtra.updateError"),
     );
   const updateContributionVisibility = (suggestion) =>
     updateContribution(
       suggestion,
       { hidden: !suggestion.hidden },
       suggestion.hidden
-        ? "Đã hiện lại nội dung trên lịch."
-        : "Đã ẩn nội dung khỏi lịch công khai.",
-      "Không đổi được hiển thị góp ý",
+        ? t("trackerExtra.shownNotice")
+        : t("trackerExtra.hiddenNotice"),
+      t("trackerExtra.visibilityError"),
     );
 
   const requestDeleteContribution = (suggestion) => {
@@ -112,17 +115,17 @@ export function useContributions({ tripSlug, viewer, announce }) {
       await requestJson(
         `/api/trips/${encodeURIComponent(tripSlug)}/suggestions/${suggestion.id}`,
         { method: "DELETE" },
-        "Không xoá được góp ý",
+        t("trackerExtra.deleteError"),
       );
       setSuggestions((current) =>
         current.filter((item) => item.id !== suggestion.id),
       );
       setSuggestionAction({ id: null, error: "" });
       setDeletionCandidate(null);
-      announce("Đã xoá vĩnh viễn nội dung.");
+      announce(t("trackerExtra.deletedNotice"));
     } catch (error) {
       setSuggestionAction({ id: null, error: "" });
-      setDeletionError(`${error.message}. Hãy thử lại.`);
+      setDeletionError(t("trackerExtra.retry", { error: error.message || t("trackerExtra.deleteError") }));
     }
   };
 
@@ -148,18 +151,18 @@ export function useContributions({ tripSlug, viewer, announce }) {
               try {
                 await submitSuggestion(values);
               } catch (error) {
-                setSuggestionError(error.message);
+                setSuggestionError(error.message || t("trackerExtra.sendError"));
               }
             }}
           />
         )}
         {deletionCandidate && (
           <ConfirmDialog
-            title="Xoá vĩnh viễn nội dung này?"
-            description={`Nội dung của ${deletionCandidate.author.name} sẽ biến mất và không thể khôi phục.`}
+            title={t("trackerExtra.deleteTitle")}
+            description={t("trackerExtra.deleteDescription", { name: deletionCandidate.author.name })}
             preview={deletionCandidate.body}
-            confirmLabel="Xoá vĩnh viễn"
-            pendingLabel="Đang xoá…"
+            confirmLabel={t("trackerExtra.delete")}
+            pendingLabel={t("trackerExtra.deleting")}
             pending={suggestionAction.id === deletionCandidate.id}
             error={deletionError}
             onCancel={() => {
@@ -182,6 +185,7 @@ export function SuggestionList({
   onToggleVisibility,
   anchorItems = true,
 }) {
+  const { t } = useLocale();
   const hiddenSuggestions = suggestions.filter(
     (suggestion) => suggestion.hidden,
   );
@@ -255,8 +259,8 @@ export function SuggestionList({
             onClick={() => setShowHidden((current) => !current)}
             ref={hiddenToggleRef}
           >
-            <span>{hiddenSuggestions.length} nội dung đã ẩn</span>
-            <span>{showHidden ? "Thu gọn" : "Xem"}</span>
+            <span>{t("trackerExtra.hiddenCount", { count: hiddenSuggestions.length })}</span>
+            <span>{showHidden ? t("trackerExtra.collapse") : t("trackerExtra.view")}</span>
           </button>
           {showHidden && (
             <div className={contributionsStyles["hidden-suggestion-list"]}>
@@ -287,12 +291,13 @@ function SuggestionNote({
   onToggleVisibility,
   anchorItems,
 }) {
+  const { t } = useLocale();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const menuButtonRef = useRef(null);
   const busy = action.id === suggestion.id;
   const contributionLabel =
-    suggestion.kind === "comment" ? "bình luận" : "đề xuất";
+    suggestion.kind === "comment" ? t("trackerExtra.commentLower") : t("trackerExtra.suggestionLower");
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -321,19 +326,19 @@ function SuggestionNote({
       <div className={contributionsStyles["suggestion-note-head"]}>
         <div className={contributionsStyles["suggestion-note-meta"]}>
           <strong>{suggestion.author.name}</strong>
-          <span>{suggestion.kind === "comment" ? "Bình luận" : "Đề xuất"}</span>
+          <span>{suggestion.kind === "comment" ? t("trackerExtra.comment") : t("trackerExtra.suggestion")}</span>
           {suggestion.status !== "open" && (
             <span
               className={`${contributionsStyles["suggestion-status"]} ${suggestion.status}`}
             >
-              {statusLabel(suggestion.status)}
+              {statusLabel(suggestion.status, t)}
             </span>
           )}
           {suggestion.hidden && (
             <span
               className={`${contributionsStyles["suggestion-status"]} hidden`}
             >
-              Đã ẩn
+              {t("trackerExtra.hidden")}
             </span>
           )}
         </div>
@@ -345,7 +350,7 @@ function SuggestionNote({
         <div
           className={contributionsStyles["suggestion-note-actions"]}
           role="group"
-          aria-label={`Thao tác với ${contributionLabel} của ${suggestion.author.name}`}
+          aria-label={t("trackerExtra.actions", { kind: contributionLabel, name: suggestion.author.name })}
         >
           {suggestion.canManage && (
             <button
@@ -355,7 +360,7 @@ function SuggestionNote({
               disabled={busy}
             >
               <ActionIcon name="check" />
-              {suggestion.status === "resolved" ? "Mở lại" : "Đã xử lý"}
+              {suggestion.status === "resolved" ? t("trackerExtra.reopen") : t("trackerExtra.resolved")}
             </button>
           )}
           {suggestion.canChangeVisibility && (
@@ -366,7 +371,7 @@ function SuggestionNote({
               disabled={busy}
             >
               <ActionIcon name={suggestion.hidden ? "eye" : "eye-off"} />
-              {suggestion.hidden ? "Hiện lại" : "Ẩn"}
+              {suggestion.hidden ? t("trackerExtra.show") : t("trackerExtra.hide")}
             </button>
           )}
           {suggestion.canDelete && (
@@ -377,10 +382,10 @@ function SuggestionNote({
               <button
                 type="button"
                 className={contributionsStyles["suggestion-more-trigger"]}
-                aria-label={`Thêm thao tác với ${contributionLabel} của ${suggestion.author.name}`}
+                aria-label={t("trackerExtra.moreActionsFor", { kind: contributionLabel, name: suggestion.author.name })}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                title="Thêm thao tác"
+                title={t("trackerExtra.moreActions")}
                 onClick={() => setMenuOpen((current) => !current)}
                 disabled={busy}
                 ref={menuButtonRef}
@@ -398,7 +403,7 @@ function SuggestionNote({
                     role="menuitem"
                     onClick={() => onDelete(suggestion)}
                   >
-                    Xoá vĩnh viễn
+                    {t("trackerExtra.delete")}
                   </button>
                 </div>
               )}
@@ -411,7 +416,7 @@ function SuggestionNote({
           className={contributionsStyles["suggestion-action-state"]}
           role="status"
         >
-          Đang cập nhật…
+          {t("trackerExtra.updating")}
         </p>
       )}
       {action.id === suggestion.id && action.error && (
@@ -419,7 +424,7 @@ function SuggestionNote({
           className={contributionsStyles["suggestion-action-error"]}
           role="alert"
         >
-          {action.error}. Hãy thử lại.
+          {t("trackerExtra.retry", { error: action.error })}
         </p>
       )}
     </article>
@@ -427,6 +432,7 @@ function SuggestionNote({
 }
 
 function SuggestionComposer({ target, error, onClose, onSubmit }) {
+  const { t } = useLocale();
   const [kind, setKind] = useState("suggestion");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
@@ -452,24 +458,24 @@ function SuggestionComposer({ target, error, onClose, onSubmit }) {
       >
         <div className={contributionsStyles["suggestion-composer-head"]}>
           <DialogTitle asChild>
-            <h2>Góp ý: {target}</h2>
+            <h2>{t("trackerExtra.composerTitle", { target })}</h2>
           </DialogTitle>
-          <button type="button" onClick={onClose} aria-label="Đóng">
+          <button type="button" onClick={onClose} aria-label={t("trackerExtra.close")}>
             <ActionIcon name="close" />
           </button>
         </div>
         <label>
-          Loại
+          {t("trackerExtra.kind")}
           <select
             value={kind}
             onChange={(event) => setKind(event.target.value)}
           >
-            <option value="suggestion">Đề xuất thay đổi</option>
-            <option value="comment">Bình luận / ghi chú</option>
+            <option value="suggestion">{t("trackerExtra.suggestChange")}</option>
+            <option value="comment">{t("trackerExtra.commentNote")}</option>
           </select>
         </label>
         <label>
-          Nội dung
+          {t("trackerExtra.body")}
           <textarea
             value={body}
             onChange={(event) => setBody(event.target.value)}
@@ -487,10 +493,10 @@ function SuggestionComposer({ target, error, onClose, onSubmit }) {
         )}
         <div className={contributionsStyles["suggestion-composer-actions"]}>
           <Button type="button" variant="ghost" onClick={onClose}>
-            Huỷ
+            {t("trackerExtra.cancel")}
           </Button>
           <Button variant="primary" disabled={busy}>
-            {busy ? "Đang gửi…" : "Gửi góp ý"}
+            {busy ? t("trackerExtra.sending") : t("trackerExtra.send")}
           </Button>
         </div>
       </form>
@@ -498,7 +504,7 @@ function SuggestionComposer({ target, error, onClose, onSubmit }) {
   );
 }
 
-const statusLabel = (status) =>
-  ({ accepted: "Đã nhận", resolved: "Đã xử lý", rejected: "Từ chối" })[
+const statusLabel = (status, t) =>
+  ({ accepted: t("trackerExtra.accepted"), resolved: t("trackerExtra.resolved"), rejected: t("trackerExtra.rejected") })[
     status
-  ] || "Mới";
+  ] || t("trackerExtra.new");

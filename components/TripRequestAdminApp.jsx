@@ -13,13 +13,13 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import AdminNav from "./AdminNav";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useLocale } from "./LocaleProvider";
+import { adminErrorMessage } from "../lib/i18n-admin.mjs";
 import TripRequestDetails, {
   formatRequestRange,
-  requestStateLabels,
+  formatRequestDate,
 } from "./TripRequestDetails";
-
-const api = (path, options) =>
-  requestJson(path, options, "Không thể cập nhật yêu cầu");
 
 export default function TripRequestAdminApp({
   viewer,
@@ -27,7 +27,16 @@ export default function TripRequestAdminApp({
   trips,
   pendingInvitationCount = 0,
 }) {
+  const api = (path, options) =>
+    requestJson(path, options, t("adminExtra.message134"));
   const router = useRouter();
+  const { t, intlLocale, locale } = useLocale();
+  const requestStateLabels = {
+    open: t("adminExtra.message140"),
+    fulfilled: t("adminExtra.message141"),
+    declined: t("adminExtra.message142"),
+    withdrawn: t("adminExtra.message143"),
+  };
   const [requests, setRequests] = useState(initialRequests);
   const [selectedId, setSelectedId] = useState(
     initialRequests.find((request) => request.state === "open")?.id ||
@@ -84,14 +93,18 @@ export default function TripRequestAdminApp({
       setNotice(success);
       return result;
     } catch (actionError) {
-      setError(`${actionError.message}. Hãy thử lại.`);
+      setError(
+        t("adminExtra.message025", {
+          value0: adminErrorMessage(actionError, t, locale),
+        }),
+      );
       return null;
     } finally {
       setBusy(false);
     }
   };
   const selectRequest = (request) => {
-    if (creatingTrip && !window.confirm("Bỏ bản nháp trip chưa lưu?")) return;
+    if (creatingTrip && !window.confirm(t("adminExtra.message135"))) return;
     setSelectedId(request.id);
     setCreatingTrip(false);
     setTripDraft(null);
@@ -118,7 +131,7 @@ export default function TripRequestAdminApp({
           method: "POST",
           body: JSON.stringify(tripDraft),
         }),
-      "Đã tạo và gắn lịch trình với yêu cầu.",
+      t("adminExtra.message136"),
     );
     if (created?.slug)
       router.push(`/admin/trips?trip=${encodeURIComponent(created.slug)}`);
@@ -131,20 +144,21 @@ export default function TripRequestAdminApp({
       <header className={adminShellStyles["admin-header"]}>
         <div>
           <Link href="/" className={adminShellStyles["admin-back"]}>
-            Về lịch
+            {t("common.backToSchedule")}
           </Link>
-          <h1>Yêu cầu chuyến đi</h1>
+          <h1>{t("requests.title")}</h1>
           <small className={adminShellStyles["admin-user"]}>
             {viewer.email}
           </small>
         </div>
+        <LanguageSwitcher />
         {viewer.authMode !== "local-dev" && (
           <Button
             variant="ghost"
             type="button"
             onClick={() => signOut({ redirectTo: "/" })}
           >
-            Đăng xuất
+            {t("common.logout")}
           </Button>
         )}
       </header>
@@ -167,29 +181,29 @@ export default function TripRequestAdminApp({
       <section className={tripRequestsStyles["request-admin-board"]}>
         <div className={tripRequestsStyles["request-admin-controls"]}>
           <label>
-            Tìm người hoặc địa điểm
+            {t("adminExtra.message137")}{" "}
             <input
               type="search"
               value={query}
-              placeholder="Tên, email, địa điểm…"
+              placeholder={t("adminExtra.message138")}
               onChange={(event) => setQuery(event.target.value)}
             />
           </label>
           <label>
-            Trạng thái
+            {t("adminExtra.message139")}{" "}
             <select
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
             >
-              <option value="open">Đang chờ</option>
-              <option value="fulfilled">Đã có lịch</option>
-              <option value="declined">Không thực hiện</option>
-              <option value="withdrawn">Đã rút</option>
-              <option value="all">Tất cả</option>
+              <option value="open">{t("adminExtra.message140")}</option>
+              <option value="fulfilled">{t("adminExtra.message141")}</option>
+              <option value="declined">{t("adminExtra.message142")}</option>
+              <option value="withdrawn">{t("adminExtra.message143")}</option>
+              <option value="all">{t("adminExtra.message144")}</option>
             </select>
           </label>
           <p>
-            <strong>{openCount}</strong> yêu cầu đang chờ · hiện{" "}
+            <strong>{openCount}</strong> {t("adminExtra.message145")}{" "}
             {visible.length}/{requests.length}
           </p>
         </div>
@@ -197,7 +211,7 @@ export default function TripRequestAdminApp({
         <div className={tripRequestsStyles["request-admin-workspace"]}>
           <aside
             className={tripRequestsStyles["request-admin-queue"]}
-            aria-label="Danh sách yêu cầu"
+            aria-label={t("adminExtra.message146")}
           >
             {visible.map((request) => (
               <button
@@ -212,14 +226,15 @@ export default function TripRequestAdminApp({
                 />
                 <b>{request.places.join(" · ")}</b>
                 <small>
-                  {request.requester.name} · {formatRequestRange(request)}
+                  {request.requester.name} ·{" "}
+                  {formatRequestRange(request, intlLocale)}
                 </small>
                 <em>{requestStateLabels[request.state]}</em>
               </button>
             ))}
             {!visible.length && (
               <p className={tripRequestsStyles["request-admin-empty"]}>
-                Không có yêu cầu khớp bộ lọc này.
+                {t("adminExtra.message147")}
               </p>
             )}
           </aside>
@@ -248,7 +263,7 @@ export default function TripRequestAdminApp({
                           disabled={busy}
                           onClick={startTrip}
                         >
-                          Tạo lịch mới
+                          {t("adminExtra.message148")}
                         </Button>
                         <Button
                           variant="danger"
@@ -259,7 +274,7 @@ export default function TripRequestAdminApp({
                             setCreatingTrip(false);
                           }}
                         >
-                          Không thực hiện
+                          {t("adminExtra.message142")}
                         </Button>
                       </>
                     )}
@@ -275,11 +290,11 @@ export default function TripRequestAdminApp({
                                 method: "PATCH",
                                 body: JSON.stringify({ action: "restore" }),
                               }),
-                            "Đã đưa yêu cầu trở lại hàng chờ.",
+                            t("adminExtra.message149"),
                           )
                         }
                       >
-                        Khôi phục
+                        {t("adminExtra.message150")}
                       </Button>
                     )}
                     {selected.state === "fulfilled" && (
@@ -288,18 +303,18 @@ export default function TripRequestAdminApp({
                         type="button"
                         disabled={busy}
                         onClick={() => {
-                          if (window.confirm("Gỡ lịch trình khỏi yêu cầu này?"))
+                          if (window.confirm(t("adminExtra.message151")))
                             run(
                               () =>
                                 api(
                                   `/api/admin/trip-requests/${selected.id}/fulfillment`,
                                   { method: "DELETE" },
                                 ),
-                              "Đã gỡ lịch; yêu cầu trở lại hàng chờ.",
+                              t("adminExtra.message152"),
                             );
                         }}
                       >
-                        Gỡ lịch
+                        {t("adminExtra.message153")}
                       </Button>
                     )}
                   </div>
@@ -319,12 +334,12 @@ export default function TripRequestAdminApp({
                               body: JSON.stringify({ tripSlug: attachSlug }),
                             },
                           ),
-                        "Đã gắn lịch có sẵn và gửi thông báo trong ứng dụng.",
+                        t("adminExtra.message154"),
                       );
                     }}
                   >
                     <label>
-                      Gắn lịch có sẵn
+                      {t("adminExtra.message155")}{" "}
                       <select
                         value={attachSlug}
                         onChange={(event) => setAttachSlug(event.target.value)}
@@ -332,13 +347,16 @@ export default function TripRequestAdminApp({
                       >
                         {trips.map((trip) => (
                           <option value={trip.slug} key={trip.slug}>
-                            {trip.title} · {trip.startDate}
+                            {trip.title} ·{" "}
+                            {formatRequestDate(trip.startDate, intlLocale)}
                           </option>
                         ))}
                       </select>
                     </label>
                     <Button variant="ghost" disabled={busy || !trips.length}>
-                      {busy ? "Đang gắn…" : "Gắn lịch"}
+                      {busy
+                        ? t("adminExtra.message156")
+                        : t("adminExtra.message157")}
                     </Button>
                   </form>
                 )}
@@ -357,19 +375,19 @@ export default function TripRequestAdminApp({
                               reason: declineReason,
                             }),
                           }),
-                        "Đã cập nhật trạng thái yêu cầu.",
+                        t("adminExtra.message158"),
                       ).then((result) => {
                         if (result) setDeclineReason(null);
                       });
                     }}
                   >
                     <label>
-                      Lý do không thực hiện
+                      {t("adminExtra.message159")}{" "}
                       <textarea
                         rows={3}
                         maxLength={300}
                         value={declineReason}
-                        placeholder="Không bắt buộc"
+                        placeholder={t("adminExtra.message160")}
                         onChange={(event) =>
                           setDeclineReason(event.target.value)
                         }
@@ -382,10 +400,12 @@ export default function TripRequestAdminApp({
                         type="button"
                         onClick={() => setDeclineReason(null)}
                       >
-                        Huỷ
+                        {t("adminExtra.message161")}
                       </Button>
                       <Button variant="danger" disabled={busy}>
-                        {busy ? "Đang cập nhật…" : "Xác nhận không thực hiện"}
+                        {busy
+                          ? t("adminExtra.message133")
+                          : t("adminExtra.message162")}
                       </Button>
                     </div>
                   </form>
@@ -398,11 +418,8 @@ export default function TripRequestAdminApp({
                   >
                     <div className={adminShellStyles["admin-section-head"]}>
                       <div>
-                        <h3>Tạo trip từ yêu cầu</h3>
-                        <p>
-                          Ngày và địa điểm đã được điền từ yêu cầu; tên, slug và
-                          timezone vẫn do admin quyết định.
-                        </p>
+                        <h3>{t("adminExtra.message163")}</h3>
+                        <p> {t("adminExtra.message164")} </p>
                       </div>
                       <Button
                         variant="ghost"
@@ -412,12 +429,12 @@ export default function TripRequestAdminApp({
                           setTripDraft(null);
                         }}
                       >
-                        Đóng
+                        {t("adminExtra.message165")}
                       </Button>
                     </div>
                     <div className={scheduleEditorStyles["form-grid"]}>
                       <label>
-                        Slug
+                        {t("adminExtra.message166")}{" "}
                         <input
                           required
                           pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
@@ -432,7 +449,7 @@ export default function TripRequestAdminApp({
                         />
                       </label>
                       <label>
-                        Tên trip
+                        {t("adminExtra.message167")}{" "}
                         <input
                           required
                           maxLength={160}
@@ -446,7 +463,7 @@ export default function TripRequestAdminApp({
                         />
                       </label>
                       <label>
-                        Ngày bắt đầu
+                        {t("adminExtra.message168")}{" "}
                         <input
                           required
                           type="date"
@@ -460,7 +477,7 @@ export default function TripRequestAdminApp({
                         />
                       </label>
                       <label>
-                        Ngày kết thúc
+                        {t("adminExtra.message169")}{" "}
                         <input
                           required
                           type="date"
@@ -475,7 +492,7 @@ export default function TripRequestAdminApp({
                         />
                       </label>
                       <label>
-                        Timezone
+                        {t("adminExtra.message170")}{" "}
                         <input
                           required
                           value={tripDraft.timezone}
@@ -488,7 +505,7 @@ export default function TripRequestAdminApp({
                         />
                       </label>
                       <label className="wide">
-                        Địa điểm
+                        {t("adminExtra.message171")}{" "}
                         <input
                           required
                           maxLength={160}
@@ -511,10 +528,12 @@ export default function TripRequestAdminApp({
                           setTripDraft(null);
                         }}
                       >
-                        Huỷ
+                        {t("adminExtra.message161")}
                       </Button>
                       <Button variant="primary" disabled={busy}>
-                        {busy ? "Đang tạo…" : "Tạo và gắn lịch"}
+                        {busy
+                          ? t("adminExtra.message090")
+                          : t("adminExtra.message172")}
                       </Button>
                     </Footer>
                   </form>
@@ -524,8 +543,8 @@ export default function TripRequestAdminApp({
               </article>
             ) : (
               <div className={tripRequestsStyles["request-stage-empty"]}>
-                <h2>Chưa có yêu cầu</h2>
-                <p>Yêu cầu mới sẽ xuất hiện tại hàng chờ này.</p>
+                <h2>{t("adminExtra.message173")}</h2>
+                <p>{t("adminExtra.message174")}</p>
               </div>
             )}
           </div>

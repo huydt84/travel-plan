@@ -15,6 +15,10 @@ import { useScheduleDraft } from "./admin/useScheduleDraft";
 import { TripForm, ScheduleForm, SourceForm } from "./admin/EditorForms";
 import AdminNav from "./AdminNav";
 import ConfirmDialog from "./ConfirmDialog";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useLocale } from "./LocaleProvider";
+import { adminErrorMessage } from "../lib/i18n-admin.mjs";
+import { translateActivityType } from "../lib/i18n.mjs";
 import {
   activityInstants,
   calendarDayDifference,
@@ -86,26 +90,25 @@ export default function AdminApp({
 }
 
 function Login() {
+  const { t } = useLocale();
   return (
     <main
       className={`${adminShellStyles["admin-shell"]} ${scheduleEditorStyles["admin-login-shell"]}`}
     >
       <section className={scheduleEditorStyles["admin-login-card"]}>
+        <LanguageSwitcher />
         <Link href="/" className={adminShellStyles["admin-back"]}>
-          Về lịch
+          {t("common.backToSchedule")}
         </Link>
-        <h1>Quản lý chuyến đi</h1>
-        <p>
-          Đăng nhập bằng Google để xem lịch và gửi góp ý. Chỉ chủ lịch mới có
-          quyền chỉnh sửa.
-        </p>
+        <h1>{t("admin.loginTitle")}</h1>
+        <p>{t("admin.loginDescription")}</p>
         <button
           className={scheduleEditorStyles["google-login"]}
           type="button"
           onClick={() => signIn("google", { redirectTo: ADMIN_ROUTES.trips })}
         >
           <GoogleIcon />
-          Tiếp tục với Google
+          {t("common.loginGoogle")}
         </button>
       </section>
     </main>
@@ -113,25 +116,25 @@ function Login() {
 }
 
 function ContributorOnly({ user }) {
+  const { t } = useLocale();
   return (
     <main
       className={`${adminShellStyles["admin-shell"]} ${scheduleEditorStyles["admin-login-shell"]}`}
     >
       <section className={scheduleEditorStyles["admin-login-card"]}>
+        <LanguageSwitcher />
         <Link href="/" className={adminShellStyles["admin-back"]}>
-          Về lịch
+          {t("common.backToSchedule")}
         </Link>
-        <h1>Gửi góp ý trên lịch</h1>
+        <h1>{t("admin.contributorTitle")}</h1>
         <p>
-          <strong>{user.email}</strong> đã đăng nhập. Bạn có thể comment hoặc
-          tạo suggestion ở từng mục lịch, nhưng không thể sửa trực tiếp trip
-          plan.
+          <strong>{user.email}</strong> {t("adminExtra.message001")}
         </p>
         <Link
           className={`${scheduleEditorStyles["google-login"]} ${scheduleEditorStyles["contributor-link"]}`}
           href="/"
         >
-          Mở lịch để góp ý
+          {t("admin.openScheduleFeedback")}
         </Link>
         <Button
           variant="ghost"
@@ -139,7 +142,7 @@ function ContributorOnly({ user }) {
           type="button"
           onClick={() => signOut({ redirectTo: "/" })}
         >
-          Đăng xuất
+          {t("adminExtra.message002")}
         </Button>
       </section>
     </main>
@@ -155,6 +158,7 @@ function Dashboard({
   pendingInvitationCount,
   pendingTripRequestCount,
 }) {
+  const { t, intlLocale, locale } = useLocale();
   const [trips, setTrips] = useState(initialTrips);
   const [selectedSlug, setSelectedSlug] = useState(initialSelectedSlug);
   const [plan, setPlan] = useState(initialPlan);
@@ -222,10 +226,12 @@ function Dashboard({
         setNotice("");
         setScheduleError("");
         refreshPlan(slug).catch((requestError) =>
-          setError(requestError.message),
+          setError(adminErrorMessage(requestError, t, locale)),
         );
       },
-      `Bạn có thay đổi chưa lưu trong “${scheduleEditor?.values.title || "hoạt động hiện tại"}”.`,
+      t("adminExtra.message003", {
+        value0: scheduleEditor?.values.title || t("adminExtra.message004"),
+      }),
     );
   };
 
@@ -236,7 +242,7 @@ function Dashboard({
     try {
       await action();
     } catch (requestError) {
-      setError(requestError.message);
+      setError(adminErrorMessage(requestError, t, locale));
     } finally {
       setBusy(false);
     }
@@ -259,7 +265,7 @@ function Dashboard({
     });
 
   const removeTrip = (slug) => {
-    if (!window.confirm(`Xoá trip “${slug}” và toàn bộ schedule?`)) return;
+    if (!window.confirm(t("adminExtra.message005", { value0: slug }))) return;
     run(async () => {
       await api(`/api/trips/${encodeURIComponent(slug)}`, { method: "DELETE" });
       setPlan(null);
@@ -288,20 +294,22 @@ function Dashboard({
         body: JSON.stringify(payload),
       });
     } catch (requestError) {
-      setScheduleError(requestError.message);
+      setScheduleError(adminErrorMessage(requestError, t, locale));
       setBusy(false);
       return;
     }
     setScheduleEditor(null);
     setNotice(
-      activityId ? "Đã lưu thay đổi hoạt động." : "Đã thêm hoạt động mới.",
+      activityId ? t("adminExtra.message006") : t("adminExtra.message007"),
     );
     try {
       await Promise.all([refreshPlan(selectedSlug), loadTrips(selectedSlug)]);
       restoreScheduleFocus();
     } catch (requestError) {
       setError(
-        `Hoạt động đã được lưu nhưng chưa thể tải lại lịch: ${requestError.message}`,
+        t("adminExtra.message008", {
+          value0: adminErrorMessage(requestError, t, locale),
+        }),
       );
     } finally {
       setBusy(false);
@@ -319,7 +327,7 @@ function Dashboard({
       setNotice(message);
       return nextPlan;
     } catch (requestError) {
-      setError(requestError.message);
+      setError(adminErrorMessage(requestError, t, locale));
       return null;
     } finally {
       setBusy(false);
@@ -330,7 +338,7 @@ function Dashboard({
     const nextPlan = await applyBranchMutation(
       `/api/trips/${encodeURIComponent(selectedSlug)}/branches`,
       { method: "POST", body: JSON.stringify(values) },
-      "Đã tạo điểm rẽ và chuyển đoạn lịch sang phương án mặc định.",
+      t("adminExtra.message009"),
     );
     if (nextPlan) setBranchCreatorAnchorId(null);
   };
@@ -342,16 +350,14 @@ function Dashboard({
     if (
       branch &&
       hasTripStarted(plan) &&
-      !window.confirm(
-        `Chuyến đi đã bắt đầu. Đổi sang “${branch.label}” có thể làm thay đổi hoạt động hiện tại và tiếp theo. Tiếp tục?`,
-      )
+      !window.confirm(t("adminExtra.message010", { value0: branch.label }))
     ) {
       return Promise.resolve(null);
     }
     return applyBranchMutation(
       `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}/selection`,
       { method: "PUT", body: JSON.stringify({ branchId }) },
-      "Đã đổi phương án đang dùng cho cả nhóm.",
+      t("adminExtra.message011"),
     );
   };
 
@@ -359,28 +365,28 @@ function Dashboard({
     applyBranchMutation(
       `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}`,
       { method: "POST", body: JSON.stringify(values) },
-      "Đã thêm phương án dự phòng.",
+      t("adminExtra.message012"),
     );
 
   const updateBranchOptionForPlan = (groupId, branchId, values) =>
     applyBranchMutation(
       `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}/${branchId}`,
       { method: "PATCH", body: JSON.stringify(values) },
-      "Đã lưu thông tin phương án.",
+      t("adminExtra.message013"),
     );
 
   const deleteBranchOptionForPlan = (groupId, branchId) =>
     applyBranchMutation(
       `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}/${branchId}`,
       { method: "DELETE" },
-      "Đã xoá phương án dự phòng.",
+      t("adminExtra.message014"),
     );
 
   const unwrapBranchGroupForPlan = (groupId, keepBranchId) =>
     applyBranchMutation(
       `/api/trips/${encodeURIComponent(selectedSlug)}/branches/${groupId}`,
       { method: "DELETE", body: JSON.stringify({ keepBranchId }) },
-      "Đã gỡ điểm rẽ và giữ phương án đã chọn trên tuyến chính.",
+      t("adminExtra.message015"),
     );
 
   const createSourceForPlan = async (values) => {
@@ -423,8 +429,14 @@ function Dashboard({
     setSourceEditor(null);
     setNotice(
       sourceNumber == null
-        ? `Đã thêm nguồn ${source.number}: ${source.title}`
-        : `Đã lưu nguồn ${source.number}: ${source.title}`,
+        ? t("adminExtra.message016", {
+            value0: source.number,
+            value1: source.title,
+          })
+        : t("adminExtra.message017", {
+            value0: source.number,
+            value1: source.title,
+          }),
     );
     return source;
   };
@@ -432,11 +444,15 @@ function Dashboard({
   const removeSourceForPlan = (source) => {
     const usageCount = sourceUsageCount(plan, source.number);
     const usageMessage = usageCount
-      ? ` Nguồn đang được gắn với ${usageCount} hoạt động và các liên kết đó cũng sẽ được gỡ.`
+      ? t("adminExtra.message018", { value0: usageCount })
       : "";
     if (
       !window.confirm(
-        `Xoá nguồn ${source.number} “${source.title}”?${usageMessage}`,
+        t("adminExtra.message019", {
+          value0: source.number,
+          value1: source.title,
+          value2: usageMessage,
+        }),
       )
     )
       return;
@@ -466,12 +482,17 @@ function Dashboard({
           : current,
       );
       await refreshPlan(selectedSlug);
-      setNotice(`Đã xoá nguồn ${source.number}: ${source.title}`);
+      setNotice(
+        t("adminExtra.message020", {
+          value0: source.number,
+          value1: source.title,
+        }),
+      );
     });
   };
 
   const removeSchedule = (activityId) => {
-    if (!window.confirm("Xoá schedule item này?")) return;
+    if (!window.confirm(t("adminExtra.message021"))) return;
     run(async () => {
       await api(
         `/api/trips/${encodeURIComponent(selectedSlug)}/schedule/${activityId}`,
@@ -509,8 +530,8 @@ function Dashboard({
       );
       setNotice(
         updated.hidden
-          ? "Đã ẩn nội dung khỏi lịch công khai."
-          : "Đã hiện lại nội dung trên lịch.",
+          ? t("adminExtra.message022")
+          : t("adminExtra.message023"),
       );
     });
 
@@ -532,9 +553,13 @@ function Dashboard({
         current.filter((item) => item.id !== suggestionToDelete.id),
       );
       setSuggestionToDelete(null);
-      setNotice("Đã xoá vĩnh viễn nội dung.");
+      setNotice(t("adminExtra.message024"));
     } catch (requestError) {
-      setSuggestionDeleteError(`${requestError.message}. Hãy thử lại.`);
+      setSuggestionDeleteError(
+        t("adminExtra.message025", {
+          value0: adminErrorMessage(requestError, t, locale),
+        }),
+      );
     } finally {
       setBusy(false);
     }
@@ -563,25 +588,29 @@ function Dashboard({
       <header className={adminShellStyles["admin-header"]}>
         <div>
           <Link href="/" className={adminShellStyles["admin-back"]}>
-            Về lịch
+            {t("adminExtra.message026")}
           </Link>
-          <h1>Quản lý lịch</h1>
+          <h1>{t("admin.tripManagement")}</h1>
           <small className={adminShellStyles["admin-user"]}>
             {user.authMode === "local-dev"
-              ? "Local admin · Docker Postgres"
+              ? t("adminExtra.localAdmin")
               : user.email}
           </small>
         </div>
+        <LanguageSwitcher />
         {user.authMode !== "local-dev" && (
           <Button variant="ghost" onClick={logout}>
-            Đăng xuất
+            {t("common.logout")}
           </Button>
         )}
       </header>
       {error && (
         <div className={adminShellStyles["admin-alert"]} role="alert">
           {error}
-          <button onClick={() => setError("")} aria-label="Đóng thông báo">
+          <button
+            onClick={() => setError("")}
+            aria-label={t("adminExtra.message027")}
+          >
             <ActionIcon name="close" />
           </button>
         </div>
@@ -589,7 +618,10 @@ function Dashboard({
       {notice && (
         <div className={adminShellStyles["admin-notice"]} role="status">
           {notice}
-          <button onClick={() => setNotice("")} aria-label="Đóng thông báo">
+          <button
+            onClick={() => setNotice("")}
+            aria-label={t("adminExtra.message027")}
+          >
             <ActionIcon name="close" />
           </button>
         </div>
@@ -605,7 +637,7 @@ function Dashboard({
       <div className={adminShellStyles["admin-grid"]}>
         <aside className={adminShellStyles["admin-sidebar"]}>
           <div className={adminShellStyles["admin-section-head"]}>
-            <h2>Trip plans</h2>
+            <h2>{t("adminExtra.message028")}</h2>
             <Button
               variant="primary"
               className="small"
@@ -615,11 +647,15 @@ function Dashboard({
                     setScheduleEditor(null);
                     setTripEditor({ values: emptyTrip, originalSlug: null });
                   },
-                  `Bạn có thay đổi chưa lưu trong “${scheduleEditor?.values.title || "hoạt động hiện tại"}”.`,
+                  t("adminExtra.message003", {
+                    value0:
+                      scheduleEditor?.values.title ||
+                      t("adminExtra.message004"),
+                  }),
                 )
               }
             >
-              Thêm
+              {t("adminExtra.message029")}
             </Button>
           </div>
           <div className={adminShellStyles["trip-list"]}>
@@ -633,17 +669,14 @@ function Dashboard({
                 <strong>{trip.title}</strong>
                 <code>{trip.slug}</code>
                 <span>
-                  {trip.startDate}
-                  {trip.endDate !== trip.startDate
-                    ? ` → ${trip.endDate}`
-                    : ""}{" "}
-                  · {trip.scheduleCount} mục
+                  {formatTripDateRange(trip, {}, intlLocale)} ·{" "}
+                  {trip.scheduleCount} {t("adminExtra.message030")}
                 </span>
               </button>
             ))}
             {!trips.length && (
               <p className={scheduleEditorStyles["admin-empty"]}>
-                Chưa có trip.
+                {t("adminExtra.message031")}
               </p>
             )}
           </div>
@@ -668,8 +701,8 @@ function Dashboard({
                     {plan.trip.slug}
                   </code>
                   <p>
-                    {formatTripDateRange(plan.trip)} · {plan.trip.location} ·{" "}
-                    {plan.trip.timezone}
+                    {formatTripDateRange(plan.trip, {}, intlLocale)} ·{" "}
+                    {plan.trip.location} · {plan.trip.timezone}
                   </p>
                 </div>
                 <div className={scheduleEditorStyles["admin-actions"]}>
@@ -684,17 +717,21 @@ function Dashboard({
                             originalSlug: plan.trip.slug,
                           });
                         },
-                        `Bạn có thay đổi chưa lưu trong “${scheduleEditor?.values.title || "hoạt động hiện tại"}”.`,
+                        t("adminExtra.message003", {
+                          value0:
+                            scheduleEditor?.values.title ||
+                            t("adminExtra.message004"),
+                        }),
                       )
                     }
                   >
-                    Sửa trip
+                    {t("adminExtra.message032")}
                   </Button>
                   <Button
                     variant="danger"
                     onClick={() => removeTrip(plan.trip.slug)}
                   >
-                    Xoá
+                    {t("adminExtra.message033")}
                   </Button>
                 </div>
               </div>
@@ -708,7 +745,7 @@ function Dashboard({
                 >
                   <div>
                     <h2 id="admin-sources-title">
-                      {plan.sources.length} nguồn địa điểm
+                      {plan.sources.length} {t("adminExtra.message034")}
                     </h2>
                   </div>
                   <Button
@@ -721,7 +758,9 @@ function Dashboard({
                     }
                     aria-expanded={Boolean(sourceEditor)}
                   >
-                    {sourceEditor ? "Đóng trình sửa" : "Thêm nguồn"}
+                    {sourceEditor
+                      ? t("adminExtra.message035")
+                      : t("adminExtra.message036")}
                   </Button>
                 </div>
                 {sourceEditor && (
@@ -768,7 +807,7 @@ function Dashboard({
                           onClick={() => setSourceEditor({ source })}
                           disabled={busy}
                         >
-                          Sửa
+                          {t("adminExtra.message037")}
                         </Button>
                         <Button
                           variant="danger"
@@ -776,14 +815,14 @@ function Dashboard({
                           onClick={() => removeSourceForPlan(source)}
                           disabled={busy}
                         >
-                          Xoá
+                          {t("adminExtra.message033")}
                         </Button>
                       </span>
                     </article>
                   ))}
                   {!plan.sources.length && (
                     <p className={scheduleEditorStyles["admin-empty"]}>
-                      Chưa có nguồn. Thêm nguồn đầu tiên để gắn vào hoạt động.
+                      {t("adminExtra.message038")}
                     </p>
                   )}
                 </div>
@@ -793,8 +832,13 @@ function Dashboard({
                 className={`${adminShellStyles["admin-section-head"]} ${scheduleEditorStyles["schedule-heading"]}`}
               >
                 <div>
-                  <h2>{plan.itinerary.length} hoạt động đang dùng</h2>
-                  <p>{plan.branchGroups?.length || 0} điểm rẽ</p>
+                  <h2>
+                    {plan.itinerary.length} {t("adminExtra.message039")}
+                  </h2>
+                  <p>
+                    {plan.branchGroups?.length || 0}{" "}
+                    {t("adminExtra.message040")}
+                  </p>
                 </div>
                 <div
                   className={scheduleEditorStyles["schedule-heading-actions"]}
@@ -815,7 +859,7 @@ function Dashboard({
                         )
                       }
                     >
-                      Tạo điểm rẽ từ đầu
+                      {t("adminExtra.message041")}
                     </Button>
                   )}
                   <Button
@@ -834,13 +878,13 @@ function Dashboard({
                       )
                     }
                   >
-                    Thêm hoạt động
+                    {t("adminExtra.message042")}
                   </Button>
                 </div>
               </div>
               <div
                 className={scheduleEditorStyles["admin-day-rail"]}
-                aria-label="Các ngày trong chuyến đi"
+                aria-label={t("adminExtra.message043")}
               >
                 {enumerateTripDays(plan.trip.startDate, plan.trip.endDate).map(
                   (date, index) => {
@@ -863,16 +907,25 @@ function Dashboard({
                         }
                         disabled={busy}
                       >
-                        <span>Ngày {index + 1}</span>
+                        <span>
+                          {t("adminExtra.dayNumber", { count: index + 1 })}
+                        </span>
                         <strong>
-                          {formatDateLabel(date, plan.trip.timezone, {
-                            weekday: "short",
-                            day: "2-digit",
-                            month: "2-digit",
-                          })}
+                          {formatDateLabel(
+                            date,
+                            plan.trip.timezone,
+                            {
+                              weekday: "short",
+                              day: "2-digit",
+                              month: "2-digit",
+                            },
+                            intlLocale,
+                          )}
                         </strong>
                         <small>
-                          {count ? `${count} hoạt động` : "Thêm hoạt động"}
+                          {count
+                            ? t("adminExtra.message045", { value0: count })
+                            : t("adminExtra.message042")}
                         </small>
                       </button>
                     );
@@ -954,11 +1007,13 @@ function Dashboard({
                         >
                           <div>
                             <span>
-                              Ngày{" "}
-                              {calendarDayDifference(
-                                plan.trip.startDate,
-                                item.startDate,
-                              ) + 1}
+                              {t("adminExtra.dayNumber", {
+                                count:
+                                  calendarDayDifference(
+                                    plan.trip.startDate,
+                                    item.startDate,
+                                  ) + 1,
+                              })}
                             </span>
                             <h3>
                               {formatDateLabel(
@@ -970,6 +1025,7 @@ function Dashboard({
                                   month: "2-digit",
                                   year: "numeric",
                                 },
+                                intlLocale,
                               )}
                             </h3>
                           </div>
@@ -988,7 +1044,7 @@ function Dashboard({
                               )
                             }
                           >
-                            Thêm vào ngày này
+                            {t("adminExtra.message046")}
                           </Button>
                         </div>
                       )}
@@ -1024,7 +1080,7 @@ function Dashboard({
                               )
                             }
                           >
-                            Tạo điểm rẽ sau mục này
+                            {t("adminExtra.message047")}
                           </Button>
                         </div>
                       )}
@@ -1070,20 +1126,22 @@ function Dashboard({
                 className={`${adminShellStyles["admin-section-head"]} ${scheduleEditorStyles["suggestion-admin-heading"]}`}
               >
                 <div>
-                  <h2>{suggestions.length} góp ý</h2>
-                  <p>Quản lý trạng thái và mức hiển thị trên lịch công khai.</p>
+                  <h2>
+                    {suggestions.length} {t("adminExtra.message048")}
+                  </h2>
+                  <p>{t("adminExtra.message049")}</p>
                 </div>
                 <div
                   className={scheduleEditorStyles["admin-suggestion-filters"]}
                   role="group"
-                  aria-label="Lọc góp ý theo hiển thị"
+                  aria-label={t("adminExtra.message050")}
                 >
                   <button
                     type="button"
                     aria-pressed={suggestionFilter === "visible"}
                     onClick={() => setSuggestionFilter("visible")}
                   >
-                    Đang hiện{" "}
+                    {t("adminExtra.message051")}{" "}
                     <span>
                       {suggestions.filter((item) => !item.hidden).length}
                     </span>
@@ -1093,7 +1151,7 @@ function Dashboard({
                     aria-pressed={suggestionFilter === "hidden"}
                     onClick={() => setSuggestionFilter("hidden")}
                   >
-                    Đã ẩn{" "}
+                    {t("adminExtra.message052")}{" "}
                     <span>
                       {suggestions.filter((item) => item.hidden).length}
                     </span>
@@ -1126,12 +1184,14 @@ function Dashboard({
                         >
                           <span>
                             {suggestion.kind === "comment"
-                              ? "Bình luận"
-                              : "Đề xuất"}
+                              ? t("adminExtra.message053")
+                              : t("adminExtra.message054")}
                           </span>
                           <strong>{suggestion.author.name}</strong>
                           <small>{suggestion.author.email}</small>
-                          {suggestion.hidden && <em>Đã ẩn</em>}
+                          {suggestion.hidden && (
+                            <em>{t("adminExtra.message052")}</em>
+                          )}
                         </div>
                         <div
                           className={
@@ -1141,7 +1201,7 @@ function Dashboard({
                           <small>
                             {activity
                               ? `${activity.start} · ${activity.title}`
-                              : "Góp ý chung cho chuyến đi"}
+                              : t("adminExtra.message055")}
                           </small>
                           <p>{suggestion.body}</p>
                         </div>
@@ -1159,12 +1219,20 @@ function Dashboard({
                               )
                             }
                             disabled={busy}
-                            aria-label="Trạng thái góp ý"
+                            aria-label={t("adminExtra.message056")}
                           >
-                            <option value="open">Mới</option>
-                            <option value="accepted">Đã nhận</option>
-                            <option value="resolved">Đã xử lý</option>
-                            <option value="rejected">Từ chối</option>
+                            <option value="open">
+                              {t("adminExtra.message057")}
+                            </option>
+                            <option value="accepted">
+                              {t("adminExtra.message058")}
+                            </option>
+                            <option value="resolved">
+                              {t("adminExtra.message059")}
+                            </option>
+                            <option value="rejected">
+                              {t("adminExtra.message060")}
+                            </option>
                           </select>
                           <Button
                             variant="ghost"
@@ -1174,7 +1242,9 @@ function Dashboard({
                             }
                             disabled={busy}
                           >
-                            {suggestion.hidden ? "Hiện lại" : "Ẩn"}
+                            {suggestion.hidden
+                              ? t("adminExtra.message061")
+                              : t("adminExtra.message062")}
                           </Button>
                           <AdminSuggestionMenu
                             suggestion={suggestion}
@@ -1187,7 +1257,7 @@ function Dashboard({
                   })}
                 {!suggestions.length && (
                   <p className={scheduleEditorStyles["admin-empty"]}>
-                    Chưa có góp ý nào.
+                    {t("adminExtra.message063")}
                   </p>
                 )}
                 {suggestions.length > 0 &&
@@ -1198,8 +1268,8 @@ function Dashboard({
                   ) && (
                     <p className={scheduleEditorStyles["admin-empty"]}>
                       {suggestionFilter === "hidden"
-                        ? "Chưa có nội dung nào bị ẩn."
-                        : "Không còn nội dung đang hiển thị."}
+                        ? t("adminExtra.message064")
+                        : t("adminExtra.message065")}
                     </p>
                   )}
               </div>
@@ -1209,7 +1279,7 @@ function Dashboard({
             <div
               className={`${scheduleEditorStyles["admin-empty"]} ${scheduleEditorStyles["large"]}`}
             >
-              Chọn hoặc tạo một trip plan.
+              {t("adminExtra.message066")}
             </div>
           )}
         </section>
@@ -1217,11 +1287,13 @@ function Dashboard({
       {discardDialog}
       {suggestionToDelete && (
         <ConfirmDialog
-          title="Xoá vĩnh viễn nội dung này?"
-          description={`Nội dung của ${suggestionToDelete.author.name} sẽ biến mất và không thể khôi phục.`}
+          title={t("adminExtra.message067")}
+          description={t("adminExtra.message068", {
+            value0: suggestionToDelete.author.name,
+          })}
           preview={suggestionToDelete.body}
-          confirmLabel="Xoá vĩnh viễn"
-          pendingLabel="Đang xoá…"
+          confirmLabel={t("adminExtra.message069")}
+          pendingLabel={t("adminExtra.message070")}
           pending={busy}
           error={suggestionDeleteError}
           onCancel={() => {
@@ -1236,6 +1308,7 @@ function Dashboard({
 }
 
 function AdminSuggestionMenu({ suggestion, busy, onDelete }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
@@ -1271,7 +1344,7 @@ function AdminSuggestionMenu({ suggestion, busy, onDelete }) {
         disabled={busy}
         ref={triggerRef}
       >
-        Thêm
+        {t("adminExtra.message029")}
       </Button>
       {open && (
         <div>
@@ -1280,7 +1353,7 @@ function AdminSuggestionMenu({ suggestion, busy, onDelete }) {
             type="button"
             onClick={() => onDelete(suggestion)}
           >
-            Xoá vĩnh viễn
+            {t("adminExtra.message069")}
           </Button>
         </div>
       )}
@@ -1301,6 +1374,7 @@ function ScheduleRow({
   onCancel,
   onRemove,
 }) {
+  const { t, locale, intlLocale } = useLocale();
   const editorId = `schedule-editor-${item.id}`;
   const isEditing = scheduleEditor?.key === String(item.id);
   return (
@@ -1308,16 +1382,19 @@ function ScheduleRow({
       className={`${scheduleEditorStyles["admin-schedule-item"]}${isEditing ? " is-editing" : ""}`}
     >
       <div className={scheduleEditorStyles["admin-schedule-time"]}>
-        <small>{item.startDate}</small>
+        <small>{formatDateLabel(item.startDate, "UTC", {}, intlLocale)}</small>
         <strong>{item.start}</strong>
         <span>
           {item.displayEnd || item.end}
-          {item.endDate !== item.startDate ? " · +1 ngày" : ""}
+          {item.endDate !== item.startDate ? t("adminExtra.message071") : ""}
         </span>
       </div>
       <div className={scheduleEditorStyles["admin-schedule-copy"]}>
         <span>
-          <TypeIcon type={item.type} /> {item.type}
+          <TypeIcon type={item.type} />{" "}
+          {locale === "vi"
+            ? item.type
+            : translateActivityType(locale, item.type)}
         </span>
         <h3>{item.title}</h3>
         {item.detail && <p>{item.detail}</p>}
@@ -1330,14 +1407,14 @@ function ScheduleRow({
           aria-controls={editorId}
           onClick={(event) => onActivateEditor(item, event.currentTarget)}
         >
-          {isEditing ? "Đang sửa" : "Sửa"}
+          {isEditing ? t("adminExtra.message072") : t("adminExtra.message037")}
         </Button>
         <Button
           variant="danger"
           disabled={busy}
           onClick={() => onRemove(item.id)}
         >
-          Xoá
+          {t("adminExtra.message033")}
         </Button>
       </div>
       {isEditing && (
@@ -1359,15 +1436,16 @@ function ScheduleRow({
 }
 
 function BranchCreateForm({ anchor, following, busy, onCancel, onSave }) {
+  const { t } = useLocale();
   const startsTrip = anchor == null;
   const selectableActivities = startsTrip ? following.slice(0, -1) : following;
   const [segmentCount, setSegmentCount] = useState(1);
   const [values, setValues] = useState({
-    title: "Phương án dự phòng",
-    defaultLabel: "Kế hoạch hiện tại",
-    defaultCondition: "Khi điều kiện bình thường",
-    alternateLabel: "Phương án thay thế",
-    alternateCondition: "Khi cần đổi kế hoạch",
+    title: t("adminExtra.message073"),
+    defaultLabel: t("adminExtra.message074"),
+    defaultCondition: t("adminExtra.message075"),
+    alternateLabel: t("adminExtra.message076"),
+    alternateCondition: t("adminExtra.message077"),
   });
   const field = (name) => ({
     value: values[name],
@@ -1401,26 +1479,25 @@ function BranchCreateForm({ anchor, following, busy, onCancel, onSave }) {
         <div>
           <h2>
             {startsTrip
-              ? "Tạo điểm rẽ từ đầu chuyến"
-              : `Tạo điểm rẽ sau “${anchor.title}”`}
+              ? t("adminExtra.message078")
+              : t("adminExtra.message079", { value0: anchor.title })}
           </h2>
           <p>
             {startsTrip
-              ? "Các hoạt động đầu tiên sẽ trở thành phương án mặc định; mọi tuyến hội nhập lại trước một hoạt động chung."
-              : "Đoạn hiện có sẽ trở thành phương án mặc định."}
+              ? t("adminExtra.message080")
+              : t("adminExtra.message081")}
           </p>
         </div>
         <Button variant="ghost" type="button" onClick={onCancel}>
-          Hủy
+          {t("adminExtra.message082")}
         </Button>
       </div>
       <div className={scheduleEditorStyles["form-grid"]}>
         <label className="wide">
-          Tên điểm rẽ
-          <input {...field("title")} required />
+          {t("adminExtra.message083")} <input {...field("title")} required />
         </label>
         <label className="wide">
-          Hội nhập lại
+          {t("adminExtra.message084")}{" "}
           <select
             value={segmentCount}
             onChange={(event) => setSegmentCount(Number(event.target.value))}
@@ -1428,37 +1505,43 @@ function BranchCreateForm({ anchor, following, busy, onCancel, onSave }) {
             {selectableActivities.map((item, index) => (
               <option value={index + 1} key={item.id}>
                 {index + 1 < following.length
-                  ? `Trước ${following[index + 1].start} · ${following[index + 1].title}`
-                  : "Cuối chuyến"}
+                  ? t("adminExtra.message085", {
+                      value0: following[index + 1].start,
+                      value1: following[index + 1].title,
+                    })
+                  : t("adminExtra.message086")}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Tên phương án mặc định
+          {t("adminExtra.message087")}{" "}
           <input {...field("defaultLabel")} required />
         </label>
         <label>
-          Điều kiện
+          {t("adminExtra.message088")}{" "}
           <input {...field("defaultCondition")} required />
         </label>
         <label>
-          Tên phương án dự phòng
+          {t("adminExtra.message089")}{" "}
           <input {...field("alternateLabel")} required />
         </label>
         <label>
-          Điều kiện
+          {t("adminExtra.message088")}{" "}
           <input {...field("alternateCondition")} required />
         </label>
       </div>
       <div className={scheduleEditorStyles["schedule-editor-actions"]}>
         <Button variant="ghost" type="button" onClick={onCancel}>
-          Hủy
+          {t("adminExtra.message082")}
         </Button>
         <Button variant="primary" disabled={busy}>
           {busy
-            ? "Đang tạo…"
-            : `Chuyển ${segmentCount} hoạt động ${startsTrip ? "đầu tiên " : ""}thành điểm rẽ`}
+            ? t("adminExtra.message090")
+            : t("adminExtra.message091", {
+                value0: segmentCount,
+                value1: startsTrip ? t("adminExtra.message092") : "",
+              })}
         </Button>
       </div>
     </form>
@@ -1484,6 +1567,7 @@ function BranchGroupAdmin({
   onCancelSchedule,
   onRemoveSchedule,
 }) {
+  const { t } = useLocale();
   const [adding, setAdding] = useState(false);
   const [newBranch, setNewBranch] = useState({ label: "", condition: "" });
   const [keepBranchId, setKeepBranchId] = useState(group.selectedBranchId);
@@ -1493,7 +1577,10 @@ function BranchGroupAdmin({
   const unwrap = () => {
     if (
       !window.confirm(
-        `Gỡ điểm rẽ và giữ “${group.branches.find((branch) => branch.id === keepBranchId)?.label}” trên tuyến chính? Các activity ở phương án khác sẽ bị xoá.`,
+        t("adminExtra.message093", {
+          value0: group.branches.find((branch) => branch.id === keepBranchId)
+            ?.label,
+        }),
       )
     )
       return;
@@ -1507,12 +1594,15 @@ function BranchGroupAdmin({
       <div className={scheduleEditorStyles["admin-branch-head"]}>
         <div>
           <span>
-            {startsTrip ? "Điểm rẽ đầu chuyến" : "Điểm rẽ"} ·{" "}
-            {group.branches.length} phương án
+            {startsTrip
+              ? t("adminExtra.message094")
+              : t("adminExtra.message095")}{" "}
+            · {group.branches.length} {t("adminExtra.message096")}
           </span>
           <h3 id={`branch-group-${group.id}`}>{group.title}</h3>
           <p>
-            Đang dùng: <strong>{selected.label}</strong> · {selected.condition}
+            {t("adminExtra.message097")} <strong>{selected.label}</strong> ·{" "}
+            {selected.condition}
           </p>
         </div>
         <Button
@@ -1521,7 +1611,7 @@ function BranchGroupAdmin({
           onClick={() => setAdding((current) => !current)}
           disabled={busy}
         >
-          {adding ? "Hủy thêm" : "Thêm phương án"}
+          {adding ? t("adminExtra.message098") : t("adminExtra.message099")}
         </Button>
       </div>
       {adding && (
@@ -1538,7 +1628,7 @@ function BranchGroupAdmin({
           }}
         >
           <label>
-            Tên phương án
+            {t("adminExtra.message100")}{" "}
             <input
               value={newBranch.label}
               onChange={(event) =>
@@ -1548,7 +1638,7 @@ function BranchGroupAdmin({
             />
           </label>
           <label>
-            Điều kiện
+            {t("adminExtra.message088")}{" "}
             <input
               value={newBranch.condition}
               onChange={(event) =>
@@ -1558,7 +1648,7 @@ function BranchGroupAdmin({
             />
           </label>
           <Button variant="primary" disabled={busy}>
-            Thêm phương án
+            {t("adminExtra.message099")}
           </Button>
         </form>
       )}
@@ -1587,7 +1677,7 @@ function BranchGroupAdmin({
       </div>
       <div className={scheduleEditorStyles["admin-branch-unwrap"]}>
         <label>
-          Giữ lại khi gỡ
+          {t("adminExtra.message101")}{" "}
           <select
             value={keepBranchId}
             onChange={(event) => setKeepBranchId(event.target.value)}
@@ -1600,7 +1690,7 @@ function BranchGroupAdmin({
           </select>
         </label>
         <Button variant="danger" type="button" onClick={unwrap} disabled={busy}>
-          Gỡ điểm rẽ
+          {t("adminExtra.message102")}
         </Button>
       </div>
     </section>
@@ -1625,6 +1715,7 @@ function BranchOptionAdmin({
   onCancelSchedule,
   onRemoveSchedule,
 }) {
+  const { t } = useLocale();
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState({
     label: branch.label,
@@ -1642,8 +1733,8 @@ function BranchOptionAdmin({
       <div className={scheduleEditorStyles["admin-branch-option-head"]}>
         <div>
           <span>
-            {selected ? "Đang dùng" : "Dự phòng"}
-            {branch.isDefault ? " · Mặc định" : ""}
+            {selected ? t("adminExtra.message103") : t("adminExtra.message104")}
+            {branch.isDefault ? t("adminExtra.message105") : ""}
           </span>
           <h4>{branch.label}</h4>
           <p>{branch.condition}</p>
@@ -1657,7 +1748,7 @@ function BranchOptionAdmin({
               onClick={() => onActivate(group.id, branch.id)}
               disabled={busy}
             >
-              Dùng phương án này
+              {t("adminExtra.message106")}
             </Button>
           )}
           <Button
@@ -1666,19 +1757,23 @@ function BranchOptionAdmin({
             onClick={() => setEditing((current) => !current)}
             disabled={busy}
           >
-            Sửa nhãn
+            {t("adminExtra.message107")}
           </Button>
           {!selected && !branch.isDefault && group.branches.length > 2 && (
             <Button
               variant="danger"
               type="button"
               onClick={() => {
-                if (window.confirm(`Xoá phương án “${branch.label}”?`))
+                if (
+                  window.confirm(
+                    t("adminExtra.message108", { value0: branch.label }),
+                  )
+                )
                   onDelete(group.id, branch.id);
               }}
               disabled={busy}
             >
-              Xoá
+              {t("adminExtra.message033")}
             </Button>
           )}
         </div>
@@ -1694,7 +1789,7 @@ function BranchOptionAdmin({
           }}
         >
           <label>
-            Tên
+            {t("adminExtra.message109")}{" "}
             <input
               value={values.label}
               onChange={(event) =>
@@ -1704,7 +1799,7 @@ function BranchOptionAdmin({
             />
           </label>
           <label>
-            Điều kiện
+            {t("adminExtra.message088")}{" "}
             <input
               value={values.condition}
               onChange={(event) =>
@@ -1714,7 +1809,7 @@ function BranchOptionAdmin({
             />
           </label>
           <Button variant="primary" disabled={busy}>
-            Lưu nhãn
+            {t("adminExtra.message110")}
           </Button>
         </form>
       )}
@@ -1737,7 +1832,7 @@ function BranchOptionAdmin({
         ))}
         {!branch.itinerary.length && (
           <p className={scheduleEditorStyles["admin-empty"]}>
-            Nhánh rỗng: nhóm sẽ đi thẳng tới mốc hội nhập.
+            {t("adminExtra.message111")}
           </p>
         )}
       </div>
@@ -1774,7 +1869,7 @@ function BranchOptionAdmin({
           }
           disabled={busy}
         >
-          Thêm hoạt động vào “{branch.label}”
+          {t("adminExtra.addActivityToBranch", { label: branch.label })}
         </Button>
       )}
     </article>
@@ -1782,11 +1877,12 @@ function BranchOptionAdmin({
 }
 
 function PlanSkeleton() {
+  const { t } = useLocale();
   return (
     <div
       className={scheduleEditorStyles["admin-plan-skeleton"]}
       aria-live="polite"
-      aria-label="Đang tải trip plan"
+      aria-label={t("adminExtra.message113")}
     >
       <span />
       <strong />

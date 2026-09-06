@@ -1,3 +1,4 @@
+import { useLocale } from "../LocaleProvider";
 import contributionsStyles from "../../src/styles/contributions.module.css";
 import scheduleEditorStyles from "../../src/styles/schedule-editor.module.css";
 
@@ -11,6 +12,7 @@ import {
 
 // Owns draft protection and focus restoration across all admin schedule entry points.
 export function useScheduleDraft(busy) {
+  const { t } = useLocale();
   const [scheduleEditor, setScheduleEditor] = useState(null);
   const [scheduleError, setScheduleError] = useState("");
   const [discardPrompt, setDiscardPrompt] = useState(null);
@@ -84,7 +86,9 @@ export function useScheduleDraft(busy) {
         setScheduleError("");
         setScheduleEditor(nextEditor);
       },
-      `Bạn có thay đổi chưa lưu trong “${scheduleEditor?.values.title || "hoạt động hiện tại"}”.`,
+      t("adminExtra.message003", {
+        value0: scheduleEditor?.values.title || t("adminExtra.message004"),
+      }),
     );
   };
 
@@ -96,7 +100,9 @@ export function useScheduleDraft(busy) {
         setScheduleError("");
         restoreFocus();
       },
-      `Bạn có thay đổi chưa lưu trong “${scheduleEditor?.values.title || "hoạt động hiện tại"}”.`,
+      t("adminExtra.message003", {
+        value0: scheduleEditor?.values.title || t("adminExtra.message004"),
+      }),
     );
   };
 
@@ -133,6 +139,7 @@ export function useScheduleDraft(busy) {
 }
 
 function DiscardChangesDialog({ message, onKeep, onDiscard }) {
+  const { t } = useLocale();
   const safeActionRef = useRef(null);
   return (
     <Dialog
@@ -143,12 +150,11 @@ function DiscardChangesDialog({ message, onKeep, onDiscard }) {
     >
       <section className={scheduleEditorStyles["discard-dialog"]}>
         <DialogTitle asChild>
-          <h2>Bỏ thay đổi chưa lưu?</h2>
+          <h2>{t("adminExtra.message230")}</h2>
         </DialogTitle>
         <DialogDescription asChild>
           <p id="discard-dialog-copy">
-            {message} Bạn muốn tiếp tục sửa hay bỏ bản nháp để chuyển sang mục
-            khác?
+            {message} {t("adminExtra.message231")}
           </p>
         </DialogDescription>
         <div className={scheduleEditorStyles["discard-dialog-actions"]}>
@@ -158,10 +164,10 @@ function DiscardChangesDialog({ message, onKeep, onDiscard }) {
             onClick={onKeep}
             ref={safeActionRef}
           >
-            Tiếp tục sửa
+            {t("adminExtra.message232")}
           </Button>
           <Button type="button" variant="danger" onClick={onDiscard}>
-            Bỏ thay đổi
+            {t("adminExtra.message233")}
           </Button>
         </div>
       </section>

@@ -7,17 +7,19 @@ import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { ActionIcon } from "./Icons";
+import { useLocale } from "./LocaleProvider";
 
 const MENU_ID = "viewer-account-menu";
 
 export default function ViewerMenu({ viewer }) {
+  const { t, locale } = useLocale();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const localDev = viewer.authMode === "local-dev";
   const label =
     localDev && viewer.isOwner ? "Local admin" : viewer.name || viewer.email;
-  const initial = label?.trim().charAt(0).toLocaleUpperCase("vi") || "T";
+  const initial = label?.trim().charAt(0).toLocaleUpperCase(locale) || "T";
   const manageClassName = localDev
     ? navigationStyles["viewer-menu-item"]
     : `${navigationStyles["viewer-menu-item"]} ${navigationStyles["mobile-manage-link"]}`;
@@ -50,7 +52,7 @@ export default function ViewerMenu({ viewer }) {
         type="button"
         aria-expanded={open}
         aria-controls={MENU_ID}
-        aria-label={`Mở menu tài khoản của ${label}`}
+        aria-label={t("nav.openAccount", { name: label })}
         onClick={() => setOpen((current) => !current)}
       >
         {viewer.image ? (
@@ -76,7 +78,7 @@ export default function ViewerMenu({ viewer }) {
           className={navigationStyles["viewer-menu-panel"]}
           id={MENU_ID}
           role="group"
-          aria-label="Tài khoản"
+          aria-label={t("nav.account")}
         >
           <div className={navigationStyles["viewer-menu-identity"]}>
             <strong>{label}</strong>
@@ -89,7 +91,7 @@ export default function ViewerMenu({ viewer }) {
             href="/requests"
             onClick={() => setOpen(false)}
           >
-            Yêu cầu của tôi
+            {t("nav.myRequests")}
           </Link>
           {viewer.isAdmin && (
             <Link
@@ -97,7 +99,7 @@ export default function ViewerMenu({ viewer }) {
               href={ADMIN_ROUTES.trips}
               onClick={() => setOpen(false)}
             >
-              Quản lý
+              {t("common.manage")}
             </Link>
           )}
           {!localDev && (
@@ -106,7 +108,7 @@ export default function ViewerMenu({ viewer }) {
               type="button"
               onClick={() => signOut({ redirectTo: "/" })}
             >
-              Đăng xuất
+              {t("common.logout")}
             </button>
           )}
         </div>

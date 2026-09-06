@@ -4,7 +4,7 @@ export async function readEvents(response, onEvent) {
     throw Object.assign(new Error(data.error || `Request failed (${response.status})`), { code: data.code, definitive: true });
   }
   const reader = response.body?.getReader();
-  if (!reader) throw new Error("Không đọc được phản hồi; hãy kiểm tra lại trạng thái");
+  if (!reader) throw new Error("assistantExtra.error.readResponse");
   const decoder = new TextDecoder();
   let pending = "", sequence = 0, runId = null, terminal = false;
   const consume = (line) => {
@@ -18,7 +18,7 @@ export async function readEvents(response, onEvent) {
         (event.type === "completed" && (event.turn?.id !== event.runId || event.turn?.status !== "completed")) ||
         (event.type === "failed" && (!event.error?.code || event.turn?.id !== event.runId || event.turn?.status !== "failed")) ||
         !["accepted", "progress", "answer-delta", "evidence", "completed", "failed"].includes(event.type)) {
-      throw new Error("Luồng phản hồi bị gián đoạn; đang kiểm tra trạng thái");
+      throw new Error("assistantExtra.error.streamInterrupted");
     }
     sequence = event.seq;
     runId = event.runId;
@@ -35,7 +35,7 @@ export async function readEvents(response, onEvent) {
       if (done) break;
     }
     consume(pending);
-    if (!terminal) throw new Error("Mất kết nối trước khi hoàn tất; đang kiểm tra trạng thái");
+    if (!terminal) throw new Error("assistantExtra.error.streamDisconnected");
   } finally {
     await reader.cancel().catch(() => {});
     reader.releaseLock();

@@ -1,5 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocale } from "../LocaleProvider";
+import { localizeAssistantMessage } from "../../lib/i18n-assistant.mjs";
 import { apiJson, observeRun } from "./transport.mjs";
 
 // A refresh cannot make a locally expired immutable approval actionable again.
@@ -8,6 +10,7 @@ const currentTurn = (turn) => ({ ...turn, actions: turn.actions?.map((action) =>
     ? { ...action, status: "expired", confirmationToken: null } : action) });
 
 export function useConversation({ initialWorkspace, viewer }) {
+  const { t } = useLocale();
   const [workspace, setWorkspace] = useState(initialWorkspace || null);
   const [turns, setTurns] = useState(initialWorkspace?.turns || []);
   const [message, setMessageState] = useState("");
@@ -54,12 +57,12 @@ export function useConversation({ initialWorkspace, viewer }) {
   const setMentions = (items) => { setMentionsState(items); persist(`mentions:${draftKey}`, JSON.stringify(items)); };
   const addMention = (item) => {
     if (mentions.some((entry) => entry.ref.kind === item.ref.kind && entry.ref.id === item.ref.id)) return;
-    if (mentions.length >= 20) { setError("Mỗi tin nhắn tối đa 20 ngữ cảnh."); return; }
+    if (mentions.length >= 20) { setError("assistantExtra.error.mentions"); return; }
     setMentions([...mentions, item]);
   };
   const changePins = async (items) => {
     if (pinBusy || submitting || workspace?.access?.enabled === false) return;
-    if (items.length > 20) { setError("Mỗi cuộc trò chuyện tối đa 20 ghim."); return; }
+    if (items.length > 20) { setError("assistantExtra.error.pins"); return; }
     const token = generation.current;
     setPinBusy(true);
     try {
@@ -162,7 +165,7 @@ export function useConversation({ initialWorkspace, viewer }) {
         persist(`pending:${draftKey}`, "");
         if (!pending?.retryOfTurnId) persist(`mentions:${draftKey}`, "[]");
         if (!pending?.retryOfTurnId && read(`draft:${draftKey}`) === pending?.message) persist(`draft:${draftKey}`, "");
-      } else if (pending) setSubmissionFailure({ body: pending, trip, message: "Chưa xác nhận được yêu cầu. Hãy thử lại." });
+      } else if (pending) setSubmissionFailure({ body: pending, trip, message: "assistantExtra.error.unconfirmed" });
       if (conversation === "new" && !next.request?.found) { next.selectedConversation = null; next.turns = []; next.nextCursor = null; }
       setWorkspace(next); setTurns(next.turns);
       const nextKey = next.selectedConversation?.id || "new";
@@ -199,14 +202,14 @@ export function useConversation({ initialWorkspace, viewer }) {
     const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input, mentions: mentions.map((item) => item.ref),
       ...(!workspace.selectedConversation ? { initialPins: (workspace.pins || []).map((item) => item.ref) } : {}) };
     try { sessionStorage.setItem(prefix + `pending:${draftKey}`, JSON.stringify(body)); }
-    catch { setError("Hãy bật lưu trữ phiên để gửi yêu cầu có thể khôi phục."); return; }
+    catch { setError("assistantExtra.error.storage"); return; }
     sending.current = true; setSubmitting(true); setError(""); setSubmissionFailure(null);
     setRetrying(body.retryOfTurnId || null);
     try {
       let accepted;
       try {
         accepted = await apiJson("/api/v1/assistant/turns", { method: "POST", body: JSON.stringify(body) });
-        if (!accepted.runId || !accepted.conversationId) throw new Error("Mất xác nhận tiếp nhận");
+        if (!accepted.runId || !accepted.conversationId) throw new Error("assistantExtra.error.acceptance");
       } catch (failure) {
         if (failure.status && failure.status < 500) { persist(`pending:${draftKey}`, ""); throw failure; }
         const recovered = await apiJson(`/api/v1/assistant/workspace?request=${body.clientTurnId}`);
@@ -230,18 +233,18 @@ export function useConversation({ initialWorkspace, viewer }) {
         if (index < 0) return [...items, turn];
         return items.map((item, i) => i === index ? turn : item);
       });
-      if (turn.status === "running") { setProgress("Đang chờ trợ lý"); observe(turn, token); }
+      if (turn.status === "running") { setProgress("assistantExtra.progress.waiting"); observe(turn, token); }
       else setProgress("");
       window.dispatchEvent(new Event("assistant-completed"));
     } catch (failure) {
       if (generation.current === token) setSubmissionFailure({ body, trip, status: failure.status, code: failure.code,
-        message: failure.status && failure.status < 500 ? failure.message : "Không thể bắt đầu trả lời. Hãy thử lại." });
+        message: failure.status && failure.status < 500 ? failure.message : "assistantExtra.answerStartFailed" });
     } finally { sending.current = false; setSubmitting(false); setRetrying(null); }
   };
   const retry = (turn) => {
     let pending;
     try { pending = JSON.parse(read(`pending:${draftKey}`) || "null"); } catch { pending = null; }
-    if (pending && pending.retryOfTurnId !== turn.id) { setError("Chưa xác nhận được yêu cầu trước. Hãy kết nối lại trước khi gửi yêu cầu khác."); return; }
+    if (pending && pending.retryOfTurnId !== turn.id) { setError("assistantExtra.error.previousReconnect"); return; }
     return send(turn.input, pending || { clientTurnId: crypto.randomUUID(),
       conversationId: workspace.selectedConversation.id, message: turn.input, mentions: turn.mentions || [], retryOfTurnId: turn.id });
   };
@@ -256,7 +259,7 @@ export function useConversation({ initialWorkspace, viewer }) {
     let pending;
     try { pending = JSON.parse(read(`pending:${draftKey}`) || "null"); } catch { pending = null; }
     if (pending && pending.message !== message.trim()) {
-      setSubmissionFailure({ body: pending, trip: workspace.selectedTripSlug, message: "Chưa xác nhận được yêu cầu trước. Thử lại yêu cầu đó trước khi gửi nội dung khác." });
+      setSubmissionFailure({ body: pending, trip: workspace.selectedTripSlug, message: "assistantExtra.error.previousRetry" });
       return;
     }
     return send(pending?.message || message.trim(), pending);
@@ -294,7 +297,7 @@ export function useConversation({ initialWorkspace, viewer }) {
       setTurns((current) => [...next.turns.filter((item) => !current.some((old) => old.id === item.id)), ...current]);
     } catch (failure) { if (token === generation.current) setError(failure.message); }
   };
-  return { workspace, turns, setTurns, message, setMessage, loading, error, setError, progress, submitting, historyLoading, historyError,
+  return { workspace, turns, setTurns, message, setMessage, loading, error: localizeAssistantMessage(t, error), setError, progress: localizeAssistantMessage(t, progress), submitting, historyLoading, historyError: localizeAssistantMessage(t, historyError),
     mentions, addMention, setMentions, pin, unpin, pinBusy, load, selectConversation, newConversation, submit, send, stop, history, older,
-    refreshConversation, retry, retrying, submissionFailure, retrySubmission, disconnected, reconnect };
+    refreshConversation, retry, retrying, submissionFailure: submissionFailure ? { ...submissionFailure, message: localizeAssistantMessage(t, submissionFailure.message) } : null, retrySubmission, disconnected, reconnect };
 }

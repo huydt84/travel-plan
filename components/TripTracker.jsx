@@ -36,10 +36,13 @@ import { SuggestionList, useContributions } from "./tracker/Contributions";
 import InvitationDialog from "./InvitationDialog";
 import NotificationCenter from "./NotificationCenter";
 import ViewerMenu from "./ViewerMenu";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useLocale } from "./LocaleProvider";
+import { translateActivityType } from "../lib/i18n.mjs";
 
 const NOTIFICATION_NAVIGATION_EVENT = "travel-plan:notification-navigation";
 
-const formatDuration = (milliseconds) => {
+const formatDuration = (milliseconds, t) => {
   const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -48,11 +51,11 @@ const formatDuration = (milliseconds) => {
   if (hours > 0)
     return {
       value: `${hours}h ${String(minutes).padStart(2, "0")}`,
-      unit: "giờ · phút",
+      unit: t("tracker.hoursMinutes"),
     };
   return {
     value: `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-    unit: "phút · giây",
+    unit: t("tracker.minutesSeconds"),
   };
 };
 
@@ -65,6 +68,7 @@ export default function TripTracker({
   trips,
 }) {
   const router = useRouter();
+  const { t, intlLocale, locale } = useLocale();
   const [data, setData] = useState(initialData);
   const [now, setNow] = useState(() => new Date(initialNow));
   const [announcement, setAnnouncement] = useState("");
@@ -251,11 +255,13 @@ export default function TripTracker({
     data.trip.timezone,
     now,
     data.trip.endDate,
+    locale,
   );
   const pageTitle = getTripPageTitle({
     mode: resolvedState?.mode,
     tripTitle,
     activityTitle: resolvedState?.current?.title,
+    locale,
   });
 
   useEffect(() => {
@@ -341,11 +347,15 @@ export default function TripTracker({
   if (!itinerary.length) {
     return (
       <main className="shell">
+        <header className={`${navigationStyles["trip-bar"]} ${navigationStyles["empty-trip-bar"]}`} id="top">
+          <Link className={navigationStyles["product-mark"]} href="/">{t("app.title")}</Link>
+          <div className={navigationStyles["viewer-utilities"]}><LanguageSwitcher /></div>
+        </header>
         <section className="now-card error-card">
-          <h1>Chưa có hoạt động</h1>
-          <p>Chuyến đi này chưa có mục lịch trình nào.</p>
+          <h1>{t("tracker.noActivities")}</h1>
+          <p>{t("tracker.noActivitiesDescription")}</p>
           <Link className={trackerStyles["jump-button"]} href="/">
-            Chọn chuyến khác
+            {t("tracker.chooseTrip")}
           </Link>
         </section>
         <SavedPlaces places={data.places} activities={data.itinerary} />
@@ -364,43 +374,44 @@ export default function TripTracker({
   let countdownLabel;
 
   if (state.mode === "preview") {
-    status = "Đang xem trước";
-    kicker = `Ngày ${tripDays.indexOf(selectedDay) + 1}`;
+    status = t("tracker.previewing");
+    kicker = t("tracker.day", { number: tripDays.indexOf(selectedDay) + 1 });
     title = state.current.title;
     detail = state.current.detail;
-    range = `${state.current.start} — ${state.current.endDate !== state.current.startDate ? `${formatDateLabel(state.current.endDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })} · ` : ""}${state.current.displayEnd || state.current.end}`;
+    range = `${state.current.start} — ${state.current.endDate !== state.current.startDate ? `${formatDateLabel(state.current.endDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" }, intlLocale)} · ` : ""}${state.current.displayEnd || state.current.end}`;
   } else if (state.mode === "before") {
-    countdown = formatDuration(state.current.startAt - now);
-    status = "Sắp bắt đầu";
-    kicker = "Chuyến đi bắt đầu sau";
+    countdown = formatDuration(state.current.startAt - now, t);
+    status = t("tracker.status.before");
+    kicker = t("tracker.tripStartsIn");
     title = state.current.title;
     detail = state.current.detail;
-    range = `Bắt đầu ${state.current.start}`;
-    countdownLabel = "đến giờ đi";
+    range = t("trackerExtra.startsAt", { time: state.current.start });
+    countdownLabel = t("tracker.untilDeparture");
   } else if (state.mode === "after") {
-    status = "Đã kết thúc";
-    kicker = "Hành trình hoàn tất";
-    title = "Chuyến đi đã hoàn tất";
-    detail = `Đã đi qua ${itinerary.length} hoạt động trong lịch trình.`;
-    range = `Hoàn tất lúc ${state.anchor.end}`;
+    status = t("tracker.status.after");
+    kicker = t("tracker.tripComplete");
+    title = t("tracker.tripCompleted");
+    detail = t("tracker.activitiesPassed", { count: itinerary.length });
+    range = t("tracker.completedAt", { time: state.anchor.end });
   } else {
     const item = state.current;
     const target = state.mode === "gap" ? item.startAt : item.endAt;
-    countdown = formatDuration(target - now);
+    countdown = formatDuration(target - now, t);
     progress =
       state.mode === "active"
         ? (now - item.startAt) / (item.endAt - item.startAt)
         : 0;
-    status =
-      state.mode === "gap" ? "Đang chờ" : `Đang ${item.type.toLowerCase()}`;
-    kicker = state.mode === "gap" ? "Hoạt động tiếp theo" : "Ngay lúc này";
+    status = state.mode === "gap"
+      ? t("tracker.status.gap")
+      : t("tracker.status.active", { type: translateActivityType(locale, item.type) });
+    kicker = state.mode === "gap" ? t("tracker.nextActivity") : t("tracker.current");
     title = item.title;
     detail = item.detail;
-    range = `${item.start} — ${item.endDate !== item.startDate ? `${formatDateLabel(item.endDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })} · ` : ""}${item.displayEnd || item.end}`;
-    countdownLabel = state.mode === "gap" ? "đến hoạt động" : "còn lại";
+    range = `${item.start} — ${item.endDate !== item.startDate ? `${formatDateLabel(item.endDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" }, intlLocale)} · ` : ""}${item.displayEnd || item.end}`;
+    countdownLabel = state.mode === "gap" ? t("tracker.untilActivity") : t("tracker.remaining");
   }
 
-  const clock = new Intl.DateTimeFormat("vi-VN", {
+  const clock = new Intl.DateTimeFormat(intlLocale, {
     timeZone: data.trip.timezone,
     hour: "2-digit",
     minute: "2-digit",
@@ -412,31 +423,32 @@ export default function TripTracker({
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  });
+  }, intlLocale);
   const scheduleHeading = browsingDay
-    ? `Ngày ${tripDays.indexOf(selectedDay) + 1} · ${formatDateLabel(selectedDay, data.trip.timezone, { weekday: "long", day: "2-digit", month: "2-digit" })}`
+      ? `${t("tracker.day", { number: tripDays.indexOf(selectedDay) + 1 })} · ${formatDateLabel(selectedDay, data.trip.timezone, { weekday: "long", day: "2-digit", month: "2-digit" }, intlLocale)}`
     : formatScheduleHeading(
         data.trip.startDate,
         data.trip.timezone,
         now,
         data.trip.endDate,
+        locale,
       );
   const isAfter = state.mode === "after";
   const isPreview = state.mode === "preview";
   const showCountdown = !isAfter && !isPreview;
   const jumpLabel = browsingDay
-    ? "Về hiện tại"
+    ? t("tracker.backToCurrent")
     : isAfter
-      ? "Điểm cuối"
-      : "Hiện tại";
+      ? t("tracker.end")
+      : t("tracker.now");
   const stationSuggestionActivityId = isAfter ? null : state.current.id;
   const stationSuggestionTarget = isAfter
-    ? "cả chuyến đi"
+    ? t("trackerExtra.wholeTrip")
     : state.current.title;
   const stationSuggestionKey = stationSuggestionActivityId || "trip";
   const stationSuggestionLabel = isAfter
-    ? "Góp ý cho cả chuyến"
-    : "Góp ý cho hoạt động này";
+    ? t("tracker.addTripNote")
+    : t("tracker.addActivityNote");
 
   const jumpToCurrent = () => {
     const targetState = resolvedState;
@@ -457,7 +469,7 @@ export default function TripTracker({
     if (
       tripStarted &&
       !window.confirm(
-        `Chuyến đi đã bắt đầu. Đổi sang “${branch.label}” có thể làm thay đổi hoạt động hiện tại và tiếp theo. Tiếp tục?`,
+        t("trackerExtra.branchConfirm", { label: branch.label }),
       )
     )
       return;
@@ -473,14 +485,14 @@ export default function TripTracker({
       );
       const result = await response.json().catch(() => ({}));
       if (!response.ok)
-        throw new Error(result.error || "Không đổi được phương án");
+        throw new Error(t("trackerExtra.branchError"));
       setData(result);
       setBranchAction({ id: null, error: "" });
-      setAnnouncement(`Đã dùng phương án ${branch.label} cho cả nhóm.`);
-    } catch (error) {
+      setAnnouncement(t("trackerExtra.branchSelected", { label: branch.label }));
+    } catch {
       setBranchAction({
         id: branch.id,
-        error: `${error.message}. Hãy thử lại.`,
+        error: t("trackerExtra.retry", { error: t("trackerExtra.branchError") }),
       });
     }
   };
@@ -518,14 +530,14 @@ export default function TripTracker({
         <a
           className={navigationStyles["product-mark"]}
           href="#top"
-          aria-label="Đầu trang"
+          aria-label={t("common.backToTrip")}
         >
           <TypeIcon type="Transit" />
-          <span>Lịch trình chuyến đi</span>
+          <span>{t("app.title")}</span>
         </a>
         <div className={navigationStyles["trip-context"]}>
           <label className={navigationStyles["trip-picker"]}>
-            <span className="sr-only">Chọn chuyến đi</span>
+            <span className="sr-only">{t("nav.selectTrip")}</span>
             <span className={navigationStyles["trip-picker-control"]}>
               <select
                 value={data.trip.slug}
@@ -543,6 +555,7 @@ export default function TripTracker({
                       trip.timezone,
                       now,
                       trip.endDate,
+                      locale,
                     )}
                   </option>
                 ))}
@@ -551,7 +564,7 @@ export default function TripTracker({
                 className={navigationStyles["trip-picker-affordance"]}
                 aria-hidden="true"
               >
-                <span>Đổi</span>
+                <span>{t("nav.change")}</span>
                 <ActionIcon name="down" />
               </span>
             </span>
@@ -566,16 +579,17 @@ export default function TripTracker({
             onClick={() => setInvitationOpen(true)}
           >
             <ActionIcon name="invite" />
-            <span>Rủ bạn đi cùng</span>
+            <span>{t("nav.invite")}</span>
           </button>
         </div>
         <div className={navigationStyles["viewer-utilities"]}>
+          <LanguageSwitcher />
           {viewer?.isAdmin && (
             <Link
               className={`${navigationStyles["admin-link"]} ${trackerStyles["desktop-manage-link"]}`}
               href={ADMIN_ROUTES.trips}
             >
-              Quản lý
+              {t("common.manage")}
             </Link>
           )}
           {viewer && <NotificationCenter />}
@@ -587,13 +601,13 @@ export default function TripTracker({
               type="button"
               onClick={() => signIn("google", { redirectTo: "/" })}
             >
-              Đăng nhập
+              {t("common.login")}
             </button>
           )}
         </div>
         <div
           className={trackerStyles["live-clock"]}
-          aria-label={`Giờ hiện tại tại ${data.trip.timezone}`}
+          aria-label={t("nav.currentTimeAt", { timezone: data.trip.timezone })}
         >
           <span className={trackerStyles["live-dot"]} aria-hidden="true" />
           <small>
@@ -605,7 +619,7 @@ export default function TripTracker({
 
       <nav
         className={trackerStyles["trip-day-selector"]}
-        aria-label="Chọn ngày trong chuyến đi"
+        aria-label={t("tracker.chooseDay")}
         ref={daySelectorRef}
       >
         {tripDays.map((date, index) => {
@@ -620,15 +634,15 @@ export default function TripTracker({
               aria-current={selectedDay === date ? "date" : undefined}
               onClick={() => setSelectedDay(date)}
             >
-              <span>Ngày {index + 1}</span>
+              <span>{t("tracker.day", { number: index + 1 })}</span>
               <strong>
                 {formatDateLabel(date, data.trip.timezone, {
                   weekday: "short",
                   day: "2-digit",
                   month: "2-digit",
-                })}
+                }, intlLocale)}
               </strong>
-              <small>{count ? `${count} hoạt động` : "Chưa có lịch"}</small>
+              <small>{count ? t("tracker.activities", { count }) : t("tracker.noSchedule")}</small>
             </button>
           );
         })}
@@ -638,10 +652,9 @@ export default function TripTracker({
         <section className={trackerStyles["empty-trip-day"]} aria-live="polite">
           <span className={trackerStyles["route-node"]} aria-hidden="true" />
           <div>
-            <h1>Ngày này chưa có hoạt động</h1>
+            <h1>{t("tracker.emptyDayTitle")}</h1>
             <p>
-              Lịch trình vẫn giữ ngày này trong chuyến đi. Chọn một ngày khác để
-              xem tuyến đã lên kế hoạch.
+              {t("trackerExtra.emptyDay")}
             </p>
           </div>
           {browsingDay && (
@@ -650,7 +663,7 @@ export default function TripTracker({
               className={trackerStyles["jump-button"]}
               onClick={jumpToCurrent}
             >
-              Về ngày hiện tại
+              {t("tracker.backToCurrent")}
             </button>
           )}
         </section>
@@ -661,8 +674,8 @@ export default function TripTracker({
           className={trackerStyles["live-board"]}
           aria-label={
             browsingDay
-              ? "Xem trước ngày đã chọn"
-              : "Tình trạng chuyến đi hiện tại"
+              ? t("tracker.previewing")
+              : t("tracker.currentRoute")
           }
         >
           <aside className={trackerStyles["route-overview"]}>
@@ -694,10 +707,10 @@ export default function TripTracker({
                         <strong>{item.title}</strong>
                         <small>
                           {item.branchLabel
-                            ? `${item.type} · ${item.branchLabel}`
-                            : item.type}
+                            ? `${translateActivityType(locale, item.type)} · ${item.branchLabel}`
+                            : translateActivityType(locale, item.type)}
                           {branchGroup
-                            ? ` · ${branchGroup.branches.length} phương án`
+                            ? ` · ${t("trackerExtra.options", { count: branchGroup.branches.length })}`
                             : ""}
                         </small>
                       </span>
@@ -768,14 +781,14 @@ export default function TripTracker({
                     )
                   }
                 >
-                  {viewer ? stationSuggestionLabel : "Đăng nhập để góp ý"}
+                          {viewer ? stationSuggestionLabel : t("tracker.loginToComment")}
                 </button>
                 <span>
                   {
                     (suggestionsByActivity.get(stationSuggestionKey) || [])
                       .length
                   }{" "}
-                  ghi chú
+                  {t("trackerExtra.notes")}
                 </span>
               </div>
               <SuggestionList
@@ -796,15 +809,15 @@ export default function TripTracker({
                   navigateToActivity(stationNext);
                 }}
               >
-                <span>Tiếp theo</span>
+                <span>{t("common.next")}</span>
                 <TypeIcon type={stationNext.type} />
                 <strong>{stationNext.title}</strong>
                 <small>
                   {stationNext.startDate !== selectedDay
-                    ? `${formatDateLabel(stationNext.startDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })} · `
+                    ? `${formatDateLabel(stationNext.startDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" }, intlLocale)} · `
                     : ""}
                   {stationNext.start} ·{" "}
-                  {stationNext.branchLabel || stationNext.type}
+                  {stationNext.branchLabel || translateActivityType(locale, stationNext.type)}
                 </small>
                 <ActionIcon name="right" />
               </a>
@@ -812,15 +825,13 @@ export default function TripTracker({
 
             <div className={trackerStyles["station-legend"]}>
               <span>
-                <i className={`${trackerStyles["legend-line"]} active`} /> Đang
-                đi
+                <i className={`${trackerStyles["legend-line"]} active`} /> {t("trackerExtra.current")}
               </span>
               <span>
-                <i className={`${trackerStyles["legend-line"]} next`} /> Tiếp
-                theo
+                <i className={`${trackerStyles["legend-line"]} next`} /> {t("common.next")}
               </span>
               <span>
-                <i className={`${trackerStyles["legend-line"]} done`} /> Đã qua
+                <i className={`${trackerStyles["legend-line"]} done`} /> {t("trackerExtra.passed")}
               </span>
             </div>
           </div>
@@ -830,7 +841,7 @@ export default function TripTracker({
       {selectedItinerary.length > 0 && (
         <section
           className={trackerStyles["mobile-route-board"]}
-          aria-label="Tuyến lịch trình hiện tại"
+          aria-label={t("tracker.currentRoute")}
         >
           <div className={trackerStyles["mobile-route-head"]}>
             <h2>{scheduleHeading}</h2>
@@ -858,8 +869,8 @@ export default function TripTracker({
                       <strong>{item.title}</strong>
                       <small>
                         {item.branchLabel
-                          ? `${item.type} · ${item.branchLabel}`
-                          : item.type}
+                          ? `${translateActivityType(locale, item.type)} · ${item.branchLabel}`
+                          : translateActivityType(locale, item.type)}
                       </small>
                     </span>
                   </a>
@@ -911,7 +922,7 @@ export default function TripTracker({
                         >
                           {viewer
                             ? stationSuggestionLabel
-                            : "Đăng nhập để góp ý"}
+                            : t("tracker.loginToComment")}
                         </button>
                         <span>
                           {
@@ -920,7 +931,7 @@ export default function TripTracker({
                               []
                             ).length
                           }{" "}
-                          ghi chú
+                          {t("trackerExtra.notes")}
                         </span>
                       </div>
                       {stationNext && (
@@ -933,9 +944,9 @@ export default function TripTracker({
                           }}
                         >
                           <span>
-                            Tiếp theo ·{" "}
+                            {t("common.next")} ·{" "}
                             {stationNext.startDate !== selectedDay
-                              ? `${formatDateLabel(stationNext.startDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" })} · `
+                              ? `${formatDateLabel(stationNext.startDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" }, intlLocale)} · `
                               : ""}
                             {stationNext.start}
                             {stationNext.branchLabel
@@ -962,12 +973,12 @@ export default function TripTracker({
           onClick={jumpToCurrent}
         >
           <span>
-            <small>{browsingDay ? "Về ngày hiện tại" : status}</small>
+            <small>{browsingDay ? t("tracker.backToCurrent") : status}</small>
             <strong>{resolvedState.anchor.title}</strong>
           </span>
           {resolvedState.next && (
             <span>
-              <small>Tiếp theo · {resolvedState.next.start}</small>
+              <small>{t("common.next")} · {resolvedState.next.start}</small>
               <strong>{resolvedState.next.title}</strong>
             </span>
           )}
@@ -976,20 +987,20 @@ export default function TripTracker({
       )}
 
       <div className={trackerStyles["section-heading"]}>
-        <h2>Toàn bộ lịch trình</h2>
+        <h2>{t("tracker.fullSchedule")}</h2>
         <button
           className={trackerStyles["jump-button"]}
           type="button"
           onClick={jumpToCurrent}
         >
-          {isAfter ? "Về điểm cuối" : "Về hiện tại"} <ActionIcon name="down" />
+          {isAfter ? t("tracker.backToEnd") : t("tracker.backToCurrent")} <ActionIcon name="down" />
         </button>
       </div>
 
       {selectedItinerary.length > 0 && (
         <section
           className={trackerStyles["timeline"]}
-          aria-label={`Lịch trình chi tiết ${selectedDay}`}
+          aria-label={t("trackerExtra.detailSchedule", { date: selectedDay })}
         >
           {selectedDay === data.trip.startDate && startBranchGroup && (
             <div className={trackerStyles["trip-start-junction"]}>
@@ -1032,11 +1043,11 @@ export default function TripTracker({
                     <div className={trackerStyles["timeline-card-head"]}>
                       <span className={trackerStyles["type-label"]}>
                         <TypeIcon type={item.type} />
-                        {item.type}
+                        {translateActivityType(locale, item.type)}
                         {item.branchLabel ? ` · ${item.branchLabel}` : ""}
                       </span>
                       <span className={trackerStyles["done-label"]}>
-                        Đã qua
+                        {t("trackerExtra.passed")}
                       </span>
                     </div>
                     <h3>{item.title}</h3>
@@ -1063,8 +1074,8 @@ export default function TripTracker({
                       onClick={() => openSuggestion(item.id, item.title)}
                     >
                       {viewer
-                        ? "Góp ý cho hoạt động này"
-                        : "Đăng nhập để góp ý"}
+                        ? t("tracker.addActivityNote")
+                        : t("tracker.loginToComment")}
                     </button>
                   </div>
                 </article>
@@ -1090,13 +1101,13 @@ export default function TripTracker({
         className={contributionsStyles["trip-suggestions"]}
         aria-labelledby="trip-suggestions-title"
       >
-        <h2 id="trip-suggestions-title">Ghi chú cho cả chuyến</h2>
+        <h2 id="trip-suggestions-title">{t("tracker.notesForTrip")}</h2>
         <button
           className={trackerStyles["jump-button"]}
           type="button"
-          onClick={() => openSuggestion(null, "cả chuyến đi")}
+          onClick={() => openSuggestion(null, t("trackerExtra.wholeTrip"))}
         >
-          Thêm ghi chú
+          {t("tracker.addNote")}
         </button>
         <SuggestionList
           suggestions={suggestionsByActivity.get("trip") || []}
@@ -1109,7 +1120,7 @@ export default function TripTracker({
         aria-labelledby="sources-title"
       >
         <div className={`${trackerStyles["section-heading"]} compact`}>
-          <h2 id="sources-title">Nguồn địa điểm</h2>
+          <h2 id="sources-title">{t("tracker.placeSources")}</h2>
         </div>
         <div className={contributionsStyles["source-list"]}>
           {data.sources.map((source) => (
@@ -1138,7 +1149,7 @@ export default function TripTracker({
       <SavedPlaces places={data.places} activities={data.itinerary} />
       <Footer>
         <span>{tripTitle}</span>
-        <span>Giữ nhịp chậm, chụp thật đẹp.</span>
+        <span>{t("trackerExtra.footer")}</span>
       </Footer>
 
       {contributionDialogs}
@@ -1173,6 +1184,7 @@ function BranchJunction({
   onSelect,
   onSuggest,
 }) {
+  const { t, locale } = useLocale();
   const selected =
     group.branches.find((branch) => branch.id === group.selectedBranchId) ||
     group.branches[0];
@@ -1233,11 +1245,11 @@ function BranchJunction({
         />
         <span>
           <small>
-            {startsTrip ? "Điểm rẽ đầu chuyến" : "Điểm rẽ"} ·{" "}
-            {group.branches.length} phương án
+            {startsTrip ? t("trackerExtra.startJunction") : t("trackerExtra.junction")} ·{" "}
+            {t("trackerExtra.options", { count: group.branches.length })}
           </small>
           <strong id={`public-branch-${group.id}`}>{group.title}</strong>
-          <em>Đang dùng: {selected.label}</em>
+          <em>{t("trackerExtra.usingLabel", { label: selected.label })}</em>
         </span>
         <span className={expanded ? "is-open" : ""}>
           <ActionIcon name="down" />
@@ -1262,8 +1274,8 @@ function BranchJunction({
                     }}
                   >
                     <span>
-                      {isSelected ? "Đang dùng" : "Dự phòng"}
-                      {branch.isDefault ? " · Mặc định" : ""}
+                      {isSelected ? t("trackerExtra.using") : t("trackerExtra.backup")}
+                      {branch.isDefault ? ` · ${t("trackerExtra.default")}` : ""}
                     </span>
                     <strong>{branch.label}</strong>
                     <small>{branch.condition}</small>
@@ -1276,8 +1288,8 @@ function BranchJunction({
                       onClick={() => onSelect(group, branch)}
                     >
                       {branchAction.id === branch.id
-                        ? "Đang đổi…"
-                        : "Dùng phương án này"}
+                        ? t("trackerExtra.switching")
+                        : t("trackerExtra.useOption")}
                     </button>
                   )}
                 </div>
@@ -1291,8 +1303,7 @@ function BranchJunction({
                 )}
                 {isSelected && (
                   <p className={trackerStyles["branch-active-note"]}>
-                    Các hoạt động của phương án này đang nằm trên tuyến chính
-                    phía dưới.
+                    {t("trackerExtra.activeBranch")}
                   </p>
                 )}
                 {!isSelected && open && (
@@ -1311,7 +1322,7 @@ function BranchJunction({
                         <div>
                           <span className={trackerStyles["type-label"]}>
                             <TypeIcon type={item.type} />
-                            {item.type}
+                            {translateActivityType(locale, item.type)}
                           </span>
                           <h4>{item.title}</h4>
                           {item.detail && (
@@ -1344,15 +1355,15 @@ function BranchJunction({
                             onClick={() => onSuggest(item.id, item.title)}
                           >
                             {viewer
-                              ? "Góp ý cho hoạt động này"
-                              : "Đăng nhập để góp ý"}
+                              ? t("trackerExtra.suggestActivity")
+                              : t("trackerExtra.loginFeedback")}
                           </button>
                         </div>
                       </article>
                     ))}
                     {!branch.itinerary.length && (
                       <p className={trackerStyles["branch-empty"]}>
-                        Không có hoạt động — đi thẳng tới mốc hội nhập.
+                        {t("trackerExtra.emptyBranch")}
                       </p>
                     )}
                   </div>
@@ -1381,6 +1392,7 @@ function ActivityDetail({ detail, placement }) {
 }
 
 function ContactDirectory({ contacts, placement }) {
+  const { t } = useLocale();
   const [copyState, setCopyState] = useState({ phone: null, status: "idle" });
   const resetTimerRef = useRef(null);
 
@@ -1405,17 +1417,17 @@ function ContactDirectory({ contacts, placement }) {
   return (
     <div
       className={`${trackerStyles["contact-directory"]} ${trackerStyles[`contact-directory-${placement}`]}`}
-      aria-label="Số điện thoại đặt bàn"
+      aria-label={t("trackerExtra.phones")}
     >
       {contacts.map((contact) => {
         const state =
           copyState.phone === contact.phone ? copyState.status : "idle";
         const buttonLabel =
           state === "copied"
-            ? "Đã sao chép"
+            ? t("trackerExtra.copied")
             : state === "error"
-              ? "Không sao chép được, thử lại"
-              : "Sao chép";
+              ? t("trackerExtra.copyError")
+              : t("trackerExtra.copy");
         return (
           <div
             className={trackerStyles["contact-directory-row"]}
@@ -1427,7 +1439,7 @@ function ContactDirectory({ contacts, placement }) {
             <a
               className={trackerStyles["contact-directory-phone"]}
               href={`tel:${contact.dial}`}
-              aria-label={`Gọi ${contact.name} theo số ${contact.phone}`}
+              aria-label={t("trackerExtra.call", { name: contact.name, phone: contact.phone })}
             >
               {contact.phone}
             </a>
@@ -1440,8 +1452,8 @@ function ContactDirectory({ contacts, placement }) {
                     : ""
               }
               type="button"
-              aria-label={`${buttonLabel} số điện thoại ${contact.name}`}
-              title={`${buttonLabel} số điện thoại`}
+              aria-label={t("trackerExtra.copyPhoneName", { action: buttonLabel, name: contact.name })}
+              title={t("trackerExtra.copyPhone", { action: buttonLabel })}
               onClick={() => copyPhone(contact)}
             >
               <ActionIcon name={state === "copied" ? "check" : "copy"} />
@@ -1451,9 +1463,9 @@ function ContactDirectory({ contacts, placement }) {
       })}
       <span className="sr-only" aria-live="polite" aria-atomic="true">
         {copyState.status === "copied"
-          ? `Đã sao chép ${copyState.phone}.`
+          ? t("trackerExtra.copiedPhone", { phone: copyState.phone })
           : copyState.status === "error"
-            ? `Không sao chép được ${copyState.phone}. Chạm lại để thử.`
+            ? t("trackerExtra.failedPhone", { phone: copyState.phone })
             : ""}
       </span>
     </div>
@@ -1461,6 +1473,7 @@ function ContactDirectory({ contacts, placement }) {
 }
 
 function Citation({ source }) {
+  const { t } = useLocale();
   if (!source) return null;
   return (
     <a
@@ -1468,9 +1481,9 @@ function Citation({ source }) {
       href={source.url}
       target="_blank"
       rel="noreferrer"
-      aria-label={`Mở nguồn ${source.number}`}
+      aria-label={t("trackerExtra.openSource", { number: source.number })}
     >
-      Nguồn {source.number}
+      {t("trackerExtra.source", { number: source.number })}
       <ActionIcon name="external" />
     </a>
   );

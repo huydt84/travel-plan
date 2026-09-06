@@ -6,7 +6,8 @@ import { countPendingInvitationRequests } from "../../../lib/invitation-permissi
 import { listUsers } from "../../../lib/user-repository";
 import { countOpenTripRequests } from "../../../lib/trip-request-repository";
 
-export const metadata = { title: "Quản lý người dùng" };
+import { localizedMetadata } from "../../../lib/locale-server";
+export const generateMetadata = () => localizedMetadata("metadata.adminUsers");
 export const dynamic = "force-dynamic";
 
 export default async function UsersAdminPage() {

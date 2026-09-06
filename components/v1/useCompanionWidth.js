@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useLocale } from "../LocaleProvider";
 
 const storageKey = "assistant:panel-width";
 const minimum = 360;
@@ -17,6 +18,7 @@ const readPreference = () => {
 };
 
 export function useCompanionWidth() {
+  const { t } = useLocale();
   const viewport = useSyncExternalStore(subscribeViewport, getViewport, getServerViewport);
   const [preferred, setPreferred] = useState(undefined);
   const preference = preferred === undefined && viewport ? readPreference() : preferred;
@@ -54,10 +56,10 @@ export function useCompanionWidth() {
   };
 
   return { width, mobile, dragging, separatorProps: {
-    role: "separator", tabIndex: 0, "aria-label": "Độ rộng trợ lý", "aria-orientation": "vertical",
+    role: "separator", tabIndex: 0, "aria-label": t("assistantExtra.width"), "aria-orientation": "vertical",
     "aria-valuemin": minimum, "aria-valuemax": maximum, "aria-valuenow": width,
-    "aria-valuetext": `${width} pixel`, "aria-controls": "trip-companion-panel",
-    title: "Kéo để đổi độ rộng · Phím trái/phải để điều chỉnh · Nhấp đúp để đặt lại",
+    "aria-valuetext": t("assistantExtra.widthPixels", { width }), "aria-controls": "trip-companion-panel",
+    title: t("assistantExtra.widthHelp"),
     onPointerDown(event) {
       if (event.button !== 0) return;
       event.preventDefault();

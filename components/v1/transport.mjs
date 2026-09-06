@@ -1,7 +1,7 @@
 export async function apiJson(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { accept: "application/json", ...(options.body ? { "content-type": "application/json" } : {}), ...options.headers } });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw Object.assign(new Error(data.error || "Không tải được dữ liệu. Hãy thử lại."), { code: data.code, status: response.status });
+  if (!response.ok) throw Object.assign(new Error(data.error || "assistantExtra.error.load"), { code: data.code, status: response.status });
   return data;
 }
 
@@ -10,7 +10,7 @@ export async function observeRun(runId, onEvent, signal) {
   while (!signal.aborted) {
     try {
       const response = await fetch(`/api/v1/assistant/runs/${runId}/events?after=${cursor}`, { signal });
-      if (!response.ok) throw Object.assign(new Error("Không kết nối được với câu trả lời"), { status: response.status });
+      if (!response.ok) throw Object.assign(new Error("assistantExtra.error.connect"), { status: response.status });
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let pending = "";
@@ -22,9 +22,9 @@ export async function observeRun(runId, onEvent, signal) {
           if (done && pending.trim()) lines.push(pending);
           for (const line of lines.filter((line) => line.trim())) {
             const event = JSON.parse(line);
-            if (event.runId !== runId || !Number.isSafeInteger(event.seq)) throw new Error("Phản hồi không hợp lệ");
+            if (event.runId !== runId || !Number.isSafeInteger(event.seq)) throw new Error("assistantExtra.error.invalidResponse");
             if (event.seq <= cursor) continue;
-            if (event.seq !== cursor + 1) throw new Error("Thiếu một phần phản hồi");
+            if (event.seq !== cursor + 1) throw new Error("assistantExtra.error.missingResponse");
             cursor = event.seq; failures = 0;
             onEvent(event);
             if (["completed", "failed", "cancelled", "awaiting_approval"].includes(event.type)) return;

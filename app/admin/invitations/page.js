@@ -5,7 +5,8 @@ import { listInvitationHistory } from "../../../lib/invitation-repository";
 import { listAllInvitationPermissions } from "../../../lib/invitation-permission-repository";
 import { countOpenTripRequests } from "../../../lib/trip-request-repository";
 
-export const metadata = { title: "Quản lý lời rủ" };
+import { localizedMetadata } from "../../../lib/locale-server";
+export const generateMetadata = () => localizedMetadata("metadata.adminInvitations");
 export const dynamic = "force-dynamic";
 
 export default async function InvitationsAdminPage({ searchParams }) {

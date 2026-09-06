@@ -5,7 +5,8 @@ import { countPendingInvitationRequests } from "../../../lib/invitation-permissi
 import { listCachedTrips } from "../../../lib/trip-cache";
 import { listAllTripRequests } from "../../../lib/trip-request-repository";
 
-export const metadata = { title: "Quản lý yêu cầu chuyến đi" };
+import { localizedMetadata } from "../../../lib/locale-server";
+export const generateMetadata = () => localizedMetadata("metadata.adminRequests");
 export const dynamic = "force-dynamic";
 
 export default async function TripRequestsAdminPage() {

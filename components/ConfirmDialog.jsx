@@ -1,4 +1,5 @@
 "use client";
+import { useLocale } from "./LocaleProvider";
 import contributionsStyles from "../src/styles/contributions.module.css";
 
 import styles from "./ConfirmDialog.module.css";
@@ -12,12 +13,13 @@ export default function ConfirmDialog({
   description,
   preview = "",
   confirmLabel,
-  pendingLabel = "Đang cập nhật…",
+  pendingLabel,
   pending = false,
   error = "",
   onCancel,
   onConfirm,
 }) {
+  const { t } = useLocale();
   const safeActionRef = useRef(null);
 
   return (
@@ -50,7 +52,7 @@ export default function ConfirmDialog({
             disabled={pending}
             ref={safeActionRef}
           >
-            Huỷ
+            {t("trackerExtra.cancel")}
           </Button>
           <Button
             type="button"
@@ -58,7 +60,7 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             disabled={pending}
           >
-            {pending ? pendingLabel : confirmLabel}
+            {pending ? (pendingLabel ?? t("trackerExtra.updating")) : confirmLabel}
           </Button>
         </div>
       </section>

@@ -72,7 +72,9 @@ test("mobile owner opens management from the account disclosure", async ({ page 
 test("invitation permission states gate the composer and recover after access errors", async ({ page, runtimeHealth }, testInfo) => {
   let permission = null;
   let fail = true;
+  let accessRequests = 0;
   await page.route("**/api/invitation-access?*", async (route) => {
+    accessRequests += 1;
     if (fail) return route.fulfill({ status: 400, json: { error: "Temporary access failure" } });
     return route.fulfill({ json: { authState: "authenticated", isOwner: false, permission, gmailAuthorized: false, quota: { batchesRemaining: 20 }, history: [] } });
   });
@@ -85,11 +87,15 @@ test("invitation permission states gate the composer and recover after access er
   const trigger = page.getByRole("button", { name: "Rủ bạn đi cùng", exact: true });
   await trigger.click();
   await expect(page.getByText("Không tải được quyền gửi lời rủ", { exact: true })).toBeVisible();
+  const refreshed = page.waitForResponse((response) => response.url().includes("/api/itinerary?"));
+  await page.evaluate(() => window.dispatchEvent(new Event("assistant-resources-changed")));
+  await refreshed;
   fail = false;
   await page.getByRole("button", { name: "Thử tải lại" }).click();
   await expect(page.locator("#invite-email")).toHaveCount(0);
   await page.getByRole("button", { name: "Yêu cầu quyền gửi lời rủ" }).click();
   await expect(page.getByRole("heading", { name: "Đã gửi yêu cầu" })).toBeVisible();
+  expect(accessRequests).toBe(3); // Initial failure, explicit retry, then permission-request refresh.
   await expect(page.locator("#invite-email")).toHaveCount(0);
   permission = { ...permission, status: "approved" };
   await page.getByRole("button", { name: "Kiểm tra lại" }).click();

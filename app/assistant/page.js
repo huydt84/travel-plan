@@ -4,8 +4,13 @@ import { resolveAgenticV1Config } from "../../lib/v1/config.mjs";
 import { getDefaultTravelAssistant } from "../../lib/v1/travel-assistant.mjs";
 import AssistantAccess from "../../components/v1/AssistantAccess";
 import AssistantWorkspace from "../../components/v1/AssistantWorkspace";
+import { cookies } from "next/headers";
+import { LOCALE_COOKIE, normalizeLocale, translate } from "../../lib/i18n.mjs";
 
-export const metadata = { title: "Trợ lý hành trình" };
+export async function generateMetadata() {
+  const locale = normalizeLocale((await cookies()).get(LOCALE_COOKIE)?.value);
+  return { title: translate(locale, "assistant.title") };
+}
 export const dynamic = "force-dynamic";
 
 export default async function AgenticTravelPage({ searchParams }) {

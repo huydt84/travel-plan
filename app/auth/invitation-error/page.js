@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import { useLocale } from "../../../components/LocaleProvider";
 
 export default function InvitationAuthErrorPage() {
+  const { t } = useLocale();
   useEffect(() => {
     const storedReturn = window.sessionStorage.getItem("travel-plan:invite:return");
     const destination = new URL(storedReturn || "/", window.location.origin);
@@ -14,8 +16,8 @@ export default function InvitationAuthErrorPage() {
   return (
     <main className="shell">
       <section className="now-card error-card" role="status">
-        <h1>Đang quay lại lời rủ</h1>
-        <p>Nội dung bạn đã nhập vẫn được giữ.</p>
+        <h1>{t("errors.returnToInvite")}</h1>
+        <p>{t("errors.invitePreserved")}</p>
       </section>
     </main>
   );

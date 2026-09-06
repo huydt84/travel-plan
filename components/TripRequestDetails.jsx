@@ -1,6 +1,7 @@
 import tripRequestsStyles from "../src/styles/trip-requests.module.css";
 import Link from "next/link";
 import { ActionIcon } from "./Icons";
+import { useLocale } from "./LocaleProvider";
 
 export const requestStateLabels = {
   open: "Đang chờ",
@@ -8,28 +9,30 @@ export const requestStateLabels = {
   declined: "Không thực hiện",
   withdrawn: "Đã rút",
 };
+export const requestStateKey = (state) => `requests.status.${state}`;
 
-const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
+const dateOptions = {
   weekday: "short",
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
   timeZone: "UTC",
-});
+};
 
-export const formatRequestDate = (value) =>
-  dateFormatter.format(new Date(`${value}T00:00:00Z`));
-export const formatRequestRange = (request) =>
+export const formatRequestDate = (value, locale = "vi-VN") =>
+  new Intl.DateTimeFormat(locale, dateOptions).format(new Date(`${value}T00:00:00Z`));
+export const formatRequestRange = (request, locale = "vi-VN") =>
   request.startDate === request.endDate
-    ? formatRequestDate(request.startDate)
-    : `${formatRequestDate(request.startDate)} — ${formatRequestDate(request.endDate)}`;
+    ? formatRequestDate(request.startDate, locale)
+    : `${formatRequestDate(request.startDate, locale)} — ${formatRequestDate(request.endDate, locale)}`;
 
 export default function TripRequestDetails({ request, admin = false }) {
+  const { t, intlLocale } = useLocale();
   return (
     <div className={tripRequestsStyles["request-detail-body"]}>
       <div className={tripRequestsStyles["request-date-board"]}>
-        <span>Thời gian mong muốn</span>
-        <strong>{formatRequestRange(request)}</strong>
+        <span>{t("requests.desiredDates")}</span>
+        <strong>{formatRequestRange(request, intlLocale)}</strong>
       </div>
 
       <section
@@ -37,7 +40,7 @@ export default function TripRequestDetails({ request, admin = false }) {
         aria-labelledby={`request-${request.id}-places`}
       >
         <h3 id={`request-${request.id}-places`}>
-          {request.places.length} điểm muốn đi
+          {t("requests.placesCount", { count: request.places.length })}
         </h3>
         <ol>
           {request.places.map((place, index) => (
@@ -51,7 +54,7 @@ export default function TripRequestDetails({ request, admin = false }) {
 
       {request.notes && (
         <section className={tripRequestsStyles["request-notes"]}>
-          <h3>Ghi chú cho người lên lịch</h3>
+          <h3>{t("requests.notesForPlanner")}</h3>
           <p>{request.notes}</p>
         </section>
       )}
@@ -60,7 +63,7 @@ export default function TripRequestDetails({ request, admin = false }) {
         className={tripRequestsStyles["request-sources"]}
         aria-labelledby={`request-${request.id}-sources`}
       >
-        <h3 id={`request-${request.id}-sources`}>Nguồn tham khảo</h3>
+        <h3 id={`request-${request.id}-sources`}>{t("requests.referenceSources")}</h3>
         {request.sources.length ? (
           <ol>
             {request.sources.map((source, index) => (
@@ -75,25 +78,25 @@ export default function TripRequestDetails({ request, admin = false }) {
             ))}
           </ol>
         ) : (
-          <p>Chưa có liên kết tham khảo.</p>
+          <p>{t("requests.noReferences")}</p>
         )}
       </section>
 
       {request.state === "declined" && (
         <div className={tripRequestsStyles["request-decision"]} role="note">
-          <strong>Yêu cầu chưa thể thực hiện</strong>
-          <p>{request.decisionReason || "Admin chưa ghi thêm lý do."}</p>
+          <strong>{t("requests.declinedTitle")}</strong>
+          <p>{request.decisionReason || t("requests.noDecisionReason")}</p>
         </div>
       )}
 
       {request.trip && (
         <div className={tripRequestsStyles["request-fulfillment"]}>
           <div>
-            <span>Lịch trình đã sẵn sàng</span>
+            <span>{t("requests.scheduleReady")}</span>
             <strong>{request.trip.title}</strong>
           </div>
           <Link href={`/?trip=${encodeURIComponent(request.trip.slug)}`}>
-            Xem lịch trình <ActionIcon name="right" />
+            {t("requests.viewSchedule")} <ActionIcon name="right" />
           </Link>
         </div>
       )}
@@ -101,19 +104,19 @@ export default function TripRequestDetails({ request, admin = false }) {
       {admin && (
         <dl className={tripRequestsStyles["request-audit"]}>
           <div>
-            <dt>Người yêu cầu</dt>
+            <dt>{t("requests.requester")}</dt>
             <dd>
               {request.requester.name}
               <small>{request.requester.email}</small>
             </dd>
           </div>
           <div>
-            <dt>Mã yêu cầu</dt>
+            <dt>{t("requests.requestId")}</dt>
             <dd>#{request.id}</dd>
           </div>
           <div>
-            <dt>Trạng thái</dt>
-            <dd>{requestStateLabels[request.state]}</dd>
+            <dt>{t("requests.status")}</dt>
+            <dd>{t(`requests.status.${request.state}`)}</dd>
           </div>
         </dl>
       )}

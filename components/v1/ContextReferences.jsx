@@ -3,21 +3,26 @@ import { useEffect, useRef, useState } from "react";
 import Dialog, { DialogTitle } from "../ui/Dialog";
 import { apiJson } from "./transport.mjs";
 import styles from "./assistant.module.css";
-export const contextLabels = { trip: "Chuyến đi", activity: "Hoạt động", source: "Nguồn", contribution: "Góp ý", place: "Địa điểm đã lưu", google_place: "Google Maps" };
-export function ReferenceList({ items = [], onPin, onRemove, removeLabel = "Bỏ", disabled = false, label }) {
+import { localizeAssistantMessage } from "../../lib/i18n-assistant.mjs";
+import { useLocale } from "../LocaleProvider";
+export function ReferenceList({ items = [], onPin, onRemove, removeLabel, disabled = false, label }) {
+  const { t } = useLocale();
+  const effectiveRemoveLabel = removeLabel ?? t("assistantExtra.remove");
+  const labels = { trip: t("context.trip"), activity: t("context.activity"), source: t("context.source"), contribution: t("context.contribution"), place: t("context.place"), google_place: "Google Maps" };
   if (!items.length) return null;
   return <ul className={styles.contextRefs} aria-label={label}>{items.map((item) => {
     const ref = item.ref || item;
-    const title = item.label || `${contextLabels[ref.kind]} · ${ref.id}`;
+    const title = item.label || `${labels[ref.kind] || ref.kind} · ${ref.id}`;
     return <li key={`${ref.kind}:${ref.id}`}>
       <span className={styles.contextName}>{item.href && item.available !== false ? <a href={item.href} target="_blank" rel="noreferrer">{title}</a> : <span>{title}</span>}
-        <small>{contextLabels[ref.kind]}{item.parent && ref.kind !== "trip" ? ` · ${item.parent.label}` : ""}{item.available === false ? " · Không khả dụng" : item.omitted ? " · Chưa đọc" : ""}</small></span>
-      {onPin && <button type="button" disabled={disabled || item.available === false} onClick={() => onPin(item)} aria-label={`Ghim ${title}`}>Ghim</button>}
-      {onRemove && <button type="button" disabled={disabled} onClick={() => onRemove(item)} aria-label={`${removeLabel} ${title}`}>{removeLabel}</button>}
+        <small>{labels[ref.kind] || ref.kind}{item.parent && ref.kind !== "trip" ? ` · ${item.parent.label}` : ""}{item.available === false ? ` · ${t("assistant.contextUnavailable")}` : item.omitted ? ` · ${t("assistant.unread")}` : ""}</small></span>
+      {onPin && <button type="button" disabled={disabled || item.available === false} onClick={() => onPin(item)} aria-label={`${t("context.pin")} ${title}`}>{t("context.pin")}</button>}
+      {onRemove && <button type="button" disabled={disabled} onClick={() => onRemove(item)} aria-label={`${effectiveRemoveLabel} ${title}`}>{effectiveRemoveLabel}</button>}
     </li>;
   })}</ul>;
 }
 export function ContextPicker({ onClose, onSelect }) {
+  const { t } = useLocale();
   const searchRef = useRef(null), generation = useRef(0);
   const [query, setQuery] = useState(""), [kind, setKind] = useState("");
   const [results, setResults] = useState([]), [cursor, setCursor] = useState(null);
@@ -49,14 +54,15 @@ export function ContextPicker({ onClose, onSelect }) {
     } catch (failure) { if (token === generation.current) setError(failure.message); }
     finally { if (token === generation.current) setLoading(false); }
   };
+  const labels = { trip: t("context.trip"), activity: t("context.activity"), source: t("context.source"), contribution: t("context.contribution"), place: t("context.place"), google_place: "Google Maps" };
   return <Dialog onClose={onClose} initialFocusRef={searchRef} overlayClassName={styles.overlay}><section className={styles.contextPicker}>
-    <header><DialogTitle>Thêm ngữ cảnh</DialogTitle><button type="button" onClick={onClose}>Đóng</button></header>
-    <label>Tìm trong chuyến đi và tài liệu<input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tên chuyến đi, hoạt động, địa điểm…" /></label>
-    <label>Loại ngữ cảnh<select value={kind} onChange={(event) => setKind(event.target.value)}><option value="">Tất cả tài liệu</option>{Object.entries(contextLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-    {loading && <p role="status">Đang tìm…</p>}
-    {error && <p role="alert">{error} <button onClick={() => setReload((n) => n + 1)}>Thử lại</button></p>}
-    {!loading && !error && !results.length && <p>{kind === "google_place" && !query ? "Nhập tên địa điểm để tìm trên Google Maps." : "Không tìm thấy ngữ cảnh phù hợp."}</p>}
-    <ul className={styles.contextResults}>{results.map((item) => <li key={`${item.ref.kind}:${item.ref.id}`}><button type="button" onClick={() => { onSelect(item); onClose(); }}><strong>{item.label}</strong><small>{contextLabels[item.ref.kind]}{item.parent ? ` · ${item.parent.label}` : ""}</small></button></li>)}</ul>
-    {cursor && <button disabled={loading} onClick={more}>Xem thêm</button>}
+    <header><DialogTitle>{t("assistant.addContext")}</DialogTitle><button type="button" onClick={onClose}>{t("common.close")}</button></header>
+    <label>{t("context.searchLabel")}<input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("context.searchPlaceholder")} /></label>
+    <label>{t("context.kindLabel")}<select value={kind} onChange={(event) => setKind(event.target.value)}><option value="">{t("context.all")}</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+    {loading && <p role="status">{t("context.searching")}</p>}
+    {error && <p role="alert">{localizeAssistantMessage(t, error)} <button onClick={() => setReload((n) => n + 1)}>{t("common.retry")}</button></p>}
+    {!loading && !error && !results.length && <p>{kind === "google_place" && !query ? t("context.googlePrompt") : t("context.noResults")}</p>}
+    <ul className={styles.contextResults}>{results.map((item) => <li key={`${item.ref.kind}:${item.ref.id}`}><button type="button" onClick={() => { onSelect(item); onClose(); }}><strong>{item.label}</strong><small>{labels[item.ref.kind] || item.ref.kind}{item.parent ? ` · ${item.parent.label}` : ""}</small></button></li>)}</ul>
+    {cursor && <button disabled={loading} onClick={more}>{t("common.next")}</button>}
   </section></Dialog>;
 }

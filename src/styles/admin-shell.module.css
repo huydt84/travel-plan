@@ -21,6 +21,10 @@
   letter-spacing: -0.025em;
   text-transform: uppercase;
 }
+.admin-header > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
 .admin-user {
   composes: admin-user from global;
   display: block;
@@ -226,7 +230,38 @@
     min-width: 44px;
   }
   .admin-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
     align-items: flex-start;
+  }
+  .admin-header:has(> button) {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .admin-header > div:first-child {
+    display: contents;
+  }
+  .admin-header .admin-back {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .admin-header h1 {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    overflow-wrap: anywhere;
+  }
+  .admin-header .admin-user {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    overflow-wrap: anywhere;
+  }
+  .admin-header > label {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .admin-header > button {
+    grid-column: 3;
+    grid-row: 1;
   }
   .admin-nav {
     grid-template-columns: repeat(2, 1fr);

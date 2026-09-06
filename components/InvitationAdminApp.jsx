@@ -8,27 +8,19 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useMemo, useState } from "react";
 import AdminNav from "./AdminNav";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useLocale } from "./LocaleProvider";
+import { invitationErrorText } from "../lib/i18n-invitations.mjs";
 
-const timeFormatter = new Intl.DateTimeFormat("vi-VN", {
+const timeOptions = {
   dateStyle: "short",
   timeStyle: "short",
   hour12: false,
   timeZone: "Asia/Tokyo",
-});
-const statusLabels = {
-  pending: "Chờ duyệt",
-  approved: "Đã duyệt",
-  denied: "Từ chối",
-  revoked: "Thu hồi",
-};
-const deliveryErrorLabels = {
-  INVITATION_AUTH_ERROR: "Gmail cần kết nối lại",
-  INVITATION_DELIVERY_ERROR: "Gmail từ chối gửi",
-  GMAIL_API_ERROR: "Gmail trả về lỗi",
 };
 
-const formatTime = (value) =>
-  value ? timeFormatter.format(new Date(value)) : "—";
+const formatTime = (value, locale = "vi-VN") =>
+  value ? new Intl.DateTimeFormat(locale, timeOptions).format(new Date(value)) : "—";
 
 export default function InvitationAdminApp({
   viewer,
@@ -37,6 +29,7 @@ export default function InvitationAdminApp({
   activeView,
   pendingTripRequestCount = 0,
 }) {
+  const { t, intlLocale, locale } = useLocale();
   const [permissions, setPermissions] = useState(initialPermissions);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("pending");
@@ -82,7 +75,7 @@ export default function InvitationAdminApp({
       );
       const payload = await response.json();
       if (!response.ok)
-        throw new Error(payload.error || "Không thể cập nhật quyền");
+        throw new Error(payload.error || "invitationsExtra.updatePermissionError");
       setPermissions((current) =>
         current.map((item) =>
           item.id === payload.id
@@ -104,16 +97,16 @@ export default function InvitationAdminApp({
     >
       <header className={adminShellStyles["admin-header"]}>
         <div>
-          <Link href="/" className={adminShellStyles["admin-back"]}>
-            Về lịch
+          <Link href="/" className={adminShellStyles["admin-back"]}>{t("invitationsExtra.back")}
           </Link>
-          <h1>Lời rủ</h1>
+          <h1>{t("nav.adminInvitations")}</h1>
           <small className={adminShellStyles["admin-user"]}>
             {viewer.email}
           </small>
         </div>
+        <LanguageSwitcher />
         <Button variant="ghost" onClick={() => signOut({ redirectTo: "/" })}>
-          Đăng xuất
+          {t("common.logout")}
         </Button>
       </header>
       <AdminNav
@@ -123,19 +116,17 @@ export default function InvitationAdminApp({
       />
       <nav
         className={invitationManagementStyles["invitation-admin-tabs"]}
-        aria-label="Nội dung lời rủ"
+        aria-label={t("invitationsExtra.tabs")}
       >
         <Link
           href="/admin/invitations"
           aria-current={activeView === "requests" ? "page" : undefined}
-        >
-          Yêu cầu quyền <span>{pendingCount}</span>
+        >{t("invitationsExtra.permissionRequests")} <span>{pendingCount}</span>
         </Link>
         <Link
           href="/admin/invitations?view=history"
           aria-current={activeView === "history" ? "page" : undefined}
-        >
-          Lịch sử gửi <span>{initialHistory.length}</span>
+        >{t("invitationsExtra.history")} <span>{initialHistory.length}</span>
         </Link>
       </nav>
 
@@ -146,39 +137,35 @@ export default function InvitationAdminApp({
         >
           <div className={invitationManagementStyles["permission-board-head"]}>
             <div>
-              <h2 id="permission-board-title">Quyền gửi lời rủ</h2>
-              <p>
-                Duyệt theo tài khoản · quyền có hiệu lực với mọi chuyến cho đến
-                khi bị thu hồi.
+              <h2 id="permission-board-title">{t("invitationsExtra.permissionTitle")}</h2>
+              <p>{t("invitationsExtra.permissionHelp")}
               </p>
             </div>
-            <strong>{pendingCount} chờ duyệt</strong>
+            <strong>{t("invitationsExtra.pendingCount", { count: pendingCount })}</strong>
           </div>
           <div className={invitationManagementStyles["permission-controls"]}>
-            <label>
-              Tìm người dùng
+            <label>{t("invitationsExtra.searchUser")}
               <input
                 type="search"
                 value={query}
-                placeholder="Tên hoặc email…"
+                placeholder={t("invitationsExtra.userPlaceholder")}
                 onChange={(event) => setQuery(event.target.value)}
               />
             </label>
-            <label>
-              Trạng thái
+            <label>{t("invitationsExtra.status")}
               <select
                 value={status}
                 onChange={(event) => setStatus(event.target.value)}
               >
-                <option value="all">Tất cả</option>
-                <option value="pending">Chờ duyệt</option>
-                <option value="approved">Đã duyệt</option>
-                <option value="denied">Từ chối</option>
-                <option value="revoked">Thu hồi</option>
+                <option value="all">{t("invitationsExtra.all")}</option>
+                <option value="pending">{t("invitationsExtra.pending")}</option>
+                <option value="approved">{t("invitationsExtra.approved")}</option>
+                <option value="denied">{t("invitationsExtra.denied")}</option>
+                <option value="revoked">{t("invitationsExtra.revoked")}</option>
               </select>
             </label>
             <p aria-live="polite">
-              Hiện {visiblePermissions.length}/{permissions.length}
+              {t("invitationsExtra.showing", { visible: visiblePermissions.length, total: permissions.length })}
             </p>
           </div>
           {error && (
@@ -186,7 +173,7 @@ export default function InvitationAdminApp({
               className={invitationManagementStyles["permission-global-error"]}
               role="alert"
             >
-              {error}
+              {invitationErrorText(t, locale, error, "invitationsExtra.updatePermissionError")}
             </p>
           )}
           {visiblePermissions.length ? (
@@ -205,16 +192,17 @@ export default function InvitationAdminApp({
                   <div
                     className={invitationManagementStyles["permission-trip"]}
                   >
-                    <small>Yêu cầu từ</small>
+                    <small>{t("invitationsExtra.requestedFrom")}</small>
                     <strong>{permission.requestedTripTitle}</strong>
                   </div>
                   <div
                     className={invitationManagementStyles["permission-state"]}
                   >
-                    <span>{statusLabels[permission.status]}</span>
+                    <span>{t(`invitationsExtra.${permission.status}`)}</span>
                     <time>
                       {formatTime(
                         permission.reviewedAt || permission.requestedAt,
+                        intlLocale,
                       )}
                     </time>
                   </div>
@@ -229,8 +217,8 @@ export default function InvitationAdminApp({
                         onClick={() => updatePermission(permission, "approve")}
                       >
                         {permission.status === "pending"
-                          ? "Duyệt"
-                          : "Duyệt lại"}
+                          ? t("invitationsExtra.approve")
+                          : t("invitationsExtra.approveAgain")}
                       </Button>
                     )}
                     {permission.status === "pending" && (
@@ -244,8 +232,7 @@ export default function InvitationAdminApp({
                             reason: "",
                           })
                         }
-                      >
-                        Từ chối
+                      >{t("invitationsExtra.denied")}
                       </Button>
                     )}
                     {permission.status === "approved" && (
@@ -259,8 +246,7 @@ export default function InvitationAdminApp({
                             reason: "",
                           })
                         }
-                      >
-                        Thu hồi
+                      >{t("invitationsExtra.revoked")}
                       </Button>
                     )}
                   </div>
@@ -290,13 +276,13 @@ export default function InvitationAdminApp({
                     >
                       <label>
                         {decision.action === "deny"
-                          ? "Lý do từ chối"
-                          : "Lý do thu hồi"}
+                          ? t("invitationsExtra.denyReason")
+                          : t("invitationsExtra.revokeReason")}
                         <textarea
                           maxLength={300}
                           rows={3}
                           value={decision.reason}
-                          placeholder="Không bắt buộc"
+                          placeholder={t("invitationsExtra.optional")}
                           onChange={(event) =>
                             setDecision((current) => ({
                               ...current,
@@ -311,18 +297,17 @@ export default function InvitationAdminApp({
                           variant="ghost"
                           type="button"
                           onClick={() => setDecision(null)}
-                        >
-                          Huỷ
+                        >{t("invitationsExtra.cancel")}
                         </Button>
                         <Button
                           variant="danger"
                           disabled={busyId === permission.id}
                         >
                           {busyId === permission.id
-                            ? "Đang cập nhật…"
+                            ? t("invitationsExtra.updating")
                             : decision.action === "deny"
-                              ? "Từ chối yêu cầu"
-                              : "Thu hồi quyền"}
+                              ? t("invitationsExtra.denyRequest")
+                              : t("invitationsExtra.revokePermission")}
                         </Button>
                       </div>
                     </form>
@@ -331,8 +316,7 @@ export default function InvitationAdminApp({
               ))}
             </div>
           ) : (
-            <p className={invitationManagementStyles["permission-empty"]}>
-              Không có yêu cầu khớp bộ lọc này.
+            <p className={invitationManagementStyles["permission-empty"]}>{t("invitationsExtra.noRequests")}
             </p>
           )}
         </section>
@@ -345,38 +329,36 @@ export default function InvitationAdminApp({
             className={invitationManagementStyles["invitation-history-head"]}
           >
             <div>
-              <h2 id="invitation-history-title">Lịch sử gửi</h2>
-              <p>Tối đa 200 lượt gần nhất · mỗi người nhận là một bản ghi.</p>
+              <h2 id="invitation-history-title">{t("invitationsExtra.history")}</h2>
+              <p>{t("invitationsExtra.historyHelp")}</p>
             </div>
-            <strong>{initialHistory.length} lượt</strong>
+            <strong>{t("invitationsExtra.attemptCount", { count: initialHistory.length })}</strong>
           </div>
           <div
             className={
               invitationManagementStyles["invitation-history-controls"]
             }
           >
-            <label>
-              Tìm người gửi, nhận hoặc chuyến đi
+            <label>{t("invitationsExtra.searchHistory")}
               <input
                 type="search"
                 value={historyQuery}
-                placeholder="Email hoặc chuyến đi…"
+                placeholder={t("invitationsExtra.historyPlaceholder")}
                 onChange={(event) => setHistoryQuery(event.target.value)}
               />
             </label>
-            <label>
-              Trạng thái
+            <label>{t("invitationsExtra.status")}
               <select
                 value={historyStatus}
                 onChange={(event) => setHistoryStatus(event.target.value)}
               >
-                <option value="all">Tất cả</option>
-                <option value="sent">Đã gửi</option>
-                <option value="failed">Gửi lỗi</option>
+                <option value="all">{t("invitationsExtra.all")}</option>
+                <option value="sent">{t("invitationsExtra.sent")}</option>
+                <option value="failed">{t("invitationsExtra.failed")}</option>
               </select>
             </label>
             <p>
-              Hiện {visibleHistory.length}/{initialHistory.length}
+              {t("invitationsExtra.showing", { visible: visibleHistory.length, total: initialHistory.length })}
             </p>
           </div>
           {visibleHistory.length ? (
@@ -392,43 +374,42 @@ export default function InvitationAdminApp({
               >
                 <thead>
                   <tr>
-                    <th scope="col">Người gửi</th>
-                    <th scope="col">Người nhận</th>
-                    <th scope="col">Chuyến đi</th>
-                    <th scope="col">Trạng thái</th>
-                    <th scope="col">Thời gian</th>
+                    <th scope="col">{t("invitationsExtra.sender")}</th>
+                    <th scope="col">{t("invitationsExtra.recipient")}</th>
+                    <th scope="col">{t("invitationsExtra.trip")}</th>
+                    <th scope="col">{t("invitationsExtra.status")}</th>
+                    <th scope="col">{t("invitationsExtra.time")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibleHistory.map((item) => (
                     <tr key={item.id}>
-                      <td data-label="Người gửi">
+                      <td data-label={t("invitationsExtra.sender")}>
                         <strong>{item.inviterEmail}</strong>
                       </td>
-                      <td data-label="Người nhận">{item.recipientEmail}</td>
-                      <td data-label="Chuyến đi">
+                      <td data-label={t("invitationsExtra.recipient")}>{item.recipientEmail}</td>
+                      <td data-label={t("invitationsExtra.trip")}>
                         <Link
                           href={`/?trip=${encodeURIComponent(item.tripSlug)}`}
                         >
                           {item.tripTitle}
                         </Link>
                       </td>
-                      <td data-label="Trạng thái">
+                      <td data-label={t("invitationsExtra.status")}>
                         <span
                           className={`${invitationManagementStyles["invitation-history-status"]} is-${item.status}`}
                         >
-                          {item.status === "sent" ? "Đã gửi" : "Gửi lỗi"}
+                          {item.status === "sent" ? t("invitationsExtra.sent") : t("invitationsExtra.failed")}
                         </span>
                         {item.errorCode && (
                           <small>
-                            {deliveryErrorLabels[item.errorCode] ||
-                              "Không gửi được"}
+                            {t({ INVITATION_AUTH_ERROR: "invitationsExtra.gmailReconnect", INVITATION_DELIVERY_ERROR: "invitationsExtra.gmailRejected", GMAIL_API_ERROR: "invitationsExtra.gmailError" }[item.errorCode] || "invitationsExtra.deliveryFailed")}
                           </small>
                         )}
                       </td>
-                      <td data-label="Thời gian">
+                      <td data-label={t("invitationsExtra.time")}>
                         <time>
-                          {formatTime(item.sentAt || item.attemptedAt)}
+                          {formatTime(item.sentAt || item.attemptedAt, intlLocale)}
                         </time>
                       </td>
                     </tr>
@@ -439,8 +420,7 @@ export default function InvitationAdminApp({
           ) : (
             <p
               className={invitationManagementStyles["invitation-history-empty"]}
-            >
-              Không có bản ghi khớp bộ lọc.
+            >{t("invitationsExtra.noHistory")}
             </p>
           )}
         </section>

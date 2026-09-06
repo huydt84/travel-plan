@@ -11,16 +11,20 @@ import {
   formatInvitationTripDate,
 } from "../lib/invitation-draft.mjs";
 import { ActionIcon } from "./Icons";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useLocale } from "./LocaleProvider";
+import { invitationErrorText } from "../lib/i18n-invitations.mjs";
 
 import { googleMailConsentParams } from "../lib/google-auth-policy.mjs";
 const DRAFT_TTL_MS = 30 * 60 * 1000;
 const MAX_RECIPIENTS = 6;
 
-const formatWhen = (value) =>
+const formatWhen = (value, locale = "vi-VN") =>
   value
-    ? new Intl.DateTimeFormat("vi-VN", {
+    ? new Intl.DateTimeFormat(locale, {
         dateStyle: "medium",
         timeStyle: "short",
+        hour12: false,
         timeZone: "Asia/Tokyo",
       }).format(new Date(value))
     : "";
@@ -59,6 +63,7 @@ export default function InvitationDialog({
   itinerary,
   gmailReturn = false,
 }) {
+  const { t, intlLocale, locale } = useLocale();
   const [access, setAccess] = useState(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -72,6 +77,7 @@ export default function InvitationDialog({
   const [receipt, setReceipt] = useState(null);
   const [portalReady, setPortalReady] = useState(false);
   const emailRef = useRef(null);
+  const initializedDraftRef = useRef(null);
   const buildGeneratedDraft = useCallback(
     () =>
       createInvitationDraft({
@@ -93,7 +99,7 @@ export default function InvitationDialog({
       );
       const payload = await response.json();
       if (!response.ok)
-        throw new Error(payload.error || "Không thể tải quyền gửi lời rủ");
+        throw new Error(payload.error || "invitationsExtra.loadAccessError");
       setAccess(payload);
       return payload;
     } catch (loadError) {
@@ -105,8 +111,15 @@ export default function InvitationDialog({
   }, [trip.slug]);
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open) {
+      initializedDraftRef.current = null;
+      return undefined;
+    }
     const initializeFrame = window.requestAnimationFrame(() => {
+      // Background itinerary refreshes replace props, but must not reset an open draft.
+      const key = draftKey(viewer, trip);
+      if (initializedDraftRef.current === key) return;
+      initializedDraftRef.current = key;
       setPortalReady(true);
       setReceipt(null);
       setError("");
@@ -177,8 +190,8 @@ export default function InvitationDialog({
   const gmailNotice =
     gmailReturn && access
       ? access.gmailAuthorized
-        ? "Gmail đã kết nối — kiểm tra lại trước khi gửi."
-        : "Bạn chưa cấp quyền Gmail. Nội dung vẫn được giữ."
+        ? t("invitationsExtra.gmailConnected")
+        : t("invitationsExtra.gmailNotConnected")
       : "";
   const visibleNotice = notice || gmailNotice;
 
@@ -216,11 +229,11 @@ export default function InvitationDialog({
       return;
     }
     if (recipients.includes(normalized)) {
-      setError("Email này đã có trong danh sách gửi.");
+      setError("invitationsExtra.duplicateEmail");
       return;
     }
     if (recipients.length >= MAX_RECIPIENTS) {
-      setError("Mỗi lượt chỉ có thể gửi tối đa 6 người.");
+      setError("invitationsExtra.recipientLimit");
       return;
     }
     setRecipients((current) => [...current, normalized]);
@@ -240,7 +253,7 @@ export default function InvitationDialog({
       });
       const payload = await response.json();
       if (!response.ok)
-        throw new Error(payload.error || "Không thể gửi yêu cầu");
+        throw new Error(payload.error || "invitationsExtra.requestError");
       await loadAccess();
     } catch (requestError) {
       setError(requestError.message);
@@ -271,12 +284,12 @@ export default function InvitationDialog({
       ]),
     ];
     if (!sendingTo.length) {
-      setError("Nhập ít nhất một email muốn rủ.");
+      setError("invitationsExtra.emailRequired");
       emailRef.current?.focus();
       return;
     }
     if (sendingTo.length > MAX_RECIPIENTS) {
-      setError("Mỗi lượt chỉ có thể gửi tối đa 6 người.");
+      setError("invitationsExtra.recipientLimit");
       return;
     }
     if (!access.gmailAuthorized) {
@@ -285,7 +298,7 @@ export default function InvitationDialog({
       return;
     }
     if (!draft.subject.trim() || !draft.message.trim()) {
-      setError("Tiêu đề và nội dung email không được để trống.");
+      setError("invitationsExtra.draftRequired");
       setDetailsOpen(true);
       return;
     }
@@ -328,7 +341,7 @@ export default function InvitationDialog({
         setRecipients(failed);
       }
       if (!response.ok)
-        throw new Error(payload.error || "Không thể gửi lời rủ lúc này");
+        throw new Error(payload.error || "invitationsExtra.sendError");
       setReceipt({
         sent: payload.sent,
         skipped: payload.skipped || 0,
@@ -357,7 +370,7 @@ export default function InvitationDialog({
       return (
         <div
           className={styles["invitation-access-skeleton"]}
-          aria-label="Đang tải quyền gửi lời rủ"
+          aria-label={t("invitationsExtra.loadingAccess")}
         >
           <i />
           <i />
@@ -367,10 +380,8 @@ export default function InvitationDialog({
     if (!access && error) {
       return (
         <section className={`${styles["invitation-access-state"]} is-error`}>
-          <h3>Không tải được quyền gửi lời rủ</h3>
-          <p>
-            Travel Plan chưa thể kiểm tra quyền của tài khoản này. Thử tải lại
-            trước khi tiếp tục.
+          <h3>{t("invitationsExtra.accessFailed")}</h3>
+          <p>{t("invitationsExtra.accessFailedHelp")}
           </p>
         </section>
       );
@@ -378,18 +389,16 @@ export default function InvitationDialog({
     if (!access || access.authState === "guest") {
       return (
         <section className={styles["invitation-access-state"]}>
-          <h3>Đăng nhập để rủ bạn</h3>
-          <p>Đăng nhập để yêu cầu quyền rủ bạn cho chuyến này.</p>
+          <h3>{t("invitationsExtra.loginTitle")}</h3>
+          <p>{t("invitationsExtra.loginHelp")}</p>
         </section>
       );
     }
     if (permissionStatus === "not_requested") {
       return (
         <section className={styles["invitation-access-state"]}>
-          <h3>Xin quyền rủ bạn</h3>
-          <p>
-            Lời rủ sẽ được gửi từ Gmail của bạn. Chủ lịch trình cần duyệt trước;
-            Travel Plan chưa yêu cầu quyền Gmail ở bước này.
+          <h3>{t("invitationsExtra.askPermission")}</h3>
+          <p>{t("invitationsExtra.askPermissionHelp")}
           </p>
         </section>
       );
@@ -397,16 +406,16 @@ export default function InvitationDialog({
     if (permissionStatus === "pending") {
       return (
         <section className={`${styles["invitation-access-state"]} is-pending`}>
-          <h3>Đã gửi yêu cầu</h3>
-          <p>Chủ lịch trình sẽ xem xét quyền gửi lời rủ của bạn.</p>
+          <h3>{t("invitationsExtra.requestSent")}</h3>
+          <p>{t("invitationsExtra.pendingHelp")}</p>
           <dl>
             <div>
-              <dt>Chuyến đi</dt>
+              <dt>{t("invitationsExtra.trip")}</dt>
               <dd>{access.permission.requestedTripTitle}</dd>
             </div>
             <div>
-              <dt>Gửi lúc</dt>
-              <dd>{formatWhen(access.permission.requestedAt)}</dd>
+              <dt>{t("invitationsExtra.sentAt")}</dt>
+              <dd>{formatWhen(access.permission.requestedAt, intlLocale)}</dd>
             </div>
           </dl>
         </section>
@@ -417,15 +426,15 @@ export default function InvitationDialog({
         <section className={`${styles["invitation-access-state"]} is-blocked`}>
           <h3>
             {permissionStatus === "denied"
-              ? "Yêu cầu chưa được chấp thuận"
-              : "Quyền gửi lời rủ đã bị thu hồi"}
+              ? t("invitationsExtra.deniedTitle")
+              : t("invitationsExtra.revokedTitle")}
           </h3>
           <p>
             {access.permission.decisionReason ||
-              "Chủ lịch trình có thể duyệt lại quyền này trong khu vực quản lý."}
+              t("invitationsExtra.reviewHelp")}
           </p>
           {access.permission.reviewedAt && (
-            <small>Cập nhật {formatWhen(access.permission.reviewedAt)}</small>
+            <small>{t("common.updatedAt", { time: formatWhen(access.permission.reviewedAt, intlLocale) })}</small>
           )}
         </section>
       );
@@ -436,8 +445,8 @@ export default function InvitationDialog({
           <span className={styles["invitation-receipt-mark"]}>
             <ActionIcon name="check" />
           </span>
-          <h3>Đã gửi {receipt.sent} lời rủ</h3>
-          <p>Mỗi người nhận đã nhận một email riêng từ Gmail của bạn.</p>
+          <h3>{t("invitationsExtra.receipt", { count: receipt.sent })}</h3>
+          <p>{t("invitationsExtra.receiptHelp")}</p>
         </section>
       );
     }
@@ -453,24 +462,20 @@ export default function InvitationDialog({
           </p>
         )}
         {!access.gmailAuthorized && (
-          <p className={styles["invitation-consent-note"]}>
-            Lần gửi đầu tiên sẽ mở Google để bạn cấp quyền gửi email. Bản nháp
-            sẽ được giữ lại.
+          <p className={styles["invitation-consent-note"]}>{t("invitationsExtra.consentHelp")}
           </p>
         )}
         {quotaExhausted && (
-          <p className={styles["invitation-quota-alert"]} role="alert">
-            Bạn đã dùng 20 lượt gửi trong 24 giờ.
+          <p className={styles["invitation-quota-alert"]} role="alert">{t("invitationsExtra.quotaExhausted")}
             {quota.resetAt
-              ? ` Có thể gửi lại từ ${formatWhen(quota.resetAt)}.`
+              ? ` ${t("invitation.resendAt", { time: formatWhen(quota.resetAt, intlLocale) })}`
               : ""}
           </p>
         )}
         <label
           className={styles["invitation-recipient-label"]}
           htmlFor="invite-email"
-        >
-          Email người bạn muốn rủ{" "}
+        >{t("invitationsExtra.recipientEmail")}{" "}
           <span>
             {recipients.length}/{MAX_RECIPIENTS}
           </span>
@@ -500,8 +505,7 @@ export default function InvitationDialog({
             variant="ghost"
             onClick={addEmail}
             disabled={busy || recipients.length >= MAX_RECIPIENTS}
-          >
-            Thêm
+          >{t("invitationsExtra.add")}
           </Button>
         </div>
         {recipients.length > 0 && (
@@ -516,7 +520,7 @@ export default function InvitationDialog({
                       current.filter((item) => item !== recipient),
                     )
                   }
-                  aria-label={`Bỏ ${recipient}`}
+                  aria-label={t("invitationsExtra.removeRecipient", { recipient })}
                 >
                   <ActionIcon name="close" />
                 </button>
@@ -529,12 +533,11 @@ export default function InvitationDialog({
           open={detailsOpen}
           onToggle={(event) => setDetailsOpen(event.currentTarget.open)}
         >
-          <summary>
-            Chỉnh lời nhắn{" "}
-            <span>{draftTouched ? "Đã chỉnh" : "Tự tạo từ lịch trình"}</span>
+          <summary>{t("invitationsExtra.editMessage")}{" "}
+            <span>{draftTouched ? t("invitationsExtra.edited") : t("invitationsExtra.generated")}</span>
           </summary>
           <div>
-            <label htmlFor="invite-subject">Tiêu đề</label>
+            <label htmlFor="invite-subject">{t("invitationsExtra.subject")}</label>
             <input
               id="invite-subject"
               value={draft.subject}
@@ -547,8 +550,7 @@ export default function InvitationDialog({
                 setDraftTouched(true);
               }}
             />
-            <label htmlFor="invite-message">
-              Nội dung <span>{draft.message.length}/10000</span>
+            <label htmlFor="invite-message">{t("invitationsExtra.message")} <span>{draft.message.length}/10000</span>
             </label>
             <textarea
               id="invite-message"
@@ -570,25 +572,23 @@ export default function InvitationDialog({
                 setDraft(buildGeneratedDraft());
                 setDraftTouched(false);
               }}
-            >
-              Tạo lại từ lịch trình
+            >{t("invitationsExtra.regenerate")}
             </button>
           </div>
         </details>
         {access.history?.length > 0 && (
           <details className={styles["invitation-history-details"]}>
-            <summary>
-              Lời rủ gần đây <span>{access.history.length}</span>
+            <summary>{t("invitationsExtra.recent")} <span>{access.history.length}</span>
             </summary>
             <ul>
               {access.history.map((item) => (
                 <li key={item.id}>
                   <span>
                     <strong>{item.recipientEmail}</strong>
-                    <small>{formatWhen(item.sentAt || item.attemptedAt)}</small>
+                    <small>{formatWhen(item.sentAt || item.attemptedAt, intlLocale)}</small>
                   </span>
                   <em className={`is-${item.status}`}>
-                    {item.status === "sent" ? "Đã gửi" : "Gửi lỗi"}
+                    {item.status === "sent" ? t("invitationsExtra.sent") : t("invitationsExtra.failed")}
                   </em>
                 </li>
               ))}
@@ -597,16 +597,16 @@ export default function InvitationDialog({
         )}
         {error && (
           <p className={styles["invitation-sheet-error"]} role="alert">
-            {error}
+            {invitationErrorText(t, locale, error, "invitationsExtra.sendError")}
           </p>
         )}
         <Footer className={styles["invitation-sheet-footer"]}>
           <p>
-            <strong>{recipientCount} người nhận</strong>
+            <strong>{t("invitationsExtra.recipientCount", { count: recipientCount })}</strong>
             <span>
               {quota
-                ? `Còn ${quota.batchesRemaining}/20 lượt gửi`
-                : "Tối đa 6 người mỗi lượt"}
+                ? t("invitationsExtra.quotaRemaining", { count: quota.batchesRemaining })
+                : t("invitationsExtra.maxRecipients")}
             </span>
           </p>
           <Button
@@ -615,10 +615,10 @@ export default function InvitationDialog({
             disabled={busy || quotaExhausted || recipientCount === 0}
           >
             {busy
-              ? "Đang gửi…"
+              ? t("invitationsExtra.sending")
               : access.gmailAuthorized
-                ? `Gửi ${recipientCount} lời rủ`
-                : "Tiếp tục với Google"}
+                ? t("invitationsExtra.sendCount", { count: recipientCount })
+                : t("invitationsExtra.continueGoogle")}
           </Button>
         </Footer>
       </form>
@@ -630,11 +630,9 @@ export default function InvitationDialog({
     if (!access && error) {
       return (
         <>
-          <Button variant="ghost" type="button" onClick={handleClose}>
-            Đóng
+          <Button variant="ghost" type="button" onClick={handleClose}>{t("invitationsExtra.close")}
           </Button>
-          <Button variant="primary" type="button" onClick={loadAccess}>
-            Thử tải lại
+          <Button variant="primary" type="button" onClick={loadAccess}>{t("invitationsExtra.retryLoad")}
           </Button>
         </>
       );
@@ -646,7 +644,7 @@ export default function InvitationDialog({
           type="button"
           onClick={() => signIn("google", { redirectTo: callbackUrl() })}
         >
-          <GoogleIcon /> Đăng nhập với Google
+          <GoogleIcon />{" "}{t("invitationsExtra.loginGoogle")}
         </button>
       );
     }
@@ -658,15 +656,14 @@ export default function InvitationDialog({
           onClick={requestPermission}
           disabled={busy}
         >
-          {busy ? "Đang gửi yêu cầu…" : "Yêu cầu quyền gửi lời rủ"}
+          {busy ? t("invitationsExtra.requesting") : t("invitationsExtra.requestPermission")}
         </Button>
       );
     }
     if (permissionStatus === "pending") {
       return (
         <>
-          <Button variant="ghost" type="button" onClick={handleClose}>
-            Đóng
+          <Button variant="ghost" type="button" onClick={handleClose}>{t("invitationsExtra.close")}
           </Button>
           <Button
             variant="primary"
@@ -674,23 +671,21 @@ export default function InvitationDialog({
             onClick={loadAccess}
             disabled={loading}
           >
-            {loading ? "Đang kiểm tra…" : "Kiểm tra lại"}
+            {loading ? t("invitationsExtra.checking") : t("invitationsExtra.checkAgain")}
           </Button>
         </>
       );
     }
     if (["denied", "revoked"].includes(permissionStatus)) {
       return (
-        <Button variant="ghost" type="button" onClick={handleClose}>
-          Đóng
+        <Button variant="ghost" type="button" onClick={handleClose}>{t("invitationsExtra.close")}
         </Button>
       );
     }
     if (receipt) {
       return (
         <>
-          <Button variant="ghost" type="button" onClick={handleClose}>
-            Đóng
+          <Button variant="ghost" type="button" onClick={handleClose}>{t("invitationsExtra.close")}
           </Button>
           <Button
             variant="primary"
@@ -699,8 +694,7 @@ export default function InvitationDialog({
               setReceipt(null);
               setDraft(buildGeneratedDraft());
             }}
-          >
-            Mời thêm
+          >{t("invitationsExtra.inviteMore")}
           </Button>
         </>
       );
@@ -719,25 +713,26 @@ export default function InvitationDialog({
         <header className={styles["invitation-sheet-head"]}>
           <div>
             <DialogTitle asChild>
-              <h2>Rủ bạn đi {trip.location}</h2>
+              <h2>{t("invitationsExtra.inviteLocation", { location: trip.location })}</h2>
             </DialogTitle>
             <p>
-              {trip.title} · {formatInvitationTripDate(trip)}
+              {trip.title} · {formatInvitationTripDate(trip, intlLocale)}
             </p>
           </div>
           <button
             type="button"
             onClick={handleClose}
             disabled={busy}
-            aria-label="Đóng lời rủ"
+            aria-label={t("invitation.close")}
           >
             <ActionIcon name="close" />
           </button>
+          <LanguageSwitcher />
         </header>
         {!isOwner && (
           <ol
             className={styles["invitation-permission-route"]}
-            aria-label="Tiến trình mở quyền gửi lời rủ"
+            aria-label={t("invitationsExtra.permissionProgress")}
           >
             <li
               className={
@@ -745,7 +740,7 @@ export default function InvitationDialog({
               }
             >
               <i />
-              <span>Đăng nhập</span>
+              <span>{t("invitationsExtra.login")}</span>
             </li>
             <li
               className={
@@ -757,7 +752,7 @@ export default function InvitationDialog({
               }
             >
               <i />
-              <span>Được duyệt</span>
+              <span>{t("invitationsExtra.permissionGranted")}</span>
             </li>
             <li
               className={
@@ -773,7 +768,14 @@ export default function InvitationDialog({
             </li>
           </ol>
         )}
-        <div className={styles["invitation-sheet-body"]}>{renderState()}</div>
+        <div className={styles["invitation-sheet-body"]}>
+          {renderState()}
+          {error && !approved && (
+            <p className={styles["invitation-sheet-error"]} role="alert">
+              {invitationErrorText(t, locale, error, access ? "invitationsExtra.requestError" : "invitationsExtra.loadAccessError")}
+            </p>
+          )}
+        </div>
         {stateFooter && (
           <Footer className={styles["invitation-state-footer"]}>
             {stateFooter}

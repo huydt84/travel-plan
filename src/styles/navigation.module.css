@@ -133,6 +133,48 @@
   padding: 8px 12px;
   border-right: 1px solid var(--navy);
 }
+.language-switcher {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 44px;
+}
+.language-switcher select {
+  width: 96px;
+  min-height: 44px;
+  padding: 8px 22px 8px 9px;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  color: transparent;
+  background: var(--paper-bright);
+  font-size: 16px;
+  font-weight: 700;
+  appearance: none;
+}
+.language-switcher select option { color: var(--navy); }
+.language-switcher .language-switcher-display {
+  position: absolute;
+  inset: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin: 0;
+  pointer-events: none;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 700;
+}
+.language-switcher-display :global(.action-icon) { width: 12px; height: 12px; }
+.language-switcher select:hover {
+  border-color: var(--green);
+  background: var(--green-soft);
+}
+.language-switcher select:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+}
 .admin-link {
   composes: admin-link from global;
   display: inline-flex;
@@ -281,6 +323,10 @@
     min-width: 44px;
     padding-inline: 10px;
   }
+  .language-switcher select {
+    width: 72px;
+    padding-inline: 7px;
+  }
   .viewer-menu-trigger .viewer-name {
     display: none;
   }
@@ -344,6 +390,10 @@
     justify-content: center;
     padding: 8px;
   }
+  .language-switcher select {
+    width: 54px;
+    padding-inline: 5px;
+  }
   .viewer-menu-panel {
     width: min(280px, calc(100vw - 20px));
   }
@@ -357,4 +407,19 @@
 
 .user-link {
   composes: user-link from global;
+}
+
+.empty-trip-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.empty-trip-bar .product-mark {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  overflow-wrap: anywhere;
+}
+.empty-trip-bar .viewer-utilities {
+  border: 0;
 }

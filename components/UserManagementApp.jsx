@@ -9,8 +9,11 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 import AdminNav from "./AdminNav";
 import ConfirmDialog from "./ConfirmDialog";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useLocale } from "./LocaleProvider";
+import { adminErrorMessage } from "../lib/i18n-admin.mjs";
 
-const loginTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
+const loginTimeOptions = {
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
@@ -18,13 +21,18 @@ const loginTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   minute: "2-digit",
   hour12: false,
   timeZone: "Asia/Tokyo",
-});
+};
 
 function LoginTime({ value }) {
+  const { t, intlLocale } = useLocale();
+  const loginTimeFormatter = new Intl.DateTimeFormat(
+    intlLocale,
+    loginTimeOptions,
+  );
   return (
     <time dateTime={value}>
       <span>{loginTimeFormatter.format(new Date(value))}</span>
-      <small>JST</small>
+      <small>{t("adminExtra.message114")}</small>
     </time>
   );
 }
@@ -35,6 +43,7 @@ export default function UserManagementApp({
   pendingInvitationCount = 0,
   pendingTripRequestCount = 0,
 }) {
+  const { t, locale } = useLocale();
   const [userRows, setUserRows] = useState(users);
   const [rolePrompt, setRolePrompt] = useState(null);
   const [busyEmail, setBusyEmail] = useState("");
@@ -62,7 +71,7 @@ export default function UserManagementApp({
       );
       const result = await response.json().catch(() => ({}));
       if (!response.ok)
-        throw new Error(result.error || "Không cập nhật được phân quyền");
+        throw new Error(result.error || t("adminExtra.message115"));
       setUserRows((current) =>
         current.map((item) => (item.email === user.email ? result : item)),
       );
@@ -70,7 +79,9 @@ export default function UserManagementApp({
     } catch (error) {
       setRoleErrors((current) => ({
         ...current,
-        [user.email]: `${error.message}. Hãy thử lại.`,
+        [user.email]: t("adminExtra.message025", {
+          value0: adminErrorMessage(error, t, locale),
+        }),
       }));
     } finally {
       setBusyEmail("");
@@ -84,15 +95,16 @@ export default function UserManagementApp({
       <header className={adminShellStyles["admin-header"]}>
         <div>
           <Link href="/" className={adminShellStyles["admin-back"]}>
-            Về lịch
+            {t("common.backToSchedule")}
           </Link>
-          <h1>Người dùng</h1>
+          <h1>{t("nav.adminUsers")}</h1>
           <small className={adminShellStyles["admin-user"]}>
             {viewer.email}
           </small>
         </div>
+        <LanguageSwitcher />
         <Button variant="ghost" onClick={() => signOut({ redirectTo: "/" })}>
-          Đăng xuất
+          {t("common.logout")}
         </Button>
       </header>
       <AdminNav
@@ -106,10 +118,9 @@ export default function UserManagementApp({
       >
         <div className={invitationManagementStyles["admin-users-head"]}>
           <div>
-            <h2 id="admin-users-title">Hoạt động người dùng</h2>
+            <h2 id="admin-users-title">{t("admin.userActivity")}</h2>
             <p>
-              {userRows.length} tài khoản Google · quyền admin có hiệu lực từ
-              request kế tiếp.
+              {userRows.length} {t("adminExtra.message116")}
             </p>
           </div>
         </div>
@@ -118,28 +129,30 @@ export default function UserManagementApp({
             <table className={invitationManagementStyles["admin-users-table"]}>
               <thead>
                 <tr>
-                  <th scope="col">Tên</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Lần đầu đăng nhập</th>
-                  <th scope="col">Hoạt động gần nhất</th>
-                  <th scope="col">Quyền</th>
+                  <th scope="col">{t("adminExtra.message109")}</th>
+                  <th scope="col">{t("adminExtra.message117")}</th>
+                  <th scope="col">{t("adminExtra.message118")}</th>
+                  <th scope="col">{t("adminExtra.message119")}</th>
+                  <th scope="col">{t("adminExtra.message120")}</th>
                 </tr>
               </thead>
               <tbody>
                 {userRows.map((loginUser) => (
                   <tr key={loginUser.email}>
-                    <td data-label="Tên">
+                    <td data-label={t("adminExtra.message109")}>
                       <strong>{loginUser.name}</strong>
                     </td>
-                    <td data-label="Email">{loginUser.email}</td>
-                    <td data-label="Lần đầu đăng nhập">
+                    <td data-label={t("adminExtra.message117")}>
+                      {loginUser.email}
+                    </td>
+                    <td data-label={t("adminExtra.message118")}>
                       <LoginTime value={loginUser.first_login} />
                     </td>
-                    <td data-label="Hoạt động gần nhất">
+                    <td data-label={t("adminExtra.message119")}>
                       <LoginTime value={loginUser.last_active_at} />
                     </td>
                     <td
-                      data-label="Quyền"
+                      data-label={t("adminExtra.message120")}
                       className={
                         invitationManagementStyles["admin-user-role-cell"]
                       }
@@ -148,7 +161,8 @@ export default function UserManagementApp({
                         <span
                           className={`${invitationManagementStyles["user-role-badge"]} is-owner`}
                         >
-                          Owner <small>Cố định</small>
+                          {t("adminExtra.message121")}{" "}
+                          <small>{t("adminExtra.message122")}</small>
                         </span>
                       ) : viewer.isOwner ? (
                         <>
@@ -158,7 +172,7 @@ export default function UserManagementApp({
                             }
                           >
                             <span className="sr-only">
-                              Quyền của {loginUser.name}
+                              {t("adminExtra.message123")} {loginUser.name}
                             </span>
                             <select
                               value={loginUser.role}
@@ -167,8 +181,12 @@ export default function UserManagementApp({
                               }
                               disabled={busyEmail === loginUser.email}
                             >
-                              <option value="member">Member</option>
-                              <option value="admin">Admin</option>
+                              <option value="member">
+                                {t("adminExtra.message124")}
+                              </option>
+                              <option value="admin">
+                                {t("adminExtra.message125")}
+                              </option>
                             </select>
                           </label>
                           {roleErrors[loginUser.email] && (
@@ -186,7 +204,9 @@ export default function UserManagementApp({
                         <span
                           className={`${invitationManagementStyles["user-role-badge"]} is-${loginUser.role}`}
                         >
-                          {loginUser.role === "admin" ? "Admin" : "Member"}
+                          {loginUser.role === "admin"
+                            ? t("adminExtra.message125")
+                            : t("adminExtra.message124")}
                         </span>
                       )}
                     </td>
@@ -197,8 +217,7 @@ export default function UserManagementApp({
           </div>
         ) : (
           <p className={invitationManagementStyles["admin-users-empty"]}>
-            Chưa có hoạt động nào. Tài khoản sẽ xuất hiện sau lần đăng nhập
-            Google tiếp theo.
+            {t("adminExtra.message126")}
           </p>
         )}
       </section>
@@ -206,19 +225,21 @@ export default function UserManagementApp({
         <ConfirmDialog
           title={
             rolePrompt.role === "admin"
-              ? "Cấp quyền Admin?"
-              : "Hạ xuống Member?"
+              ? t("adminExtra.message127")
+              : t("adminExtra.message128")
           }
           description={
             rolePrompt.role === "admin"
-              ? `${rolePrompt.user.name} sẽ được quản lý chuyến đi, lịch, lời mời và mọi nội dung đóng góp; người này không thể đổi role.`
-              : `${rolePrompt.user.name} sẽ mất quyền truy cập khu quản trị từ request kế tiếp.`
+              ? t("adminExtra.message129", { value0: rolePrompt.user.name })
+              : t("adminExtra.message130", { value0: rolePrompt.user.name })
           }
           preview={rolePrompt.user.email}
           confirmLabel={
-            rolePrompt.role === "admin" ? "Cấp quyền Admin" : "Hạ xuống Member"
+            rolePrompt.role === "admin"
+              ? t("adminExtra.message131")
+              : t("adminExtra.message132")
           }
-          pendingLabel="Đang cập nhật…"
+          pendingLabel={t("adminExtra.message133")}
           pending={busyEmail === rolePrompt.user.email}
           error={roleErrors[rolePrompt.user.email] || ""}
           onCancel={() => setRolePrompt(null)}

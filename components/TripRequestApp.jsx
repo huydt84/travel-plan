@@ -12,11 +12,13 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 import NotificationCenter from "./NotificationCenter";
+import LanguageSwitcher from "./LanguageSwitcher";
 import TripRequestDetails, {
   formatRequestRange,
-  requestStateLabels,
 } from "./TripRequestDetails";
 import ViewerMenu from "./ViewerMenu";
+import { useLocale } from "./LocaleProvider";
+import { invitationErrorText } from "../lib/i18n-invitations.mjs";
 
 const emptyRequest = {
   startDate: "",
@@ -26,34 +28,30 @@ const emptyRequest = {
   notes: "",
 };
 
-const api = (path, options) =>
-  requestJson(path, options, "Không thể cập nhật yêu cầu");
-
 export default function TripRequestApp({ viewer, initialRequests }) {
   if (!viewer) return <RequestLogin />;
   return <RequestWorkspace viewer={viewer} initialRequests={initialRequests} />;
 }
 
 function RequestLogin() {
+  const { t } = useLocale();
   return (
     <main
       className={`${adminShellStyles["admin-shell"]} ${scheduleEditorStyles["admin-login-shell"]} request-login-shell`}
     >
       <section className={scheduleEditorStyles["admin-login-card"]}>
+        <LanguageSwitcher />
         <Link href="/" className={adminShellStyles["admin-back"]}>
-          Về lịch trình
+          {t("common.backToTrip")}
         </Link>
-        <h1>Yêu cầu chuyến đi</h1>
-        <p>
-          Đăng nhập bằng Google để gửi yêu cầu và theo dõi lịch trình được tạo
-          cho bạn.
-        </p>
+        <h1>{t("requests.title")}</h1>
+        <p>{t("requests.loginDescription")}</p>
         <Button
           variant="primary"
           type="button"
           onClick={() => signIn("google", { redirectTo: "/requests" })}
         >
-          Đăng nhập để tiếp tục
+          {t("common.loginContinue")}
         </Button>
       </section>
     </main>
@@ -61,6 +59,9 @@ function RequestLogin() {
 }
 
 function RequestWorkspace({ viewer, initialRequests }) {
+  const { t, intlLocale, locale } = useLocale();
+  const api = (path, options) =>
+    requestJson(path, options, "invitationsExtra.updateRequestError");
   const [requests, setRequests] = useState(initialRequests);
   const [selectedId, setSelectedId] = useState(initialRequests[0]?.id || null);
   const [editor, setEditor] = useState(
@@ -90,7 +91,7 @@ function RequestWorkspace({ viewer, initialRequests }) {
 
   const leaveEditor = () =>
     !editorDirty ||
-    window.confirm("Bỏ các thay đổi chưa lưu trong yêu cầu này?");
+    window.confirm(t("invitationsExtra.discardRequest"));
   const chooseRequest = (request) => {
     if (!leaveEditor()) return;
     setSelectedId(request.id);
@@ -148,11 +149,11 @@ function RequestWorkspace({ viewer, initialRequests }) {
       setEditor(null);
       setNotice(
         editor.mode === "new"
-          ? "Đã gửi yêu cầu chuyến đi."
-          : "Đã lưu thay đổi trong yêu cầu.",
+          ? "invitationsExtra.tripRequestSent"
+          : "invitationsExtra.tripRequestSaved",
       );
     } catch (saveError) {
-      setError(`${saveError.message}. Hãy kiểm tra lại các trường.`);
+      setError({ message: saveError.message, suffix: "invitationsExtra.checkFields" });
     } finally {
       setBusy(false);
     }
@@ -161,7 +162,7 @@ function RequestWorkspace({ viewer, initialRequests }) {
   const changeState = async (request, action) => {
     const question =
       action === "withdraw"
-        ? "Rút yêu cầu chuyến đi này? Bạn có thể khôi phục sau."
+        ? t("invitationsExtra.withdrawConfirm")
         : null;
     if (question && !window.confirm(question)) return;
     setBusy(true);
@@ -175,11 +176,11 @@ function RequestWorkspace({ viewer, initialRequests }) {
       replaceRequest(updated);
       setNotice(
         action === "withdraw"
-          ? "Đã rút yêu cầu."
-          : "Đã khôi phục yêu cầu vào hàng chờ.",
+          ? "invitationsExtra.withdrawnNotice"
+          : "invitationsExtra.restoredNotice",
       );
     } catch (stateError) {
-      setError(`${stateError.message}. Hãy thử lại.`);
+      setError({ message: stateError.message, suffix: "invitationsExtra.retryError" });
     } finally {
       setBusy(false);
     }
@@ -199,55 +200,53 @@ function RequestWorkspace({ viewer, initialRequests }) {
       <header className={tripRequestsStyles["request-header"]}>
         <div>
           <Link href="/" className={adminShellStyles["admin-back"]}>
-            Về lịch trình
+            {t("common.backToTrip")}
           </Link>
-          <h1>Yêu cầu chuyến đi</h1>
-          <p>
-            Gửi nơi bạn muốn đến. Lịch trình hoàn chỉnh sẽ quay lại đúng tài
-            khoản này.
-          </p>
+          <h1>{t("requests.title")}</h1>
+          <p>{t("requests.description")}</p>
         </div>
         <div className={tripRequestsStyles["request-header-tools"]}>
+          <LanguageSwitcher />
           <NotificationCenter />
           <ViewerMenu viewer={viewer} />
         </div>
       </header>
       <div
         className={tripRequestsStyles["request-status-band"]}
-        aria-label="Tóm tắt yêu cầu"
+        aria-label={t("requests.summary")}
       >
         <span>
-          <strong>{counts.open}</strong> đang chờ
+          <strong>{counts.open}</strong> {t("requests.open")}
         </span>
         <span>
-          <strong>{counts.fulfilled}</strong> đã có lịch
+          <strong>{counts.fulfilled}</strong> {t("requests.fulfilled")}
         </span>
         <span>
-          <strong>{requests.length}</strong> tổng yêu cầu
+          <strong>{requests.length}</strong>{t("invitationsExtra.totalRequests")}
         </span>
       </div>
       {error && (
         <p className={adminShellStyles["admin-alert"]} role="alert">
-          {error}
+          {t(error.suffix, { error: invitationErrorText(t, locale, error, "invitationsExtra.updateRequestError") })}
         </p>
       )}
       {notice && (
         <p className={adminShellStyles["admin-notice"]} role="status">
-          {notice}
+          {t(notice)}
         </p>
       )}
 
       <div className={tripRequestsStyles["request-workspace"]}>
         <aside className={tripRequestsStyles["request-rail"]}>
           <div className={adminShellStyles["admin-section-head"]}>
-            <h2>Yêu cầu của tôi</h2>
+          <h2>{t("nav.myRequests")}</h2>
             <Button
               variant="primary"
               className="small"
               type="button"
               onClick={startNew}
             >
-              Yêu cầu mới
+              {t("requests.new")}
             </Button>
           </div>
           <div className={tripRequestsStyles["request-rail-list"]}>
@@ -263,14 +262,13 @@ function RequestWorkspace({ viewer, initialRequests }) {
                   aria-hidden="true"
                 />
                 <b>{request.places[0]}</b>
-                <small>{formatRequestRange(request)}</small>
-                <em>{requestStateLabels[request.state]}</em>
+                <small>{formatRequestRange(request, intlLocale)}</small>
+                <em>{t(`requests.status.${request.state}`)}</em>
               </button>
             ))}
             {!requests.length && (
               <p className={tripRequestsStyles["request-empty-rail"]}>
-                Chưa có yêu cầu nào. Bắt đầu bằng ngày đi và nơi bạn đang nghĩ
-                tới.
+                {t("requests.empty")}
               </p>
             )}
           </div>
@@ -301,14 +299,14 @@ function RequestWorkspace({ viewer, initialRequests }) {
             >
               <header className={tripRequestsStyles["request-ticket-head"]}>
                 <div>
-                  <span>{requestStateLabels[selected.state]}</span>
+                  <span>{t(`requests.status.${selected.state}`)}</span>
                   <h2>{selected.places.join(" · ")}</h2>
                 </div>
                 <div className={tripRequestsStyles["request-ticket-actions"]}>
                   {selected.state === "open" && (
                     <>
                       <Button variant="ghost" type="button" onClick={startEdit}>
-                        Sửa yêu cầu
+                        {t("common.edit")}
                       </Button>
                       <Button
                         variant="danger"
@@ -316,7 +314,7 @@ function RequestWorkspace({ viewer, initialRequests }) {
                         disabled={busy}
                         onClick={() => changeState(selected, "withdraw")}
                       >
-                        Rút yêu cầu
+                        {t("requests.withdraw")}
                       </Button>
                     </>
                   )}
@@ -327,7 +325,7 @@ function RequestWorkspace({ viewer, initialRequests }) {
                       disabled={busy}
                       onClick={() => changeState(selected, "restore")}
                     >
-                      Khôi phục yêu cầu
+                      {t("requests.restore")}
                     </Button>
                   )}
                 </div>
@@ -336,8 +334,8 @@ function RequestWorkspace({ viewer, initialRequests }) {
             </article>
           ) : (
             <div className={tripRequestsStyles["request-stage-empty"]}>
-              <h2>Chọn một yêu cầu</h2>
-              <p>Xem chi tiết hoặc tạo yêu cầu mới từ tuyến bên trái.</p>
+              <h2>{t("requests.chooseRequest")}</h2>
+              <p>{t("requests.chooseRequestDescription")}</p>
             </div>
           )}
         </section>
@@ -347,6 +345,7 @@ function RequestWorkspace({ viewer, initialRequests }) {
 }
 
 function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
+  const { t } = useLocale();
   const values = editor.values;
   const set = (key, value) => onChange({ ...values, [key]: value });
   const updatePlace = (index, value) =>
@@ -374,17 +373,17 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
       <header>
         <div>
           <span>
-            {editor.mode === "new" ? "Yêu cầu mới" : "Đang chỉnh sửa"}
+            {editor.mode === "new" ? t("requests.new") : t("requests.editing")}
           </span>
-          <h2>Bạn muốn đi đâu?</h2>
+          <h2>{t("requests.whereToGo")}</h2>
         </div>
         <Button variant="ghost" type="button" onClick={onCancel}>
-          Đóng
+          {t("common.close")}
         </Button>
       </header>
       <div className={tripRequestsStyles["request-date-fields"]}>
         <label>
-          Ngày bắt đầu
+          {t("requests.fields.startDate")}
           <input
             type="date"
             required
@@ -393,7 +392,7 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
           />
         </label>
         <label>
-          Ngày kết thúc
+          {t("requests.fields.endDate")}
           <input
             type="date"
             required
@@ -404,8 +403,8 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
         </label>
       </div>
       <fieldset className={tripRequestsStyles["request-repeatable"]}>
-        <legend>Những nơi muốn đi</legend>
-        <p>Thêm theo thứ tự ưu tiên. Tối đa 12 địa điểm.</p>
+        <legend>{t("requests.fields.places")}</legend>
+        <p>{t("requests.placesHelp")}</p>
         {values.places.map((place, index) => (
           <div
             className={tripRequestsStyles["request-place-field"]}
@@ -413,13 +412,13 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
           >
             <span>{String(index + 1).padStart(2, "0")}</span>
             <label>
-              <span className="sr-only">Địa điểm {index + 1}</span>
+              <span className="sr-only">{t("requests.placeNumber", { number: index + 1 })}</span>
               <input
                 required
                 maxLength={160}
                 value={place}
                 placeholder={
-                  index === 0 ? "Ví dụ: Kamakura" : "Địa điểm tiếp theo"
+                  index === 0 ? t("requests.examplePlace") : t("requests.nextPlace")
                 }
                 onChange={(event) => updatePlace(index, event.target.value)}
               />
@@ -428,7 +427,7 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
               <Button
                 variant="danger"
                 type="button"
-                aria-label={`Xoá địa điểm ${index + 1}`}
+                aria-label={t("requests.removePlace", { number: index + 1 })}
                 onClick={() =>
                   set(
                     "places",
@@ -438,7 +437,7 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
                   )
                 }
               >
-                Xoá
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -450,13 +449,13 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
             type="button"
             onClick={() => set("places", [...values.places, ""])}
           >
-            Thêm địa điểm
+            {t("requests.addPlace")}
           </Button>
         )}
       </fieldset>
       <fieldset className={tripRequestsStyles["request-repeatable"]}>
-        <legend>Liên kết tham khảo</legend>
-        <p>Không bắt buộc. Tối đa 10 liên kết HTTP(S).</p>
+        <legend>{t("requests.referenceSources")}</legend>
+        <p>{t("requests.sourcesHelp")}</p>
         {values.sources.map((source, index) => (
           <div
             className={tripRequestsStyles["request-source-field"]}
@@ -464,18 +463,17 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
           >
             <span>{String(index + 1).padStart(2, "0")}</span>
             <label>
-              Nhãn
+              {t("requests.sourceLabel")}
               <input
                 maxLength={300}
                 value={source.label || ""}
-                placeholder="Tên nguồn (không bắt buộc)"
+                placeholder={t("requests.sourceLabelPlaceholder")}
                 onChange={(event) =>
                   updateSource(index, "label", event.target.value)
                 }
               />
             </label>
-            <label>
-              URL
+            <label>{t("invitationsExtra.url")}
               <input
                 type="url"
                 required
@@ -489,7 +487,7 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
             <Button
               variant="danger"
               type="button"
-              aria-label={`Xoá liên kết ${index + 1}`}
+              aria-label={t("requests.removeSource", { number: index + 1 })}
               onClick={() =>
                 set(
                   "sources",
@@ -499,7 +497,7 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
                 )
               }
             >
-              Xoá
+              {t("common.delete")}
             </Button>
           </div>
         ))}
@@ -512,31 +510,31 @@ function TripRequestForm({ editor, busy, onChange, onSave, onCancel }) {
               set("sources", [...values.sources, { label: "", url: "" }])
             }
           >
-            Thêm liên kết
+            {t("requests.addSource")}
           </Button>
         )}
       </fieldset>
       <label className={tripRequestsStyles["request-notes-field"]}>
-        Ghi chú
+        {t("requests.fields.notes")}
         <textarea
           rows={5}
           maxLength={2000}
           value={values.notes}
-          placeholder="Mức độ linh hoạt về ngày, điều đặc biệt cần lưu ý…"
+          placeholder={t("requests.notesPlaceholder")}
           onChange={(event) => set("notes", event.target.value)}
         />
         <span>{values.notes.length}/2000</span>
       </label>
       <Footer>
         <Button variant="ghost" type="button" onClick={onCancel}>
-          Huỷ
+          {t("common.cancel")}
         </Button>
         <Button variant="primary" disabled={busy}>
           {busy
-            ? "Đang lưu…"
+            ? t("common.saving")
             : editor.mode === "new"
-              ? "Gửi yêu cầu"
-              : "Lưu thay đổi"}
+              ? t("requests.send")
+              : t("common.save")}
         </Button>
       </Footer>
     </form>

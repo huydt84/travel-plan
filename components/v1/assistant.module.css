@@ -99,8 +99,9 @@
 .historyScrim .historySidebar { width: min(280px, calc(100% - 44px)); }
 .historyScrim[data-state="open"] { animation: history-scrim-in 220ms ease-out both; }
 .historyScrim[data-state="closed"] { animation: history-scrim-out 160ms ease-in both; }
-.historyTopbar { display: flex; align-items: center; gap: 4px; padding: 12px 8px; flex-shrink: 0; }
-.historyNew { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: var(--navy); font-size: 13px; text-align: left; }
+.historyTopbar { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 12px 8px; flex-shrink: 0; }
+.historyUtilities { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.historyNew { display: inline-flex; align-items: center; gap: 8px; min-width: 0; min-height: 44px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: var(--navy); font-size: 13px; text-align: left; overflow-wrap: anywhere; }
 .historyNew svg { flex-shrink: 0; }
 .history { min-height: 0; overflow-y: auto; padding: 0 8px 16px; scrollbar-color: var(--line) var(--paper-bright); }
 .history nav { display: grid; gap: 4px; margin-bottom: 16px; }

@@ -1,3 +1,5 @@
+import { useLocale } from "../LocaleProvider";
+import { adminErrorMessage } from "../../lib/i18n-admin.mjs";
 import scheduleEditorStyles from "../../src/styles/schedule-editor.module.css";
 import adminShellStyles from "../../src/styles/admin-shell.module.css";
 
@@ -8,40 +10,6 @@ import { normalizeScheduleRefs } from "../../lib/schedule-editor-state.mjs";
 import { ActionIcon } from "../Icons";
 
 const emptySource = { title: "", url: "" };
-const ACTIVITY_TYPES = [
-  { value: "Transit", label: "Di chuyển", icon: "🚆" },
-  { value: "Walk", label: "Đi bộ", icon: "🚶" },
-  { value: "Visit", label: "Tham quan", icon: "📍" },
-  { value: "Film", label: "Quay phim / chụp ảnh", icon: "🎬📷" },
-  { value: "Buffer", label: "Thời gian đệm", icon: "🧊" },
-  { value: "Rest", label: "Nghỉ", icon: "☕" },
-  { value: "Cafe", label: "Quán cà phê", icon: "☕" },
-  { value: "Lunch", label: "Ăn trưa", icon: "🍜" },
-  { value: "Dinner", label: "Ăn tối", icon: "🍽️" },
-  { value: "Picnic", label: "Picnic / Cắm trại", icon: "🧺" },
-  { value: "Indoor", label: "Trong nhà", icon: "🏠" },
-];
-const ACTIVITY_ICONS = [
-  { value: "🚆", label: "Tàu / di chuyển" },
-  { value: "🚃", label: "Tàu điện / Enoden" },
-  { value: "🚶", label: "Đi bộ" },
-  { value: "📍", label: "Địa điểm" },
-  { value: "🎬📷", label: "Quay phim / chụp ảnh" },
-  { value: "🧊", label: "Thời gian đệm" },
-  { value: "☕", label: "Nghỉ / cà phê" },
-  { value: "🍜", label: "Món ăn" },
-  { value: "🍽️", label: "Bữa ăn" },
-  { value: "🧺", label: "Picnic / cắm trại" },
-  { value: "🏠", label: "Trong nhà" },
-  { value: "⛩️", label: "Đền / chùa" },
-  { value: "🏛️", label: "Điểm tham quan" },
-];
-
-const includeCurrentOption = (options, value, label = value) =>
-  value && !options.some((option) => option.value === value)
-    ? [{ value, label: `${label} · đang dùng` }, ...options]
-    : options;
-
 const openTimePicker = (event) => {
   try {
     event.currentTarget.showPicker?.();
@@ -51,6 +19,7 @@ const openTimePicker = (event) => {
 };
 
 export function TripForm({ editor, busy, onSave, onCancel }) {
+  const { t } = useLocale();
   const [values, setValues] = useState({
     ...editor.values,
     moveSchedule: Boolean(editor.originalSlug),
@@ -90,22 +59,25 @@ export function TripForm({ editor, busy, onSave, onCancel }) {
       }}
     >
       <div className={adminShellStyles["admin-section-head"]}>
-        <h2>{editor.originalSlug ? "Sửa trip" : "Trip mới"}</h2>
+        <h2>
+          {editor.originalSlug
+            ? t("adminExtra.message032")
+            : t("adminExtra.message194")}
+        </h2>
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Đóng
+          {t("adminExtra.message165")}
         </Button>
       </div>
       <div className={scheduleEditorStyles["form-grid"]}>
         <label>
-          Slug
+          {t("adminExtra.message166")}{" "}
           <input {...field("slug")} placeholder="tokyo-2026-08-10" required />
         </label>
         <label>
-          Tên trip
-          <input {...field("title")} required />
+          {t("adminExtra.message167")} <input {...field("title")} required />
         </label>
         <label>
-          Ngày bắt đầu
+          {t("adminExtra.message168")}{" "}
           <input
             type="date"
             value={values.startDate || ""}
@@ -114,7 +86,7 @@ export function TripForm({ editor, busy, onSave, onCancel }) {
           />
         </label>
         <label>
-          Ngày kết thúc
+          {t("adminExtra.message169")}{" "}
           <input
             type="date"
             {...field("endDate")}
@@ -123,12 +95,10 @@ export function TripForm({ editor, busy, onSave, onCancel }) {
           />
         </label>
         <label>
-          Timezone
-          <input {...field("timezone")} required />
+          {t("adminExtra.message170")} <input {...field("timezone")} required />
         </label>
         <label className="wide">
-          Địa điểm
-          <input {...field("location")} required />
+          {t("adminExtra.message171")} <input {...field("location")} required />
         </label>
       </div>
       {canMoveSchedule && (
@@ -141,21 +111,18 @@ export function TripForm({ editor, busy, onSave, onCancel }) {
             }
           />
           <span>
-            <strong>Dời toàn bộ lịch theo khoảng ngày mới</strong>
-            <small>
-              Các hoạt động và phương án sẽ giữ nguyên ngày tương đối.
-            </small>
+            <strong>{t("adminExtra.message195")}</strong>
+            <small> {t("adminExtra.message196")} </small>
           </span>
         </label>
       )}
       {datesChanged && !canMoveSchedule && (
         <p className={scheduleEditorStyles["form-guidance"]}>
-          Thời lượng chuyến đi đã đổi. Hoạt động hiện có giữ nguyên ngày; hệ
-          thống sẽ báo nếu có mục nằm ngoài khoảng mới.
+          {t("adminExtra.message197")}
         </p>
       )}
       <Button variant="primary" disabled={busy}>
-        {busy ? "Đang lưu…" : "Lưu trip"}
+        {busy ? t("adminExtra.message198") : t("adminExtra.message199")}
       </Button>
     </form>
   );
@@ -172,6 +139,44 @@ export function ScheduleForm({
   onSave,
   onCancel,
 }) {
+  const { t } = useLocale();
+  const ACTIVITY_TYPES = [
+    { value: "Transit", label: t("adminExtra.message175"), icon: "🚆" },
+    { value: "Walk", label: t("adminExtra.message176"), icon: "🚶" },
+    { value: "Visit", label: t("adminExtra.message234"), icon: "📍" },
+    { value: "Film", label: t("adminExtra.message177"), icon: "🎬📷" },
+    { value: "Buffer", label: t("adminExtra.message178"), icon: "🧊" },
+    { value: "Rest", label: t("adminExtra.message179"), icon: "☕" },
+    { value: "Cafe", label: t("adminExtra.message180"), icon: "☕" },
+    { value: "Lunch", label: t("adminExtra.message181"), icon: "🍜" },
+    { value: "Dinner", label: t("adminExtra.message182"), icon: "🍽️" },
+    { value: "Picnic", label: t("adminExtra.message183"), icon: "🧺" },
+    { value: "Indoor", label: t("adminExtra.message184"), icon: "🏠" },
+  ];
+  const ACTIVITY_ICONS = [
+    { value: "🚆", label: t("adminExtra.message185") },
+    { value: "🚃", label: t("adminExtra.message186") },
+    { value: "🚶", label: t("adminExtra.message176") },
+    { value: "📍", label: t("adminExtra.message171") },
+    { value: "🎬📷", label: t("adminExtra.message177") },
+    { value: "🧊", label: t("adminExtra.message178") },
+    { value: "☕", label: t("adminExtra.message187") },
+    { value: "🍜", label: t("adminExtra.message188") },
+    { value: "🍽️", label: t("adminExtra.message189") },
+    { value: "🧺", label: t("adminExtra.message190") },
+    { value: "🏠", label: t("adminExtra.message184") },
+    { value: "⛩️", label: t("adminExtra.message191") },
+    { value: "🏛️", label: t("adminExtra.message192") },
+  ];
+
+  const includeCurrentOption = (options, value, label = value) =>
+    value && !options.some((option) => option.value === value)
+      ? [
+          { value, label: t("adminExtra.message193", { value0: label }) },
+          ...options,
+        ]
+      : options;
+
   const values = editor.values;
   const field = (name) => ({
     value: values[name] ?? "",
@@ -213,7 +218,11 @@ export function ScheduleForm({
         className={`${adminShellStyles["admin-section-head"]} ${scheduleEditorStyles["schedule-editor-head"]}`}
       >
         <h2 tabIndex="-1" data-editor-heading>
-          {values.id ? `Sửa: ${values.title || "Hoạt động"}` : "Hoạt động mới"}
+          {values.id
+            ? t("adminExtra.message200", {
+                value0: values.title || t("adminExtra.message201"),
+              })
+            : t("adminExtra.message202")}
         </h2>
         <Button
           type="button"
@@ -221,7 +230,7 @@ export function ScheduleForm({
           onClick={onCancel}
           disabled={busy}
         >
-          Hủy
+          {t("adminExtra.message082")}
         </Button>
       </div>
       <div
@@ -230,13 +239,13 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-date-field"]}`}
         >
-          Ngày bắt đầu
+          {t("adminExtra.message168")}{" "}
           <input type="date" {...field("startDate")} required />
         </label>
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-time-field"]}`}
         >
-          Bắt đầu
+          {t("adminExtra.message203")}{" "}
           <input
             type="time"
             {...field("start")}
@@ -247,7 +256,7 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-date-field"]}`}
         >
-          Ngày kết thúc
+          {t("adminExtra.message169")}{" "}
           <input
             type="date"
             {...field("endDate")}
@@ -258,7 +267,7 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-time-field"]}`}
         >
-          Kết thúc
+          {t("adminExtra.message204")}{" "}
           <input
             type="time"
             {...field("end")}
@@ -269,13 +278,16 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-display-field"]}`}
         >
-          Hiển thị kết thúc
-          <input {...field("displayEnd")} placeholder="Tuỳ chọn, ví dụ +" />
+          {t("adminExtra.message205")}{" "}
+          <input
+            {...field("displayEnd")}
+            placeholder={t("adminExtra.message206")}
+          />
         </label>
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-type-field"]}`}
         >
-          Loại
+          {t("adminExtra.message207")}{" "}
           <select value={values.type || ""} onChange={changeType} required>
             {typeOptions.map((option) => (
               <option value={option.value} key={option.value}>
@@ -287,7 +299,7 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-icon-field"]}`}
         >
-          Icon
+          {t("adminExtra.message208")}{" "}
           <select {...field("icon")} required>
             {iconOptions.map((option) => (
               <option value={option.value} key={option.value}>
@@ -299,16 +311,15 @@ export function ScheduleForm({
         <label
           className={`wide ${scheduleEditorStyles["schedule-field"]} schedule-title-field`}
         >
-          Tiêu đề
-          <input {...field("title")} required />
+          {t("adminExtra.message209")} <input {...field("title")} required />
         </label>
         <label
           className={`wide ${scheduleEditorStyles["schedule-field"]} schedule-detail-field`}
         >
           <span>
-            Chi tiết{" "}
+            {t("adminExtra.message210")}{" "}
             <small className={scheduleEditorStyles["field-optional"]}>
-              Không bắt buộc
+              {t("adminExtra.message160")}
             </small>
           </span>
           <textarea {...field("detail")} rows="3" />
@@ -318,7 +329,7 @@ export function ScheduleForm({
         values.endDate &&
         values.endDate !== values.startDate && (
           <p className={scheduleEditorStyles["overnight-note"]}>
-            <ActionIcon name="moon" /> Hoạt động kết thúc vào ngày hôm sau.
+            <ActionIcon name="moon" /> {t("adminExtra.message211")}
           </p>
         )}
       <SourcePicker
@@ -342,10 +353,14 @@ export function ScheduleForm({
           onClick={onCancel}
           disabled={busy}
         >
-          Hủy
+          {t("adminExtra.message082")}
         </Button>
         <Button variant="primary" disabled={busy}>
-          {busy ? "Đang lưu…" : values.id ? "Lưu thay đổi" : "Thêm hoạt động"}
+          {busy
+            ? t("adminExtra.message198")
+            : values.id
+              ? t("adminExtra.message212")
+              : t("adminExtra.message042")}
         </Button>
       </div>
     </form>
@@ -353,6 +368,7 @@ export function ScheduleForm({
 }
 
 function SourcePicker({ sources, selectedRefs, onChange, onCreateSource }) {
+  const { t } = useLocale();
   const [addingSource, setAddingSource] = useState(false);
   const [creatingSource, setCreatingSource] = useState(false);
   const [createdNotice, setCreatedNotice] = useState("");
@@ -369,7 +385,7 @@ function SourcePicker({ sources, selectedRefs, onChange, onCreateSource }) {
       const source = await onCreateSource(values);
       onChange(normalizeScheduleRefs([...refs, source.number]));
       setAddingSource(false);
-      setCreatedNotice(`Đã thêm và chọn “${source.title}”.`);
+      setCreatedNotice(t("adminExtra.message213", { value0: source.title }));
       return source;
     } finally {
       setCreatingSource(false);
@@ -377,13 +393,13 @@ function SourcePicker({ sources, selectedRefs, onChange, onCreateSource }) {
   };
   return (
     <fieldset className={scheduleEditorStyles["source-picker"]}>
-      <legend>Nguồn tham khảo</legend>
+      <legend>{t("adminExtra.message214")}</legend>
       <div className={scheduleEditorStyles["source-picker-frame"]}>
         <div className={scheduleEditorStyles["source-picker-head"]}>
           <p>
             {sources.length
-              ? "Chọn các nguồn xác nhận thông tin cho hoạt động này."
-              : "Chuyến đi này chưa có nguồn tham khảo."}
+              ? t("adminExtra.message215")
+              : t("adminExtra.message216")}
           </p>
           {!addingSource && (
             <Button
@@ -394,7 +410,9 @@ function SourcePicker({ sources, selectedRefs, onChange, onCreateSource }) {
                 setCreatedNotice("");
               }}
             >
-              {sources.length ? "Thêm nguồn mới" : "Thêm nguồn đầu tiên"}
+              {sources.length
+                ? t("adminExtra.message217")
+                : t("adminExtra.message218")}
             </Button>
           )}
         </div>
@@ -448,6 +466,7 @@ export function SourceForm({
   onSave,
   onCancel,
 }) {
+  const { t, locale } = useLocale();
   const [values, setValues] = useState(
     source ? { title: source.title, url: source.url } : emptySource,
   );
@@ -463,7 +482,7 @@ export function SourceForm({
     event?.preventDefault?.();
     if (compact) {
       if (!values.title.trim()) {
-        setError("Hãy nhập tên nguồn.");
+        setError(t("adminExtra.message219"));
         fieldsRef.current?.querySelector("input")?.focus();
         return;
       }
@@ -471,7 +490,7 @@ export function SourceForm({
         const parsed = new URL(values.url);
         if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
       } catch {
-        setError("URL phải bắt đầu bằng http:// hoặc https://.");
+        setError(t("adminExtra.message220"));
         fieldsRef.current?.querySelectorAll("input")?.[1]?.focus();
         return;
       }
@@ -481,7 +500,7 @@ export function SourceForm({
     try {
       await onSave(values);
     } catch (requestError) {
-      setError(requestError.message);
+      setError(adminErrorMessage(requestError, t, locale));
     } finally {
       setBusy(false);
     }
@@ -496,16 +515,16 @@ export function SourceForm({
       ref={fieldsRef}
     >
       <label className={compact ? "" : "wide"}>
-        Tên nguồn
+        {t("adminExtra.message221")}{" "}
         <input
           {...field("title")}
           maxLength={300}
-          placeholder="Ví dụ: Trang chính thức của bảo tàng"
+          placeholder={t("adminExtra.message222")}
           required={!compact}
         />
       </label>
       <label className={compact ? "" : "wide"}>
-        URL
+        {t("adminExtra.message223")}{" "}
         <input
           type={compact ? "text" : "url"}
           inputMode="url"
@@ -517,7 +536,7 @@ export function SourceForm({
           aria-describedby={hintId}
           required={!compact}
         />
-        <small id={hintId}>Tên miền và số nguồn được tạo tự động.</small>
+        <small id={hintId}>{t("adminExtra.message224")}</small>
       </label>
     </div>
   );
@@ -531,9 +550,9 @@ export function SourceForm({
         }}
       >
         <div className={scheduleEditorStyles["source-inline-head"]}>
-          <strong>Thêm nguồn mới</strong>
+          <strong>{t("adminExtra.message217")}</strong>
           <Button type="button" variant="ghost" onClick={onCancel}>
-            Hủy
+            {t("adminExtra.message082")}
           </Button>
         </div>
         {fields}
@@ -548,7 +567,7 @@ export function SourceForm({
           onClick={submitSource}
           disabled={busy}
         >
-          {busy ? "Đang thêm…" : "Thêm và chọn nguồn"}
+          {busy ? t("adminExtra.message225") : t("adminExtra.message226")}
         </Button>
       </section>
     );
@@ -559,9 +578,13 @@ export function SourceForm({
       onSubmit={submitSource}
     >
       <div className={adminShellStyles["admin-section-head"]}>
-        <h2>{source ? `Sửa nguồn ${source.number}` : "Nguồn mới"}</h2>
+        <h2>
+          {source
+            ? t("adminExtra.message227", { value0: source.number })
+            : t("adminExtra.message228")}
+        </h2>
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Hủy
+          {t("adminExtra.message082")}
         </Button>
       </div>
       {fields}
@@ -571,7 +594,11 @@ export function SourceForm({
         </p>
       )}
       <Button variant="primary" disabled={busy}>
-        {busy ? "Đang lưu…" : source ? "Lưu nguồn" : "Thêm nguồn"}
+        {busy
+          ? t("adminExtra.message198")
+          : source
+            ? t("adminExtra.message229")
+            : t("adminExtra.message036")}
       </Button>
     </form>
   );

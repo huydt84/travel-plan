@@ -7,61 +7,60 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ActionIcon } from "./Icons";
 import Dialog, { DialogTitle } from "./ui/Dialog";
+import { useLocale } from "./LocaleProvider";
 
 const PANEL_ID = "viewer-notification-panel";
 const POLL_INTERVAL = 45_000;
 const NOTIFICATION_NAVIGATION_EVENT = "travel-plan:notification-navigation";
 
-const statusLabels = {
-  accepted: "Đã nhận",
-  resolved: "Đã xử lý",
-  rejected: "Từ chối",
-  open: "Mở lại",
-};
-
-const relativeTime = (value) => {
+const relativeTime = (value, locale) => {
   const milliseconds = new Date(value).getTime() - Date.now();
   const absolute = Math.abs(milliseconds);
-  const formatter = new Intl.RelativeTimeFormat("vi-VN", { numeric: "auto" });
-  if (absolute < 60_000) return "vừa xong";
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (absolute < 60_000) return locale === "en-US" ? "just now" : locale === "ja-JP" ? "たった今" : "vừa xong";
   if (absolute < 3_600_000)
     return formatter.format(Math.round(milliseconds / 60_000), "minute");
   if (absolute < 86_400_000)
     return formatter.format(Math.round(milliseconds / 3_600_000), "hour");
   if (absolute < 604_800_000)
     return formatter.format(Math.round(milliseconds / 86_400_000), "day");
-  return new Intl.DateTimeFormat("vi-VN", {
+  return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   }).format(new Date(value));
 };
 
-const notificationCopy = (notification) => {
+const notificationCopy = (notification, t) => {
   if (notification.type === "trip_request_fulfilled") {
     return {
-      title: "Lịch trình cho yêu cầu của bạn đã sẵn sàng",
-      detail: `${notification.actor.name} đã gắn “${notification.trip.title}” với yêu cầu của bạn.`,
+      title: t("notifications.tripReady"),
+      detail: t("notifications.tripLinked", { actor: notification.actor.name, trip: notification.trip.title }),
     };
   }
   if (notification.type === "contribution_visibility_changed") {
     return {
       title: notification.contribution.hidden
-        ? "Nội dung của bạn đã được ẩn"
-        : "Nội dung của bạn đã được hiện lại",
-      detail: `${notification.actor.name} đã đổi mức hiển thị nội dung của bạn.`,
+        ? t("notifications.contentHidden")
+        : t("notifications.contentShown"),
+      detail: t("notifications.visibilityChanged", { actor: notification.actor.name }),
     };
   }
   if (notification.type === "contribution_status_changed") {
     return {
-      title: `Góp ý của bạn: ${statusLabels[notification.contribution.status] || "Đã cập nhật"}`,
-      detail: `${notification.actor.name} đã đổi trạng thái góp ý của bạn.`,
+      title: t("notifications.contributionStatus", { status: t({
+        open: "notifications.reopened",
+        accepted: "notifications.accepted",
+        resolved: "notifications.resolved",
+        rejected: "notifications.rejected",
+      }[notification.contribution.status] || "notifications.updated") }),
+      detail: t("notifications.statusChanged", { actor: notification.actor.name }),
     };
   }
   const action =
     notification.contribution.kind === "comment"
-      ? "đã bình luận"
-      : "đã gửi một đề xuất";
+      ? t("notifications.commented")
+      : t("notifications.suggested");
   return {
     title: `${notification.actor.name} ${action}`,
     detail: notification.contribution.body,
@@ -70,6 +69,7 @@ const notificationCopy = (notification) => {
 
 export default function NotificationCenter() {
   const router = useRouter();
+  const { t, intlLocale } = useLocale();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -94,7 +94,7 @@ export default function NotificationCenter() {
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok)
-          throw new Error(result.error || "Không tải được thông báo");
+          throw new Error(result.error || t("notifications.loadError"));
         setNotifications((current) =>
           append
             ? [
@@ -118,7 +118,7 @@ export default function NotificationCenter() {
         }
       }
     },
-    [],
+    [t],
   );
 
   useEffect(() => {
@@ -200,12 +200,12 @@ export default function NotificationCenter() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok)
-        throw new Error(result.error || "Không đánh dấu được thông báo");
+        throw new Error(result.error || t("notifications.markError"));
       setError("");
     } catch (markError) {
       setNotifications(previous);
       setUnreadCount(previousCount);
-      setError(`${markError.message}. Hãy thử lại.`);
+      setError(t("trackerExtra.retry", { error: markError.message }));
     } finally {
       setMarkingAll(false);
     }
@@ -214,9 +214,9 @@ export default function NotificationCenter() {
   const unreadLabel = useMemo(
     () =>
       unreadCount === 1
-        ? "1 thông báo chưa đọc"
-        : `${unreadCount} thông báo chưa đọc`,
-    [unreadCount],
+      ? t("notifications.unreadOne")
+        : t("notifications.unreadMany", { count: unreadCount }),
+    [t, unreadCount],
   );
 
   return (
@@ -228,7 +228,7 @@ export default function NotificationCenter() {
         aria-expanded={open}
         aria-controls={PANEL_ID}
         aria-label={
-          unreadCount ? `Mở thông báo, ${unreadLabel}` : "Mở thông báo"
+          unreadCount ? t("notifications.openWithCount", { label: unreadLabel }) : t("notifications.open")
         }
         onClick={() => {
           restoreFocusRef.current = true;
@@ -262,28 +262,28 @@ export default function NotificationCenter() {
               <div>
                 <DialogTitle asChild>
                   <h2 tabIndex="-1" ref={headingRef}>
-                    Thông báo
+                    {t("notifications.title")}
                   </h2>
                 </DialogTitle>
                 <p>
                   {unreadCount
                     ? unreadLabel
-                    : "Bạn đã xem hết các cập nhật mới"}
+                    : t("notifications.allCaughtUp")}
                 </p>
               </div>
-              <button type="button" aria-label="Đóng" onClick={closePanel}>
+              <button type="button" aria-label={t("common.close")} onClick={closePanel}>
                 <ActionIcon name="close" />
               </button>
             </header>
 
             <div className={styles["notification-panel-tools"]}>
-              <span>Cập nhật dành cho bạn</span>
+              <span>{t("notifications.forYou")}</span>
               <button
                 type="button"
                 disabled={!unreadCount || markingAll}
                 onClick={markAllRead}
               >
-                {markingAll ? "Đang đánh dấu…" : "Đánh dấu tất cả đã đọc"}
+                {markingAll ? t("notifications.marking") : t("notifications.markAllRead")}
               </button>
             </div>
 
@@ -297,10 +297,10 @@ export default function NotificationCenter() {
                   className={`${styles["notification-state"]} is-error`}
                   role="alert"
                 >
-                  <strong>Chưa nối được bảng tin</strong>
+                  <strong>{t("notifications.feedUnavailable")}</strong>
                   <p>{error}</p>
                   <button type="button" onClick={() => loadNotifications()}>
-                    Thử lại
+                    {t("common.retry")}
                   </button>
                 </div>
               )}
@@ -310,21 +310,18 @@ export default function NotificationCenter() {
                     className={styles["notification-empty-node"]}
                     aria-hidden="true"
                   />
-                  <strong>Chưa có cập nhật</strong>
-                  <p>
-                    Khi có cập nhật về góp ý hoặc yêu cầu chuyến đi, thông báo
-                    sẽ xuất hiện tại đây.
-                  </p>
+                  <strong>{t("notifications.emptyFeed")}</strong>
+                  <p>{t("notifications.emptyDescription")}</p>
                 </div>
               )}
               {notifications.length > 0 && (
                 <ul className={styles["notification-list"]}>
                   {notifications.map((notification) => {
-                    const copy = notificationCopy(notification);
+                    const copy = notificationCopy(notification, t);
                     const target = notification.request
                       ? notification.request.places.join(" · ")
                       : notification.contribution.activityTitle ||
-                        "Cả chuyến đi";
+                        t("notifications.wholeTrip");
                     return (
                       <li
                         className={
@@ -343,10 +340,10 @@ export default function NotificationCenter() {
                           <span className={styles["notification-item-copy"]}>
                             <span className={styles["notification-item-meta"]}>
                               <strong>
-                                {notification.readAt ? "Đã đọc" : "Chưa đọc"}
+                                {notification.readAt ? t("notifications.read") : t("notifications.unread")}
                               </strong>
                               <time dateTime={notification.createdAt}>
-                                {relativeTime(notification.createdAt)}
+                                {relativeTime(notification.createdAt, intlLocale)}
                               </time>
                             </span>
                             <b>{copy.title}</b>
@@ -382,7 +379,7 @@ export default function NotificationCenter() {
                     loadNotifications({ cursor: nextCursor, append: true })
                   }
                 >
-                  {loadingMore ? "Đang tải…" : "Xem thêm cập nhật"}
+                  {loadingMore ? t("common.loading") : t("notifications.more")}
                 </button>
               </Footer>
             )}
@@ -394,10 +391,11 @@ export default function NotificationCenter() {
 }
 
 function NotificationSkeleton() {
+  const { t } = useLocale();
   return (
     <div
       className={styles["notification-skeleton"]}
-      aria-label="Đang tải thông báo"
+      aria-label={t("notifications.loading")}
     >
       {[0, 1, 2].map((item) => (
         <span key={item}>

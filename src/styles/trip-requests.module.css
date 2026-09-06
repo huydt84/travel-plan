@@ -928,20 +928,38 @@
     min-width: 44px;
   }
   .request-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: flex-start;
     gap: 16px;
     padding-top: 12px;
   }
+  .request-header > div:first-child {
+    display: contents;
+  }
+  .request-header > div:first-child > a {
+    grid-row: 1;
+    grid-column: 1;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
   .request-header h1 {
+    grid-column: 1 / -1;
+    grid-row: 2;
     font-size: clamp(42px, 14vw, 58px);
   }
   .request-header p {
+    grid-column: 1 / -1;
+    grid-row: 3;
     font-size: 11px;
   }
   .request-header-tools {
+    grid-column: 2;
+    grid-row: 1;
     display: grid;
     flex: none;
-    grid-template-columns: 44px 44px;
+    grid-template-columns: 54px 44px 44px;
   }
   .request-header-tools :global(.viewer-menu-trigger) {
     width: 44px;
