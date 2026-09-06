@@ -11,20 +11,29 @@ import { snapshot, call, scriptedClient } from "./assistant-fixtures.mjs";
 
 const run = (client, options = {}) => createGeminiModelAdapter({ client, model: "test", ...options }).run({ message: "Help", actor: { email: "test@example.com", isAdmin: true }, contextService: { targetSnapshot: async () => snapshot } });
 
+test("single-request live smoke blocks provider retries and paid research", async () => {
+  let requests = 0;
+  const client = { interactions: { create() { requests++; throw Object.assign(new Error("Unavailable"), { status: 503 }); } } };
+  await assert.rejects(run(client, { maxModelRequests: 1 }), { code: "MODEL_BUDGET_EXCEEDED" });
+  assert.equal(requests, 1);
+  const researchClient = scriptedClient([{ steps: [call("search_web", { query: "museum" })] }]);
+  await assert.rejects(run(researchClient, { maxModelRequests: 1, research: { searchWeb() { assert.fail("No paid research in smoke mode"); } } }), { code: "MODEL_BUDGET_EXCEEDED" });
+});
+
 test("proposal validation reaches the model for repair before publication", async () => {
   const client = scriptedClient([
-    { steps: [call("stage_plan_changes", { trip: { kind: "trip", id: "1" }, operations: [{ kind: "activity.update", itemKey: "missing", set: { title: "New" } }] })] },
+    { steps: [call("apply_changes", { operations: [{ kind: "activity.update", trip: { id: "1" }, target: { id: "999" }, set: { title: "New" } }] })] },
     (request) => {
       assert.ok(request.input[0].result.error);
-      assert.match(request.system_instruction, /Never claim to have committed a plan/);
+      assert.match(request.system_instruction, /Only claim changes were saved/);
       assert.match(request.system_instruction, /activity.update/);
-      return { steps: [call("stage_plan_changes", { trip: { kind: "trip", id: "1" }, operations: [{ kind: "activity.update", itemKey: "museum", set: { title: "New" } }] })] };
+      return { steps: [call("apply_changes", { operations: [{ kind: "activity.update", trip: { id: "1" }, target: { id: String(snapshot.backbone[0].id) }, set: { title: "New" } }] })] };
     },
     { output_text: "Ready to review" },
   ]);
   const result = await run(client);
-  assert.equal(result.compiledProposal.preview.changes[0].after.title, "New");
-  assert.equal(client.deleted.length, 3);
+  assert.equal(result.pendingAction.compiled.preview.changes[0].after.title, "New");
+  assert.equal(client.deleted.length, 2);
 });
 
 test("invalid arguments and unavailable research become tool results with one retry", async () => {
@@ -141,10 +150,10 @@ test("model retries one transient failure and preserves proposal/evidence contex
 });
 
 test("proposal source additions require previously researched evidence", async () => {
-  const client = scriptedClient([{ steps: [call("stage_plan_changes", { trip: { kind: "trip", id: "1" }, operations: [
-    { kind: "source.add", draftId: "unknown", title: "Unknown", url: "https://example.com/unverified" },
+  const client = scriptedClient([{ steps: [call("apply_changes", { operations: [
+    { kind: "source.create", trip: { id: "1" }, draftId: "unknown", value: { title: "Unknown", url: "https://example.com/unverified" } },
   ] })] }, (request) => {
-    assert.equal(request.input[0].result.error.code, "INVALID_EVIDENCE");
+    assert.equal(request.input[0].result.error.code, "BATCH_INVALID");
     return { output_text: "I could not verify that source." };
   }]);
   assert.equal((await run(client)).operations, null);

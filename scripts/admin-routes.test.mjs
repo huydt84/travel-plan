@@ -8,5 +8,6 @@ test("admin management screens are siblings with no compatibility gateway", () =
     requests: "/admin/requests",
     invitations: "/admin/invitations",
     users: "/admin/users",
+    assistant: "/admin/assistant",
   });
 });

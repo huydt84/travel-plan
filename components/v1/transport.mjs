@@ -27,7 +27,7 @@ export async function observeRun(runId, onEvent, signal) {
             if (event.seq !== cursor + 1) throw new Error("Thiếu một phần phản hồi");
             cursor = event.seq; failures = 0;
             onEvent(event);
-            if (["completed", "failed", "cancelled"].includes(event.type)) return;
+            if (["completed", "failed", "cancelled", "awaiting_approval"].includes(event.type)) return;
           }
           if (done) break;
         }

@@ -2,6 +2,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiJson, observeRun } from "./transport.mjs";
 
+// A refresh cannot make a locally expired immutable approval actionable again.
+const currentTurn = (turn) => ({ ...turn, actions: turn.actions?.map((action) =>
+  action.status === "pending" && Date.parse(action.expiresAt) <= Date.now()
+    ? { ...action, status: "expired", confirmationToken: null } : action) });
+
 export function useConversation({ initialWorkspace, viewer }) {
   const [workspace, setWorkspace] = useState(initialWorkspace || null);
   const [turns, setTurns] = useState(initialWorkspace?.turns || []);
@@ -19,6 +24,17 @@ export function useConversation({ initialWorkspace, viewer }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
   const generation = useRef(0), loadController = useRef(null), streamController = useRef(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    const refresh = async () => {
+      try { const access = await apiJson("/api/v1/assistant/access", { signal: controller.signal });
+        if (!controller.signal.aborted) setWorkspace((current) => current ? { ...current,access } : current);
+      } catch { /* Request acceptance remains authoritative during a lost connection. */ }
+    };
+    const timer=setInterval(refresh,15000);
+    window.addEventListener("assistant-completed",refresh);window.addEventListener("focus",refresh);
+    return () => { controller.abort();clearInterval(timer);window.removeEventListener("assistant-completed",refresh);window.removeEventListener("focus",refresh); };
+  }, []);
   const historyGeneration = useRef(0);
   useEffect(() => {
     const refresh = (event) => {
@@ -42,7 +58,7 @@ export function useConversation({ initialWorkspace, viewer }) {
     setMentions([...mentions, item]);
   };
   const changePins = async (items) => {
-    if (pinBusy || submitting) return;
+    if (pinBusy || submitting || workspace?.access?.enabled === false) return;
     if (items.length > 20) { setError("Mỗi cuộc trò chuyện tối đa 20 ghim."); return; }
     const token = generation.current;
     setPinBusy(true);
@@ -94,6 +110,40 @@ export function useConversation({ initialWorkspace, viewer }) {
     }, controller.signal).catch((failure) => { if (generation.current === token && !controller.signal.aborted) { setDisconnected({ turnId: turn.id, status: failure.status }); setProgress(""); } });
   }, []);
 
+  const refreshConversation = async (conversationId) => {
+    const token = generation.current;
+    const next = await apiJson(`/api/v1/assistant/workspace?conversation=${conversationId}`);
+    if (token !== generation.current) return;
+    const latest = new Map(next.turns.map((turn) => [turn.id, currentTurn(turn)]));
+    setTurns((items) => items.map((turn) => latest.get(turn.id) || turn));
+    const resumed = next.turns.find((turn) => turn.status === "running");
+    if (resumed) observe(resumed, token);
+    return next;
+  };
+
+  const waitingTurnId = turns.find((turn) => turn.status === "awaiting_approval")?.id;
+  const waitingConversationId = workspace?.selectedConversation?.id;
+  useEffect(() => {
+    if (!waitingTurnId || !waitingConversationId) return;
+    let disposed = false, inFlight = false;
+    const token = generation.current;
+    const refresh = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const next = await apiJson(`/api/v1/assistant/workspace?conversation=${waitingConversationId}`);
+        if (disposed || token !== generation.current) return;
+        setTurns(next.turns.map(currentTurn));
+        const resumed = next.turns.find((t) => t.id === waitingTurnId && t.status === "running");
+        if (resumed) observe(resumed, token);
+      } catch { /* Approval endpoints remain authoritative; keep the review visible. */ }
+      finally { inFlight = false; }
+    };
+    const timer = setInterval(refresh, 5000);
+    window.addEventListener("focus", refresh);
+    return () => { disposed = true; clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [waitingTurnId, waitingConversationId, observe]);
+
   const load = useCallback(async ({ trip, conversation = null, replace = false, navigation = true } = {}) => {
     const token = ++generation.current;
     loadController.current?.abort(); streamController.current?.abort();
@@ -143,7 +193,7 @@ export function useConversation({ initialWorkspace, viewer }) {
   const selectConversation = (conversation) => void load({ conversation: conversation.id });
   const newConversation = () => void load({ conversation: "new" });
   const send = async (input = message.trim(), retryRequest = null) => {
-    if (!input || sending.current || submitting || pinBusy || loading || turns.some((turn) => turn.status === "running")) return;
+    if (!input || sending.current || submitting || pinBusy || loading || turns.some((turn) => ["running", "awaiting_approval"].includes(turn.status))) return;
     const token = generation.current;
     const trip = null;
     const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input, mentions: mentions.map((item) => item.ref),
@@ -212,7 +262,7 @@ export function useConversation({ initialWorkspace, viewer }) {
     return send(pending?.message || message.trim(), pending);
   };
   const stop = async () => {
-    const turn = turns.find((item) => item.status === "running");
+    const turn = turns.find((item) => ["running", "awaiting_approval"].includes(item.status));
     if (!turn) return;
     const token = generation.current;
     try {
@@ -246,5 +296,5 @@ export function useConversation({ initialWorkspace, viewer }) {
   };
   return { workspace, turns, setTurns, message, setMessage, loading, error, setError, progress, submitting, historyLoading, historyError,
     mentions, addMention, setMentions, pin, unpin, pinBusy, load, selectConversation, newConversation, submit, send, stop, history, older,
-    retry, retrying, submissionFailure, retrySubmission, disconnected, reconnect };
+    refreshConversation, retry, retrying, submissionFailure, retrySubmission, disconnected, reconnect };
 }

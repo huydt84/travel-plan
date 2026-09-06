@@ -167,7 +167,7 @@
 .admin-nav {
   composes: admin-nav from global;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(var(--admin-columns, 4), minmax(0, 1fr));
   margin-bottom: 20px;
   border: 2px solid var(--navy);
   background: var(--paper-bright);
@@ -207,6 +207,9 @@
   .admin-grid {
     grid-template-columns: 240px minmax(0, 1fr);
   }
+}
+@media (min-width: 681px) and (max-width: 1100px) {
+  .admin-nav[data-owner] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 680px) {
   .admin-shell {

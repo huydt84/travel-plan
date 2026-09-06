@@ -475,3 +475,10 @@
 .suggestion-more-trigger {
   composes: suggestion-more-trigger from global;
 }
+
+.savedPlaces { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,280px),1fr)); gap: 18px; }
+.savedPlaces article { padding-block: 14px; border-top: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
+.savedPlaces h3 { font-size: 18px; margin: 0 0 10px; }
+.savedPlaces p { font-size: 14px; line-height: 1.6; }
+.savedPlaces article > div { display: flex; gap: 14px; flex-wrap: wrap; }
+.savedPlaces a { display: inline-block; padding-block: 10px; text-underline-offset: 3px; }

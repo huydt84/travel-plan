@@ -13,19 +13,16 @@ test("assistant persists a turn, stages a complete diff, and applies only after 
   const request = "Cập nhật hoạt động đầu tiên với một ghi chú thử nghiệm";
   await page.getByLabel("Yêu cầu cho trợ lý").fill(request);
   await page.getByRole("button", { name: "Gửi yêu cầu" }).click();
-  await expect(page.getByText("Tôi đã chuẩn bị một thay đổi", { exact: false }).last()).toBeVisible({ timeout: 20_000 });
-  await page.getByRole("button", { name: /Xem 1 thay đổi/ }).last().click();
-  await expect(page.getByRole("heading", { name: "1 thay đổi được đề xuất" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Áp dụng 1 thay đổi" })).toBeEnabled();
+  await expect(page.getByRole("heading", { name: "Cần phê duyệt" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Cần phê duyệt" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Phê duyệt thay đổi" })).toBeEnabled();
 
-  await page.getByRole("button", { name: "Áp dụng 1 thay đổi" }).click();
-  await expect(page.getByText("Đã cập nhật lịch")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole("link", { name: "Mở lịch hiện tại" })).toBeVisible();
+  await page.getByRole("button", { name: "Phê duyệt thay đổi" }).click();
+  await expect(page.getByText("Đã lưu toàn bộ nhóm thay đổi được phê duyệt.")).toBeVisible({ timeout: 20_000 });
 
   await page.reload();
   await expect(page.getByText(request).last()).toBeVisible();
-  await page.getByRole("button", { name: "Xem thay đổi đã áp dụng" }).last().click();
-  await expect(page.getByText("Đã cập nhật lịch").last()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tài nguyên đã lưu" })).toBeVisible();
 });
 
 test("v1 transport rejects a confirmation request without same-origin browser context", async ({ request }) => {

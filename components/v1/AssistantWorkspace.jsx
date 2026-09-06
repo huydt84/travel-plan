@@ -6,6 +6,7 @@ import Dialog, { DialogTitle } from "../ui/Dialog";
 import { useAssistantNavigation } from "./AssistantProvider";
 import { useConversation } from "./useConversation";
 import { apiJson } from "./transport.mjs";
+import BatchReview from "./BatchReview";
 import MessageContent from "./MessageContent";
 import Composer from "./Composer";
 import { ContextPicker, ReferenceList } from "./ContextReferences";
@@ -34,9 +35,14 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
   const [newResponse, setNewResponse] = useState(false);
   const listRef = useRef(null), nearEnd = useRef(true), olderAnchor = useRef(null), focusCitation = useRef(null), citationFocus = useRef(null);
   const retryFocus = useRef(null);
+  const access = chat.workspace?.access;
+  const restricted = access?.enabled === false;
+  const quotaBlocked = access && ((access.daily !== null && access.dailyUsed >= access.daily) || (access.weekly !== null && access.weeklyUsed >= access.weekly));
+  const requestBlocked = restricted || quotaBlocked;
   const running = chat.turns.some((turn) => turn.status === "running");
   const selected = chat.turns.find((turn) => turn.id === selectedId) || chat.turns.at(-1);
   const changeSet = selected?.changeSet;
+  const awaiting = chat.turns.some((t) => t.status === "awaiting_approval");
   useEffect(() => {
     if (!chat.retrying && retryFocus.current) {
       const target = listRef.current?.querySelector(`[data-exchange="${retryFocus.current}"]`);
@@ -57,15 +63,20 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     if (element) element.scrollTop = element.scrollHeight;
   }, [chat.workspace?.selectedConversation?.id]);
   useEffect(() => {
-    const expiries = chat.turns.filter((turn) => turn.changeSet?.status === "staged").map((turn) => Date.parse(turn.changeSet.expiresAt));
+    const expiries = chat.turns.flatMap((turn) => [
+      ...(turn.changeSet?.status === "staged" ? [Date.parse(turn.changeSet.expiresAt)] : []),
+      ...(turn.actions || []).filter((action) => action.status === "pending").map((action) => Date.parse(action.expiresAt)),
+    ]);
     if (!expiries.length) return;
-    const timer = setTimeout(() => setTurns((items) => items.map((turn) => turn.changeSet?.status === "staged" && Date.parse(turn.changeSet.expiresAt) <= Date.now()
-      ? { ...turn, changeSet: { ...turn.changeSet, status: "expired", confirmationToken: null } } : turn)), Math.max(0, Math.min(...expiries) - Date.now()));
+    const timer = setTimeout(() => setTurns((items) => items.map((turn) => ({ ...turn,
+      ...(turn.changeSet?.status === "staged" && Date.parse(turn.changeSet.expiresAt) <= Date.now() ? { changeSet: { ...turn.changeSet, status: "expired", confirmationToken: null } } : {}),
+      actions: turn.actions?.map((action) => action.status === "pending" && Date.parse(action.expiresAt) <= Date.now() ? { ...action, status: "expired", confirmationToken: null } : action),
+    }))), Math.max(0, Math.min(...expiries) - Date.now()));
     return () => clearTimeout(timer);
   }, [chat.turns, setTurns]);
   const inspect = (turn, nextPanel, citation) => { setSelectedId(turn.id); focusCitation.current = citation || null; setPanel(nextPanel); };
   const confirm = async () => {
-    if (!changeSet?.confirmationToken || applying) return;
+    if (restricted || !changeSet?.confirmationToken || applying) return;
     setApplying(true); chat.setError("");
     try {
       const receipt = await apiJson(`/api/v1/assistant/proposals/${changeSet.id}/confirm`, { method: "POST", body: JSON.stringify({ confirmationToken: changeSet.confirmationToken }) });
@@ -74,6 +85,24 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     } catch (failure) {
       chat.setError(failure.message);
       if (["PLAN_CONFLICT", "PROPOSAL_EXPIRED"].includes(failure.code)) chat.setTurns((items) => items.map((turn) => turn.id === selected.id ? { ...turn, changeSet: { ...turn.changeSet, status: failure.code === "PLAN_CONFLICT" ? "conflicted" : "expired", confirmationToken: null } } : turn));
+    } finally { setApplying(false); }
+  };
+  const decideBatch = async (action, decision) => {
+    if (!action || applying || restricted) return;
+    const conversationId = chat.workspace.selectedConversation?.id;
+    setApplying(true); chat.setError("");
+    try {
+      await apiJson(`/api/v1/assistant/actions/${action.id}/${decision}`, { method: "POST", body: JSON.stringify(decision === "approve" ? { confirmationToken: action.confirmationToken } : {}) });
+      window.dispatchEvent(new Event("assistant-completed"));
+      window.dispatchEvent(new Event("assistant-resources-changed"));
+      await chat.refreshConversation(conversationId);
+    } catch (failure) {
+      // A lost response may follow a committed batch. Reconcile; never repeat the write.
+      let recovered;
+      try { recovered = await chat.refreshConversation(conversationId); } catch { /* Keep the existing request visible for reconnect. */ }
+      const resolved = recovered?.turns.flatMap((turn) => turn.actions || []).find((item) => item.id === action.id);
+      if (resolved?.status === "applied") window.dispatchEvent(new Event("assistant-resources-changed"));
+      else if (resolved?.status !== "rejected") chat.setError(failure.message);
     } finally { setApplying(false); }
   };
   const trackerTrip = tripSlug || initialWorkspace?.selectedTripSlug || null;
@@ -108,36 +137,43 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
         {onClose && <button className={styles.iconButton} type="button" onClick={onClose} aria-label="Đóng" title="Đóng"><AssistantIcon name="close" /></button>}
       </div>
       <div className={styles.toolbar}>
-        <button type="button" className={styles.secondaryButton} disabled={chat.loading || chat.submitting} onClick={() => setPickerOpen(true)}>Thêm ngữ cảnh</button>
-        {(tripSlug || initialWorkspace?.selectedTripSlug) && <button type="button" className={styles.secondaryButton} disabled={chat.loading || chat.submitting} onClick={async () => {
+        <button type="button" className={styles.secondaryButton} disabled={restricted || chat.loading || chat.submitting} onClick={() => setPickerOpen(true)}>Thêm ngữ cảnh</button>
+        {(tripSlug || initialWorkspace?.selectedTripSlug) && <button type="button" className={styles.secondaryButton} disabled={restricted || chat.loading || chat.submitting} onClick={async () => {
           try { chat.addMention(await apiJson(`/api/v1/assistant/context?slug=${encodeURIComponent(tripSlug || initialWorkspace.selectedTripSlug)}`)); }
           catch (failure) { chat.setError(failure.message); }
         }}>Thêm chuyến đi này</button>}
-        <ReferenceList items={chat.workspace?.pins} label="Ngữ cảnh đã ghim" onRemove={chat.unpin} removeLabel="Bỏ ghim" disabled={chat.pinBusy || chat.submitting} />
+        <ReferenceList items={chat.workspace?.pins} label="Ngữ cảnh đã ghim" onRemove={chat.unpin} removeLabel="Bỏ ghim" disabled={restricted || chat.pinBusy || chat.submitting} />
       </div>
       <div className={styles.conversationActions}>
-        <button className={styles.iconButton} type="button" disabled={chat.loading || chat.submitting} onClick={chat.newConversation} aria-label="Trò chuyện mới" title="Trò chuyện mới"><AssistantIcon name="new" /></button>
+        <button className={styles.iconButton} type="button" disabled={restricted || chat.loading || chat.submitting} onClick={chat.newConversation} aria-label="Trò chuyện mới" title="Trò chuyện mới"><AssistantIcon name="new" /></button>
       </div>
     </header>
     <div className={styles.turnList} ref={listRef} aria-label="Nội dung cuộc trò chuyện" aria-busy={chat.loading} onScroll={(event) => { const el = event.currentTarget; nearEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; if (nearEnd.current) setNewResponse(false); }}>
+      {access && !viewer.isOwner && <p className={styles.accessSummary}>Owner có thể xem các cuộc trò chuyện của admin.</p>}
+      {access && <details className={styles.accessSummary}><summary>{restricted ? "Trợ lý đã tắt · Chỉ đọc lịch sử" : quotaBlocked ? "Đã hết hạn mức trợ lý" : "Quyền và hạn mức sử dụng"}</summary>
+        <p>{access.model} · Mức suy nghĩ: {({ default: "Mặc định nhà cung cấp", minimal: "Tối thiểu", low: "Thấp", medium: "Trung bình", high: "Cao" })[access.effort]}</p>
+        <p>Còn {access.daily === null ? "không giới hạn" : Math.max(0,access.daily-access.dailyUsed)} yêu cầu hôm nay; {access.weekly === null ? "không giới hạn" : Math.max(0,access.weekly-access.weeklyUsed)} trong tuần.</p>
+        <p>Đặt lại (JST): ngày {new Date(access.dailyReset).toLocaleString("vi-VN", { timeZone:"Asia/Tokyo" })}; tuần {new Date(access.weeklyReset).toLocaleString("vi-VN", { timeZone:"Asia/Tokyo" })}.</p>
+      </details>}
       {chat.loading ? <p role="status">Đang tải cuộc trò chuyện…</p> : <>
         {chat.workspace?.nextCursor && <button className={styles.secondaryButton} onClick={() => { olderAnchor.current = listRef.current.scrollHeight; void chat.older(); }}>Xem trao đổi trước</button>}
         {!chat.turns.length && <div className={styles.firstRun}><h2>Cùng lên một chuyến đi vừa ý hơn.</h2><p>Hỏi về lịch trình, tìm hiểu điểm đến, hoặc chuẩn bị thay đổi. Bạn luôn là người quyết định.</p>
           <div>{["Gợi ý điểm đến cho cuối tuần", "Tìm các chuyến đi đã có", "So sánh hai chuyến đi"].map((prompt) => <button key={prompt} onClick={() => { chat.setMessage(prompt); document.getElementById("assistant-message")?.focus(); }}><AssistantIcon name="prompt" /><span>{prompt}</span></button>)}</div></div>}
         {chat.turns.map((turn, index) => <article key={turn.exchangeId || turn.id} className={styles.turn} aria-label={`Lượt trao đổi: ${turn.input}`}>
-          <div className={styles.userMessage}><span>Bạn</span><p>{turn.input}</p><ReferenceList label="Ngữ cảnh tin nhắn" items={(turn.mentions || []).map((ref) => turn.resolvedContext?.find((item) => item.ref.kind === ref.kind && item.ref.id === ref.id) || { ref })} onPin={chat.pin} disabled={chat.pinBusy} /></div>
+          <div className={styles.userMessage}><span>Bạn</span><p>{turn.input}</p><ReferenceList label="Ngữ cảnh tin nhắn" items={(turn.mentions || []).map((ref) => turn.resolvedContext?.find((item) => item.ref.kind === ref.kind && item.ref.id === ref.id) || { ref })} onPin={chat.pin} disabled={restricted || chat.pinBusy} /></div>
           <div className={styles.assistantMessage} data-exchange={turn.exchangeId || turn.id} tabIndex={-1}><span>Trợ lý</span>
             {turn.output && <MessageContent text={turn.output} citations={turn.citations} onCitation={(citation) => inspect(turn, "evidence", citation)} />}
             {turn.status === "running" && chat.disconnected?.turnId !== turn.id && <p className={styles.running} role="status">{chat.progress || "Đang trả lời…"}</p>}
             {turn.status === "failed" && <div className={styles.interrupted}>
               <p role="status">{turn.errorCode === "TURN_CANCELLED" ? "Đã dừng trả lời." : turn.output ? "Câu trả lời bị gián đoạn." : "Không thể bắt đầu trả lời. Hãy thử lại."}</p>
-              {index === chat.turns.length - 1 && <button disabled={running || chat.submitting || chat.loading} onClick={() => { retryFocus.current = turn.exchangeId || turn.id; void chat.retry(turn); }}>{chat.retrying === turn.id ? "Đang thử lại…" : "Thử lại"}</button>}
+              {index === chat.turns.length - 1 && <button disabled={requestBlocked || running || chat.submitting || chat.loading} onClick={() => { retryFocus.current = turn.exchangeId || turn.id; void chat.retry(turn); }}>{chat.retrying === turn.id ? "Đang thử lại…" : "Thử lại"}</button>}
             </div>}
             {chat.disconnected?.turnId === turn.id && <div className={styles.interrupted}>
               <p role="status">{[401, 403, 404].includes(chat.disconnected.status) ? "Không thể truy cập câu trả lời. Hãy kiểm tra đăng nhập và quyền truy cập." : "Mất kết nối với câu trả lời"}</p>
               {![401, 403, 404].includes(chat.disconnected.status) && <button onClick={chat.reconnect}>Kết nối lại</button>}
             </div>}
-            <ReferenceList items={turn.usedContext} label="Ngữ cảnh đã dùng" onPin={chat.pin} disabled={chat.pinBusy} />
+            {turn.actions?.map((item) => <BatchReview key={item.id} action={item} busy={applying} readOnly={restricted} onApprove={() => decideBatch(item, "approve")} onReject={() => decideBatch(item, "reject")} onRevise={() => { chat.setMessage(`Tạo lại đề xuất: ${turn.input}`); document.getElementById("assistant-message")?.focus(); }} />)}
+            <ReferenceList items={turn.usedContext} label="Ngữ cảnh đã dùng" onPin={chat.pin} disabled={restricted || chat.pinBusy} />
             <div className={styles.messageActions}>
               {!!turn.citations?.length && <button onClick={() => inspect(turn, "evidence")}>Nguồn · {turn.citations.length}</button>}
               {turn.status === "completed" && turn.changeSet && <button data-status={turn.changeSet.status} className={styles.reviewButton} onClick={() => inspect(turn, "changes")}>{turn.changeSet.status === "applied" ? "Xem thay đổi đã áp dụng" : ["expired", "conflicted"].includes(turn.changeSet.status) ? "Xem đề xuất không còn hiệu lực" : `Xem ${turn.changeSet.preview.changes.length} thay đổi được đề xuất`}</button>}
@@ -155,14 +191,14 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     {chat.error && <div role="alert" className={styles.errorBanner}>{chat.error}<button onClick={() => chat.load({ trip: chat.workspace?.selectedTripSlug, conversation: chat.workspace?.selectedConversation?.id, replace: true })}>Kết nối lại</button></div>}
     <div className={styles.composerDock}>
     {newResponse && <button className={styles.newResponse} onClick={() => { nearEnd.current = true; listRef.current.scrollTop = listRef.current.scrollHeight; setNewResponse(false); }}>Có câu trả lời mới</button>}
-    <ReferenceList items={chat.mentions} label="Ngữ cảnh sắp gửi" onPin={chat.pin} onRemove={(item) => chat.setMentions(chat.mentions.filter((entry) => entry !== item))} disabled={chat.submitting || chat.pinBusy} />
-    <Composer onMention={() => setPickerOpen(true)} message={chat.message} setMessage={chat.setMessage} onSubmit={chat.submit} onStop={chat.stop} running={running} disabled={chat.submitting || chat.loading || chat.pinBusy} />
+    <ReferenceList items={chat.mentions} label="Ngữ cảnh sắp gửi" onPin={chat.pin} onRemove={(item) => chat.setMentions(chat.mentions.filter((entry) => entry !== item))} disabled={restricted || chat.submitting || chat.pinBusy} />
+    <Composer onMention={() => setPickerOpen(true)} message={chat.message} setMessage={chat.setMessage} onSubmit={chat.submit} onStop={chat.stop} running={running || awaiting} disabled={requestBlocked || chat.submitting || chat.loading || chat.pinBusy} />
     </div>
     </div>
     {!historyWide && <HistorySidebar {...historyProps} wide={false} />}
     {pickerOpen && <ContextPicker onClose={() => setPickerOpen(false)} onSelect={chat.addMention} />}
     {panel && <Dialog onClose={() => setPanel(null)} pending={applying} overlayClassName={styles.overlay} initialFocusRef={citationFocus}><section className={styles.inspection}><header><DialogTitle>{panel === "evidence" ? "Nguồn tham khảo" : "Xem lại thay đổi"}</DialogTitle><button className={styles.iconButton} disabled={applying} onClick={() => setPanel(null)} aria-label="Đóng" title="Đóng"><AssistantIcon name="close" /></button></header>
-      {panel === "evidence" ? <EvidencePanel focusId={focusCitation.current} focusRef={citationFocus} citations={selected?.citations || []} /> : <ChangePanel changeSet={changeSet} busy={applying} onConfirm={confirm} onRegenerate={() => { setPanel(null); chat.setMessage(`Tạo lại đề xuất từ lịch mới nhất: ${selected.input}`); }} />}
+      {panel === "evidence" ? <EvidencePanel focusId={focusCitation.current} focusRef={citationFocus} citations={selected?.citations || []} /> : <ChangePanel readOnly={restricted} changeSet={changeSet} busy={applying} onConfirm={confirm} onRegenerate={() => { setPanel(null); chat.setMessage(`Tạo lại đề xuất từ lịch mới nhất: ${selected.input}`); }} />}
     </section></Dialog>}
   </section>;
   return companion ? content : <ViewTransition name="trip-assistant" default="none" share="assistant-morph" enter="assistant-enter" exit="assistant-exit">{content}</ViewTransition>;

@@ -403,3 +403,40 @@
   .topbar h1 { font-size: 16px; line-height: 1.2; }
   .toolbar > .secondaryButton { font-size: 13px; padding: 8px 10px; }
 }
+
+.accessSummary { padding: 10px 0; border-bottom: 1px solid var(--line, #a8aa9f); font-size: 12px; overflow-wrap: anywhere; }
+.accessSummary summary { cursor: pointer; min-height: 32px; }
+
+/* Tool approvals and receipts stay in their originating chat message. */
+.batchReview { min-width: 0; margin-block: 18px; padding: 0 16px; border: 1px solid var(--line); border-left: 1px solid var(--green); border-radius: 6px; background: var(--paper-bright); color: var(--navy); font-size: 14px; }
+.batchSummary, .batchGroup, .batchReceipt { padding-block: 18px; border-bottom: 1px solid var(--line); }
+.batchReview h3 { font-size: 18px; line-height: 1.4; margin: 0 0 10px; }
+.batchReview h4 { font-size: 15px; line-height: 1.5; margin: 14px 0; overflow-wrap: anywhere; }
+.batchReview p { line-height: 1.6; }
+.batchGroup summary { min-height: 44px; cursor: pointer; padding-block: 12px; font-weight: 600; }
+.batchChange { padding-bottom: 14px; }
+.batchField { padding-block: 10px; }
+.batchField dt { font-weight: 600; margin-bottom: 7px; }
+.batchField dd { margin: 0; display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,180px),1fr)); gap: 10px; }
+.batchField dd > div { min-width: 0; }
+.batchField span { display: block; font-size: 12px; margin-bottom: 4px; }
+.batchField ins, .batchField del { display: block; overflow-wrap: anywhere; white-space: pre-wrap; text-decoration: none; line-height: 1.6; }
+.batchField ins { font-weight: 500; }
+.batchField del { opacity: .8; }
+.batchApproval { padding: 14px 0; background: var(--paper-bright); border-top: 1px solid var(--line); }
+.batchApproval > div { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.batchApproval p { font-size: 12px; margin: 0 0 10px; }
+.batchApproval .applyButton { position: static; width: 100%; margin: 0; padding: 8px 12px; font-weight: 600; }
+.batchApproval .secondaryButton { margin: 0; padding: 8px 12px; }
+.batchApproval button, .batchReview > button { min-height: 44px; }
+.batchReceipt ul { list-style: none; padding: 0; }
+.batchReceipt li { display: flex; flex-wrap: wrap; gap: 10px; margin-block: 10px; overflow-wrap: anywhere; }
+.batchReceipt li span { font-size: 12px; }
+.batchPending { font-size: 14px; line-height: 1.6; font-weight: 600; }
+@media(max-width: 600px) { .batchField dd { grid-template-columns: 1fr; } .batchApproval > div { display: grid; grid-template-columns: 1fr; } }
+
+.batchDetails > summary { min-height: 44px; padding-block: 12px; cursor: pointer; font-weight: 600; }
+.batchReview summary:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+.batchSummary p:last-child { margin-bottom: 0; }
+.batchReview[data-status="applied"] { border-left-color: var(--green); }
+.batchReview[data-status="rejected"], .batchReview[data-status="cancelled"] { border-left-color: var(--muted); }

@@ -33,15 +33,9 @@ test("a no-context model turn can discover and read two trips with internal cita
   assert.equal(result.usedContext.length, 2); assert.equal(result.citations.length, 2); assert.ok(result.citations.every(safeEvidence));
   assert.equal(result.operations, null);
 });
-test("explicit action target can differ from attached context and cannot change mid-response", async () => {
-  const state = { evidence: [] }; const other = { ...snapshot, tripId: "2", trip: { ...snapshot.trip, slug: "other" } };
-  const context = { actor, now: Date.now, contextService: { targetSnapshot: async (_actor, ref) => ref.id === "2" ? other : snapshot } };
-  const operations = [{ kind: "activity.update", itemKey: "museum", set: { title: "New" } }];
-  const staged = await executeTool("stage_plan_changes", { trip: { kind: "trip", id: "2" }, operations }, state, context);
-  assert.equal(staged.staged, true); assert.equal(state.targetSnapshot.tripId, "2");
-  const rejected = await executeTool("stage_plan_changes", { trip, operations }, state, context);
-  assert.equal(rejected.error.code, "MULTIPLE_TARGETS"); assert.equal(state.targetSnapshot.tripId, "2");
-  assert.equal((await executeTool("stage_plan_changes", { operations }, state, context)).error.code, "INVALID_INPUT");
+test("write tools cannot execute through the read tool runtime", async () => {
+  await assert.rejects(executeTool("apply_changes", { operations: [] }, { evidence: [] }, {}), { code: "APPROVAL_REQUIRED" });
+  await assert.rejects(executeTool("stage_plan_changes", {}, { evidence: [] }, {}), { code: "TOOL_NOT_ALLOWED" });
 });
 test("route departure has no implicit trip timezone and internal evidence rejects unsafe links", async () => {
   const result = await executeTool("compute_route", { origin: { address: "Tokyo" }, destination: { address: "Kyoto" }, departureTime: "2030-01-01T12:00:00" }, { evidence: [] }, { now: Date.now });

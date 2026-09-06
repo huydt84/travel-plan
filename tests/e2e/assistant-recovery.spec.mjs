@@ -42,6 +42,7 @@ test("lost acceptance and truncated responses recover without a second turn", as
     });
     await send(page, "Tóm tắt lịch kiểm tra khôi phục");
     await expect(page.getByText("Đây là chế độ mô phỏng cục bộ.", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button",{name:"Dừng",exact:true})).toHaveCount(0);
     expect(submissions).toBe(1);
     expect(await f.sql`SELECT t.id FROM assistant_turns t JOIN assistant_conversations c ON c.id=t.conversation_id WHERE t.mentions @> ${JSON.stringify([{ kind: "trip", id: String(f.trip.id) }])}::JSONB`).toHaveLength(1);
     await page.reload();
@@ -83,16 +84,20 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
     const f = await setup(page);
     try {
       await send(page, "Cập nhật hoạt động đầu tiên với một ghi chú thử nghiệm");
-      await expect(page.getByRole("button", { name: /Xem 1 thay đổi/ })).toBeVisible();
-      await page.getByRole("button", { name: /Xem 1 thay đổi/ }).click();
-      await expect(page.getByRole("button", { name: "Áp dụng 1 thay đổi" })).toBeVisible();
-      const [proposal] = await f.sql`SELECT * FROM assistant_change_sets WHERE trip_id=${f.trip.id}`;
+      await expect(page.getByRole("heading", { name: "Cần phê duyệt" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Phê duyệt thay đổi" })).toBeVisible();
+      const [proposal] = await f.sql`SELECT a.* FROM assistant_actions a JOIN assistant_turns t ON t.id=a.turn_id JOIN assistant_conversations c ON c.id=t.conversation_id WHERE c.owner_email=${ownerEmail} ORDER BY a.created_at DESC LIMIT 1`;
       // Advance the browser clock beyond the displayed immutable expiry.
       await page.clock.fastForward(31 * 60 * 1000);
-      await expect(page.getByRole("button", { name: "Áp dụng 1 thay đổi" })).toHaveCount(0);
-      const regenerate = page.getByRole("button", { name: "Tạo lại đề xuất từ lịch mới nhất" });
+      await expect(page.getByRole("button", { name: "Phê duyệt thay đổi" })).toHaveCount(0);
+      const regenerate = page.getByRole("button", { name: "Tạo lại đề xuất" });
       await expect(regenerate).toBeVisible();
-      expect((await f.sql`SELECT status FROM assistant_change_sets WHERE id=${proposal.id}`)[0].status).toBe("staged");
+      const refreshed=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/v1/assistant/workspace" && response.ok());
+      await page.evaluate(()=>window.dispatchEvent(new Event("focus")));
+      await refreshed;
+      await expect(regenerate).toBeVisible();
+      await expect(page.getByRole("button",{name:"Phê duyệt thay đổi",exact:true})).toHaveCount(0);
+      expect((await f.sql`SELECT status FROM assistant_actions WHERE id=${proposal.id}`)[0].status).toBe("pending");
       await page.screenshot({ path: testInfo.outputPath("expired-proposal.png"), fullPage: true });
       const bounds = await regenerate.boundingBox();
       expect(bounds.x).toBeGreaterThanOrEqual(0);
@@ -110,13 +115,13 @@ test("conflicts leave the canonical plan untouched", async ({ page, runtimeHealt
   const f = await setup(page);
   try {
     await send(page, "Cập nhật hoạt động đầu tiên với một ghi chú thử nghiệm");
-    await page.getByRole("button", { name: /Xem 1 thay đổi/ }).click();
+    await expect(page.getByRole("button",{name:"Phê duyệt thay đổi",exact:true})).toBeEnabled();
     expect((await f.sql`SELECT detail FROM activities WHERE trip_id=${f.trip.id}`)[0].detail).toBe("Original");
     await f.sql`UPDATE trips SET title='Concurrent plan edit' WHERE id=${f.trip.id}`;
-    const response = page.waitForResponse((response) => response.url().endsWith("/confirm"));
-    await page.getByRole("button", { name: "Áp dụng 1 thay đổi" }).click();
+    const response = page.waitForResponse((response) => response.url().endsWith("/approve"));
+    await page.getByRole("button", { name: "Phê duyệt thay đổi" }).click();
     expect((await response).status()).toBe(409);
-    await expect(page.getByRole("button", { name: "Tạo lại đề xuất từ lịch mới nhất" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tạo lại đề xuất" })).toBeVisible();
     const expectedConsole = "console: Failed to load resource: the server responded with a status of 409 (Conflict)";
     await expect.poll(() => runtimeHealth.includes(expectedConsole)).toBe(true);
     runtimeHealth.splice(runtimeHealth.indexOf(expectedConsole), 1);
@@ -127,9 +132,11 @@ test("conflicts leave the canonical plan untouched", async ({ page, runtimeHealt
 test("assistant HTTP boundaries isolate actors and reject cross-origin or empty submissions", async ({ page, request, baseURL }) => {
   const f = await setup(page);
   const other = `harness-admin-${randomUUID()}@localhost.invalid`;
+  const member = `harness-member-${randomUUID()}@localhost.invalid`;
   try {
     await f.sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at)
       VALUES(${other},'Harness admin','admin',NOW(),NOW(),NOW())`;
+    await f.sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at) VALUES(${member},'Member','member',NOW(),NOW(),NOW())`;
     const accepted = await f.store.acceptRequest({ ownerEmail, tripSlug: f.slug, conversationId: null,
       clientTurnId: randomUUID(), input: "Private request", title: "Private", leaseMs: 60000, maxTurnsPerHour: 100 });
     await f.store.publishTurn({ turnId: accepted.turn.id, output: "Private answer", citations: [] });
@@ -146,9 +153,9 @@ test("assistant HTTP boundaries isolate actors and reject cross-origin or empty 
     expect((await request.post(endpoint, { data })).status()).toBe(403);
     expect((await request.post(endpoint, { headers: { origin: baseURL }, data: { ...data, message: "   " } })).status()).toBe(400);
     expect((await request.post(endpoint, { headers: otherHeaders, data: { ...data, conversationId: accepted.conversation.id } })).status()).toBe(404);
-    expect((await request.get("/api/v1/assistant/workspace", { headers: { "x-local-viewer-email": "harness-member@localhost.invalid" } })).status()).toBe(403);
+    expect((await request.get("/api/v1/assistant/workspace", { headers: { "x-local-viewer-email": member } })).status()).toBe(403);
   } finally {
-    await f.sql`DELETE FROM users WHERE email=${other}`;
+    await f.sql`DELETE FROM users WHERE email IN (${other},${member})`;
     await f.cleanup();
   }
 });

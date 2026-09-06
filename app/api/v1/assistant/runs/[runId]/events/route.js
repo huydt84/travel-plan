@@ -24,12 +24,17 @@ export async function GET(request, context) {
         await store.reconcile(actor.email);
         const state = await store.getTurn(runId, actor.email);
         if (state.status !== "running") await background.append(runId, {
-          runId, type: state.errorCode === "TURN_CANCELLED" ? "cancelled" : state.status, turn: state,
+          runId, segment: state.segment, type: state.errorCode === "TURN_CANCELLED" ? "cancelled" : state.status, turn: state,
         });
         const page = await background.events(runId, cursor);
         for (const event of page) {
           cursor = event.seq;
-          if (["completed", "failed", "cancelled"].includes(event.type)) {
+          if ((event.segment != null && event.segment < state.segment) || (event.type === "awaiting_approval" && state.status !== "awaiting_approval")) {
+            // Preserve the contiguous replay cursor without replaying an old segment.
+            yield { runId, seq: event.seq, type: "checkpoint" };
+            continue;
+          }
+          if (["completed", "failed", "cancelled", "awaiting_approval"].includes(event.type)) {
             const turn = await getDefaultTravelAssistant().getTurn({ actor, turnId: runId });
             yield { ...event, type: turn.errorCode === "TURN_CANCELLED" ? "cancelled" : turn.status, turn };
             return;

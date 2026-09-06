@@ -133,7 +133,7 @@ test("conversation and turn pagination reach old history without losing scroll p
     const [conversation] = await f.sql`SELECT id FROM assistant_conversations WHERE trip_id=${f.trips[0].id} AND title='History 35'`;
     await f.sql`INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,output_text,status,created_at,completed_at)
       SELECT gen_random_uuid(),${conversation.id},gen_random_uuid(),
-        'Question ' || i,'Answer ' || i,'completed',NOW()+i*INTERVAL '1 microsecond',NOW() FROM generate_series(1,65) i`;
+        'Question ' || i,'Answer ' || i,'completed',NOW()-INTERVAL '2 days'+i*INTERVAL '1 microsecond',NOW() FROM generate_series(1,65) i`;
     await gotoHealthy(page, `/assistant?trip=${f.trips[0].slug}`);
     await page.getByRole("button", { name: "Lịch sử", exact: true }).click();
     await expect(page.getByRole("button", { name: /History 35/ })).toHaveCount(0);

@@ -30,7 +30,7 @@ Open `http://127.0.0.1:3000` and choose **Trợ lý**. Local admin mode defaults
 | `ConversationHistory.jsx` | Current-trip/all-trip history and pagination |
 | `ProposalReview.jsx` | Sources, before/after values and explicit Apply |
 | `background.mjs`, `background-store.mjs`, `dispatch.js` | Accepted jobs, durable dispatch, worker claims and event publication |
-| `travel-assistant.mjs`, `gemini-adapter.mjs`, `committer.mjs` | Existing bounded model/tools and atomic proposal confirmation |
+| `travel-assistant.mjs`, `gemini-adapter.mjs`, `batch-store.mjs` | Bounded model/tools, durable approval and atomic batches |
 
 Assistant URL observation has its own Suspense boundary. It must never duplicate or suspend the existing tracker as a loading fallback.
 
@@ -52,7 +52,7 @@ A killed worker is not blindly restarted from an unknown provider position. Its 
 
 Events include accepted/queued, progress/running, actual `answer-delta`, normalized `evidence`, and completed/failed/cancelled terminal states. Gemini streaming forwards only public model-output text steps. Every model interaction re-sends the system instructions, since `previous_interaction_id` carries history but not those instructions ([Google API behavior](https://ai.google.dev/gemini-api/docs/interactions-overview#server-side-state-management)). Tool payloads, thought steps and hidden reasoning never enter replay. A new model interaction can reset provisional answer text; the final persisted response remains authoritative. Production does not use typing timers or split a finished answer to imitate streaming.
 
-`assistant_events` persists replay; partial text and evidence also update `assistant_turns`. `append_assistant_event` serializes writes and creates only one terminal event, including reconciliation of a stopped or interrupted worker. Late deltas after termination are rejected. Stored events omit confirmation tokens; the authenticated endpoint rehydrates the current proposal status and token when returning a terminal result. An incomplete response cannot publish an applicable proposal.
+`assistant_events` persists replay; partial text and evidence also update `assistant_turns`. `append_assistant_event` serializes writes and creates one terminal event per execution segment, including reconciliation of a stopped or interrupted worker. Late deltas after termination are rejected. Stored events omit confirmation tokens; the authenticated endpoint rehydrates the current proposal status and token when returning a terminal result. An incomplete response cannot publish an applicable proposal.
 
 `POST /api/v1/assistant/runs/:runId` requests Stop. It checks ownership and same origin. If completion won the transaction race, it returns that completed turn; it cannot undo an already completed reply. `GET /api/v1/assistant/runs` returns up to 100 actor-owned runs from the last 24 hours for background status. The badge uses actor-scoped local storage to remember viewed completions, without changing the selected trip.
 
@@ -75,9 +75,11 @@ Messages render through `react-markdown` and `remark-gfm`, with raw HTML disable
 
 ## Proposal and provider safeguards
 
-Research tools are read-only. Staging compiles typed operations against the canonical snapshot. Invalid arguments return focused validation feedback within the remaining tool budget. At completion, one database statement publishes the answer and immutable proposal, including full diff, digest, revision, expiry, evidence and hashed token. Only the explicit confirmation endpoint may change the itinerary.
+Research tools execute automatically. The `apply_changes` tool pauses before execution and prepares an immutable batch of up to 24 create/update operations across explicit trip targets. Trips, activities, sources, and saved places share one approval. The inline chat request contains the full expandable review and Approve/Reject controls; it becomes a receipt in the same message. See [approval architecture](assistant-architecture.md#approval-per-write-call).
 
-Confirmation rechecks actor ownership, token, turn/proposal status, expiry and plan revision. A Serializable transaction applies all changes and records the receipt. Concurrent/repeated confirmation returns that receipt. Revision conflicts apply nothing. The existing itinerary cache is invalidated and the browser refreshes after success.
+`awaiting_approval` releases the worker and suspends its deadline. Authenticated same-origin action endpoints check the action-bound token, current role/access, expiry and all target revisions. A single database transaction executes and consumes the whole approval, stores the receipt, and queues the next execution segment. Duplicate submissions return the receipt. Errors roll back all domain writes; changed or expired proposals require fresh approval. Each subsequent write call also requires fresh approval. Legacy pending proposals must be regenerated.
+
+Continuation reconstructs context from persisted messages, calls and receipts, preserving captured model settings and attribution. Segment-fenced workers and replay checkpoints prevent stale workers or earlier waiting events from interrupting the next response. Closing, reloading and reconnecting preserve pending reviews. Stop cancels the whole pending batch. Owner oversight remains read-only and never receives approval credentials.
 
 Existing limits remain: eight requested tools, at most two concurrent read-only calls, one retry for transient provider failures within the turn deadline, 30 turns per actor per hour, and 30-minute proposal expiry. Search, Places and Routes retain normalized evidence and safe audit metadata; raw pages, full provider responses and hidden reasoning are excluded. Stored conversation text and replay events are private user content. Retention/export/deletion policy must be finalized before access expands beyond admins; no automatic retention purge is introduced here.
 
@@ -116,3 +118,12 @@ Controlled live-provider acceptance passed on 2026-09-05, including nonempty Gem
 Migration `1788825600000_assistant-manual-retry` is additive and required before deploying this version. Existing turns remain valid as one-attempt exchanges. The old execution-table dispatch columns are retained for migration compatibility but no longer schedule retries. Production migration and deployment are separate operations.
 
 Verification on 2026-09-05: the repository check passed 145 unit tests and 106 browser tests (three retained-trip cases are opt-in). A separate run on `http://127.0.0.1:3000` passed all 18 companion, retained-trip and retry cases, including an additional unconfirmed-submission regression. Build and controlled Gemini/Search/Places/Routes acceptance passed. The responsive audit covered public/admin surfaces at 320×760, 1440×900 and 1920×1080, with 900px assistant coverage. The screenshot review found a clipped mobile reconnect action; the confirmation pass verifies it stays above the composer. Migration was applied locally only.
+
+
+### One-generation live browser smoke
+
+For a low-cost approval check, start a separate local server with `AGENTIC_V1_ENABLED=true`, `AGENTIC_V1_REAL_PROVIDERS=true`, `AGENTIC_V1_SINGLE_REQUEST_SMOKE=true`, and `LOCAL_ADMIN_BYPASS=true` on port 3102, with `APP_URL=http://127.0.0.1:3102`. Next reads provider credentials internally from `.env`; never inspect that file. Keep the normal simulated preview separate.
+
+Run `pnpm exec node scripts/assistant-live-browser.mjs`. The local-only smoke budget permits one generation attempt, caps output at 1024 tokens, blocks generation retries and paid research tools, and leaves production behavior unchanged. The browser requests one new trip and one saved place, opens their inline review, verifies no domain writes, then rejects the batch. It never approves or triggers a continuation. The script removes its disposable local account/conversation and writes screenshots under `.impeccable/review/live-gemini`. Stop the live-provider server when finished.
+
+Verified on 2026-09-06 with real `gemini-3.6-flash`: one generation, 5491 reported total tokens, two operations awaiting approval, inline rejection, zero domain writes. This check covers proposal generation and rejection; successful execution/continuation remains covered by the local database/browser suite, not by this deliberately limited live run.

@@ -1,3 +1,6 @@
+import { after } from "next/server";
+import { createBackgroundStore } from "../../../../../lib/v1/background-store.mjs";
+import { dispatchAssistantJobs } from "../../../../../lib/v1/dispatch.js";
 import { assistantErrorResponse, requireV1Actor } from "../../../../../lib/v1/http.mjs";
 import { getDefaultTravelAssistant } from "../../../../../lib/v1/travel-assistant.mjs";
 
@@ -7,6 +10,8 @@ export const runtime = "nodejs";
 export async function GET(request) {
   try {
     const actor = await requireV1Actor();
+    const pending = await createBackgroundStore().pendingContinuations(actor.email);
+    if (pending.length) after(() => Promise.all(pending.map((job) => dispatchAssistantJobs(job.id))));
     const url = new URL(request.url);
     const workspace = await getDefaultTravelAssistant().loadWorkspace({
       actor,

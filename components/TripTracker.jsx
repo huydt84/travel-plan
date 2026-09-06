@@ -1,4 +1,5 @@
 "use client";
+import SavedPlaces from "./tracker/SavedPlaces";
 import trackerStyles from "../src/styles/tracker.module.css";
 import navigationStyles from "../src/styles/navigation.module.css";
 import contributionsStyles from "../src/styles/contributions.module.css";
@@ -115,7 +116,9 @@ export default function TripTracker({
       if (document.visibilityState === "visible") refreshItinerary();
     }, 30_000);
     refreshItinerary();
+    window.addEventListener("assistant-resources-changed", refreshItinerary);
     return () => {
+      window.removeEventListener("assistant-resources-changed", refreshItinerary);
       window.clearInterval(timer);
       window.clearInterval(poll);
     };
@@ -345,6 +348,7 @@ export default function TripTracker({
             Chọn chuyến khác
           </Link>
         </section>
+        <SavedPlaces places={data.places} activities={data.itinerary} />
       </main>
     );
   }
@@ -1131,6 +1135,7 @@ export default function TripTracker({
         </div>
       </section>
 
+      <SavedPlaces places={data.places} activities={data.itinerary} />
       <Footer>
         <span>{tripTitle}</span>
         <span>Giữ nhịp chậm, chụp thật đẹp.</span>

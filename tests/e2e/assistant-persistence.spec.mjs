@@ -7,7 +7,8 @@ import { expect, test } from "./fixtures.mjs";
 test("assistant claims guard every shared write, roll back together, and replay one receipt", async () => {
   const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
   const slug = `assistant-atomic-${Date.now()}`;
-  const owner = "assistant-test@example.com";
+  const owner = `assistant-test-${randomUUID()}@example.com`;
+  await sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at) VALUES(${owner},'Assistant test','admin',NOW(),NOW(),NOW())`;
   const [trip] = await sql`INSERT INTO trips (slug,title,trip_date,end_date,timezone,location)
     VALUES (${slug},'Atomic assistant','2032-01-01','2032-01-01','Asia/Tokyo','Tokyo') RETURNING id`;
   const conversationId = randomUUID();
@@ -50,7 +51,9 @@ test("assistant claims guard every shared write, roll back together, and replay 
     expect(await sql`SELECT * FROM activities WHERE trip_id = ${trip.id}`).toHaveLength(1);
     expect(await sql`SELECT * FROM sources WHERE trip_id = ${trip.id}`).toHaveLength(1);
   } finally {
+    await sql`DELETE FROM assistant_conversations WHERE owner_email=${owner}`;
     await sql`DELETE FROM trips WHERE id = ${trip.id}`;
+    await sql`DELETE FROM users WHERE email=${owner}`;
     await sql.end();
   }
 });

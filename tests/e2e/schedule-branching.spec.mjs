@@ -149,13 +149,25 @@ test("admin can branch from the start so the first activity is not forced", asyn
   }
 });
 
+async function openBranchFixture(page) {
+  const slug = `branch-controls-${Date.now()}`;
+  const title = `Branch controls ${Date.now()}`;
+  expect((await page.request.post("/api/trips", { data: { slug, title, startDate: "2030-01-01", endDate: "2030-01-01", timezone: "Asia/Tokyo", location: "Tokyo" } })).status()).toBe(201);
+  for (let i=0;i<3;i++) expect((await page.request.post(`/api/trips/${slug}/schedule`, { data: { startDate: "2030-01-01", start: `${String(9+i).padStart(2,"0")}:00`, endDate: "2030-01-01", end: `${String(10+i).padStart(2,"0")}:00`, type: "Visit", icon: "pin", title: `Branch stop ${i}`, detail: "", refs: [] } })).status()).toBe(201);
+  await gotoHealthy(page, "/admin/trips");
+  await page.getByRole("button", { name: new RegExp(`^${title}`) }).click();
+  return async () => { expect((await page.request.delete(`/api/trips/${slug}`)).status()).toBe(204); };
+}
+
 test("branch creation controls stay within a 320px admin viewport", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 760 });
-  await gotoHealthy(page, "/admin/trips");
+  const cleanup = await openBranchFixture(page);
+  try {
   await page.getByRole("button", { name: "Tạo điểm rẽ sau mục này", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: /Tạo điểm rẽ sau/ })).toBeVisible();
   const width = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }));
   expect(width.document).toBe(width.viewport);
+  } finally { await cleanup(); }
 });
 
 for (const viewport of [
@@ -165,7 +177,8 @@ for (const viewport of [
 ]) {
   test(`${viewport.name} branch creation actions clear the preceding separator`, async ({ page }) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await gotoHealthy(page, "/admin/trips");
+    const cleanup = await openBranchFixture(page);
+    try {
 
     const gaps = await page.evaluate(() => [...document.querySelectorAll(".admin-branch-entry")].map((entry) => {
       const button = entry.querySelector("button");
@@ -175,6 +188,7 @@ for (const viewport of [
 
     expect(gaps.length).toBeGreaterThan(0);
     expect(Math.min(...gaps)).toBeGreaterThanOrEqual(8);
+    } finally { await cleanup(); }
   });
 }
 

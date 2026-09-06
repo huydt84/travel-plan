@@ -99,7 +99,7 @@ export default function AssistantProvider({ viewer, children }) {
   const workspace = present ? <Workspace viewer={viewer} tripSlug={trackerTrip || params.get("trip")} companion onClose={close} /> : null;
   // Prime the companion query before the route commits so both modes share one snapshot.
   const prepareCompanion = (href) => setLocation({ pathname: "/", query: new URL(href, window.location.origin).searchParams.toString() });
-  return <AssistantContext.Provider value={{ enabled, count, open, prepareCompanion, setTrackerTrip }}>
+  return <AssistantContext.Provider value={{ enabled, isOwner: Boolean(viewer?.isOwner), count, open, prepareCompanion, setTrackerTrip }}>
     <Suspense fallback={null}><AssistantLocation onChange={setLocation} /></Suspense>
     <ViewTransition name="assistant-itinerary" default="none" update={{ "assistant-ui": "assistant-layout" }}><div className={`${styles.pageLayout} ${visible && !mobile ? styles.withCompanion : ""}`} style={panelStyle} data-resizing={dragging || undefined} data-closing={closing && !visible || undefined}>{children}</div></ViewTransition>
     {present && <ViewTransition name="trip-assistant" default="none" share="assistant-morph" enter="assistant-enter" exit="assistant-exit">{mobile ? <Dialog portal={false} onClose={close} overlayClassName={styles.mobileOverlay}><div className={styles.mobilePanel} data-closing={closing && !visible || undefined} onAnimationEnd={(event) => { if (event.target === event.currentTarget && !visible) setClosing(false); }}><DialogTitle asChild><span className="sr-only">Trợ lý hành trình</span></DialogTitle>{workspace}</div></Dialog>

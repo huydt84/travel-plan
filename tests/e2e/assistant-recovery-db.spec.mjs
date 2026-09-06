@@ -11,10 +11,11 @@ async function fixture() {
   const [trip] = await sql`INSERT INTO trips(slug,title,trip_date,end_date,timezone,location)
     VALUES(${slug},'Harness','2030-01-01','2030-01-01','Asia/Tokyo','Tokyo') RETURNING *`;
   trip.plan_revision = (await sql`SELECT plan_revision FROM trips WHERE id=${trip.id}`)[0].plan_revision;
+  await sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at) VALUES(${ownerEmail},'Assistant fixture','admin',NOW(),NOW(),NOW()) ON CONFLICT(email) DO UPDATE SET role='admin'`;
   const store = createAssistantStore({ sql });
   const accept = (overrides = {}) => store.acceptRequest({ ownerEmail, tripSlug: slug, conversationId: null,
     clientTurnId: randomUUID(), input: "Hello", title: "Harness", leaseMs: 60000, maxTurnsPerHour: 100, ...overrides });
-  return { sql, trip, store, accept, ownerEmail, cleanup: async () => { await sql`DELETE FROM assistant_conversations WHERE owner_email=${ownerEmail}`; await sql`DELETE FROM trips WHERE id=${trip.id}`; await sql.end(); } };
+  return { sql, trip, store, accept, ownerEmail, cleanup: async () => { await sql`DELETE FROM assistant_conversations WHERE owner_email=${ownerEmail}`; await sql`DELETE FROM trips WHERE id=${trip.id}`; await sql`DELETE FROM users WHERE email=${ownerEmail}`; await sql.end(); } };
 }
 
 test("simultaneous first submissions create one conversation and one ledger entry", async () => {
@@ -81,7 +82,7 @@ test("history selects the newest completed turns and pages backwards without dup
     await f.store.failTurn(first.turn.id, "TEST");
     for (let i = 0; i < 65; i++) {
       await f.sql`INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,output_text,status,created_at)
-        VALUES(${randomUUID()},${first.conversation.id},${randomUUID()},${String(i)},'Answer','completed',NOW()+${i}*INTERVAL '1 second')`;
+        VALUES(${randomUUID()},${first.conversation.id},${randomUUID()},${String(i)},'Answer','completed',NOW()-INTERVAL '2 days'+${i}*INTERVAL '1 second')`;
     }
     const latest = await f.store.listTurns(first.conversation.id, f.ownerEmail, { limit: 12, completedOnly: true });
     expect(latest.map((turn) => turn.input)).toEqual(Array.from({ length: 12 }, (_, i) => String(53 + i)));

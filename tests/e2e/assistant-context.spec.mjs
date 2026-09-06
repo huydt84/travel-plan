@@ -16,11 +16,12 @@ async function fixture() {
     trips.push(trip);
   }
   const refs = trips.map((t) => ({ kind: "trip", id: String(t.id) }));
+  await sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at) VALUES(${ownerEmail},'Assistant fixture','admin',NOW(),NOW(),NOW()) ON CONFLICT(email) DO UPDATE SET role='admin'`;
   const store = createAssistantStore({ sql });
   const accept = (options = {}) => store.acceptRequest({ ownerEmail, clientTurnId: randomUUID(), conversationId: null, input: "Context question", title: "Context", leaseMs: 60000, maxTurnsPerHour: 100, ...options });
   return { sql, store, trips, refs, accept, ownerEmail, close: async () => {
     await sql`DELETE FROM assistant_conversations WHERE owner_email=${ownerEmail}`;
-    await sql`DELETE FROM trips WHERE id=ANY(${trips.map((t) => t.id)}::BIGINT[])`; await sql.end();
+    await sql`DELETE FROM trips WHERE id=ANY(${trips.map((t) => t.id)}::BIGINT[])`; await sql`DELETE FROM users WHERE email=${ownerEmail}`; await sql.end();
   } };
 }
 test("no-trip acceptance, context capture, pin conflict, replay and retry are independent of trips", async () => {

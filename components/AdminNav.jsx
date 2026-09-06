@@ -1,4 +1,4 @@
-import { AssistantLauncher } from "./v1/AssistantProvider";
+import { AssistantLauncher, useAssistantNavigation } from "./v1/AssistantProvider";
 import adminShellStyles from "../src/styles/admin-shell.module.css";
 import Link from "next/link";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
@@ -9,8 +9,9 @@ export default function AdminNav({
   pendingInvitationCount = 0,
   pendingTripRequestCount = 0,
 }) {
+  const assistant = useAssistantNavigation();
   return (
-    <nav className={adminShellStyles["admin-nav"]} aria-label="Khu vực quản lý">
+    <nav className={adminShellStyles["admin-nav"]} data-owner={assistant?.isOwner || undefined} style={{ "--admin-columns": assistant?.enabled ? (assistant.isOwner ? 6 : 5) : 4 }} aria-label="Khu vực quản lý">
       <Link
         href={ADMIN_ROUTES.trips}
         aria-current={active === "trips" ? "page" : undefined}
@@ -52,6 +53,7 @@ export default function AdminNav({
         Người dùng
       </Link>
       <AssistantLauncher tripSlug={tripSlug} />
+      {assistant?.isOwner && <Link href={ADMIN_ROUTES.assistant} aria-current={active === "assistant" ? "page" : undefined}>Quản lý trợ lý</Link>}
     </nav>
   );
 }

@@ -14,12 +14,13 @@ test("migration preserves legacy history and supports an entirely empty trip lib
     await client.query(`CREATE SCHEMA ${schema}`);
     await client.query(`SET search_path TO ${schema}`);
     const files = (await readdir("migrations")).filter((f) => /^\d.*\.mjs$/.test(f)).sort();
-    for (const file of files.slice(0,-1)) await (await import(`../../migrations/${file}`)).up({ db: client });
+    const contextIndex=files.indexOf("1788912000000_assistant-context.mjs");
+    for (const file of files.slice(0,contextIndex)) await (await import(`../../migrations/${file}`)).up({ db: client });
     const trip = (await client.query("INSERT INTO trips(slug,title,trip_date,end_date,timezone,location) VALUES('legacy','Legacy','2030-01-01','2030-01-01','Asia/Tokyo','Tokyo') RETURNING id")).rows[0];
     const conversation = randomUUID(), turn = randomUUID();
     await client.query("INSERT INTO assistant_conversations(id,owner_email,trip_id,title) VALUES($1,'migration@example.com',$2,'Legacy conversation')",[conversation,trip.id]);
     await client.query("INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,output_text,status) VALUES($1,$2,$3,'Old question','Old answer','completed')",[turn,conversation,randomUUID()]);
-    await (await import(`../../migrations/${files.at(-1)}`)).up({ db: client });
+    await (await import(`../../migrations/${files[contextIndex]}`)).up({ db: client });
     expect((await client.query("SELECT pins FROM assistant_conversations WHERE id=$1",[conversation])).rows[0].pins).toEqual([{ kind: "trip", id: String(trip.id) }]);
     const legacyRequest = randomUUID();
     const legacy = (await client.query("SELECT accept_assistant_background_request('migration@example.com','legacy',NULL,$1,'Legacy worker','Legacy', $2,$3,60000,100,NULL) AS result", [legacyRequest,randomUUID(),randomUUID()])).rows[0].result;
@@ -30,7 +31,7 @@ test("migration preserves legacy history and supports an entirely empty trip lib
     expect(legacyReplay.replayed).toBe(true); expect(legacyReplay.turn.id).toBe(legacy.turnId);
     // Re-adoption must preserve deliberate unpins and historical captures.
     await client.query("UPDATE assistant_conversations SET pins='[]',pins_version=1 WHERE id=$1",[conversation]);
-    await (await import(`../../migrations/${files.at(-1)}`)).up({ db: client });
+    await (await import(`../../migrations/${files[contextIndex]}`)).up({ db: client });
     expect((await client.query("SELECT pins FROM assistant_conversations WHERE id=$1",[conversation])).rows[0].pins).toEqual([]);
     const accept = async (retryOf = null) => (await client.query("SELECT accept_assistant_context_request('migration@example.com',$1,$2,'Retry question','Legacy',$3,$4,60000,100,'[]','[]',$5,false) AS result",[conversation,randomUUID(),randomUUID(),randomUUID(),retryOf])).rows[0].result;
     const original = await accept();

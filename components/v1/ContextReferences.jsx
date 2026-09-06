@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Dialog, { DialogTitle } from "../ui/Dialog";
 import { apiJson } from "./transport.mjs";
 import styles from "./assistant.module.css";
-export const contextLabels = { trip: "Chuyến đi", activity: "Hoạt động", source: "Nguồn", contribution: "Góp ý", place: "Địa điểm" };
+export const contextLabels = { trip: "Chuyến đi", activity: "Hoạt động", source: "Nguồn", contribution: "Góp ý", place: "Địa điểm đã lưu", google_place: "Google Maps" };
 export function ReferenceList({ items = [], onPin, onRemove, removeLabel = "Bỏ", disabled = false, label }) {
   if (!items.length) return null;
   return <ul className={styles.contextRefs} aria-label={label}>{items.map((item) => {
@@ -55,7 +55,7 @@ export function ContextPicker({ onClose, onSelect }) {
     <label>Loại ngữ cảnh<select value={kind} onChange={(event) => setKind(event.target.value)}><option value="">Tất cả tài liệu</option>{Object.entries(contextLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
     {loading && <p role="status">Đang tìm…</p>}
     {error && <p role="alert">{error} <button onClick={() => setReload((n) => n + 1)}>Thử lại</button></p>}
-    {!loading && !error && !results.length && <p>{kind === "place" && !query ? "Nhập tên địa điểm để tìm trên Google Maps." : "Không tìm thấy ngữ cảnh phù hợp."}</p>}
+    {!loading && !error && !results.length && <p>{kind === "google_place" && !query ? "Nhập tên địa điểm để tìm trên Google Maps." : "Không tìm thấy ngữ cảnh phù hợp."}</p>}
     <ul className={styles.contextResults}>{results.map((item) => <li key={`${item.ref.kind}:${item.ref.id}`}><button type="button" onClick={() => { onSelect(item); onClose(); }}><strong>{item.label}</strong><small>{contextLabels[item.ref.kind]}{item.parent ? ` · ${item.parent.label}` : ""}</small></button></li>)}</ul>
     {cursor && <button disabled={loading} onClick={more}>Xem thêm</button>}
   </section></Dialog>;

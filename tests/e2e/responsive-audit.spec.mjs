@@ -7,6 +7,7 @@ const viewports = [
 ];
 
 const surfaces = [
+  { name: "assistant management", path: "/admin/assistant", ready: (page) => page.getByRole("heading", { level: 1, name: "Quản lý trợ lý" }) },
   { name: "trip companion", path: "/?chat=1", ready: (page) => page.getByRole("heading", { level: 1, name: "Trợ lý hành trình" }) },
   { name: "assistant history", path: "/assistant", setup: async (page) => page.getByRole("button", { name: "Lịch sử", exact: true }).click(), ready: (page) => page.getByRole("navigation", { name: "Lịch sử trò chuyện" }) },
   {
