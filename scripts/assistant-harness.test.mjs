@@ -130,7 +130,7 @@ test("real providers are opt-in only within isolated development mode", () => {
   assert.equal(resolveAgenticV1Config({ AGENTIC_V1_REAL_PROVIDERS: "true" }).realProviders, false);
   const config = resolveAgenticV1Config({ NODE_ENV: "development", LOCAL_ADMIN_BYPASS: "true", AGENTIC_V1_REAL_PROVIDERS: "true" });
   assert.equal(config.realProviders, true);
-  assert.equal(config.turnDeadlineMs, 45_000);
+  assert.equal(config.turnDeadlineMs, 270_000);
 });
 
 

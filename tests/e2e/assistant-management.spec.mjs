@@ -1,3 +1,8 @@
+import { mkdir } from "node:fs/promises";
+import { dispatchAttempt } from "../../lib/v1/dispatch-attempt.mjs";
+import { createTravelAssistant } from "../../lib/v1/travel-assistant.mjs";
+import { resolveAgenticV1Config } from "../../lib/v1/config.mjs";
+import { createBackgroundStore } from "../../lib/v1/background-store.mjs";
 import { randomUUID } from "node:crypto";
 import { createPostgresSql } from "../../lib/sql-adapter.mjs";
 import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
@@ -217,4 +222,69 @@ test("switch blocks duplicate clicks and restores state on a failed save",async(
     for(let i=runtimeHealth.length-1;i>=0;i--) if(runtimeHealth[i].includes("409 (Conflict)")) runtimeHealth.splice(i,1);
     expect((await f.service.access(f.email)).enabled).toBe(true);
   }finally{release();await f.close();}
+});
+
+for (const [width,height] of [[320,760],[1440,900],[1920,1080]]) {
+  test(`owner error log keeps diagnostics out of chat at ${width}`, async ({page,request}) => {
+    const f=await fixture();let ownerTurn;
+    try {
+      ownerTurn=await f.accept({ownerEmail:owner,background:true,title:"Diagnostic owner test"});
+      const providerError=Object.assign(new Error("Bearer SECRET_SENTINEL prompt=PRIVATE_SENTINEL"),{status:503,cause:Object.assign(new Error("private"),{code:"ECONNRESET"})});
+      await dispatchAttempt(ownerTurn.turn.id,{store:createBackgroundStore(f.store),start:async()=>{throw providerError;}});
+      const response=await request.get("/api/admin/assistant/failures");expect(response.status()).toBe(200);
+      const body=await response.json();const recorded=body.items.find(item=>item.id===ownerTurn.turn.id);
+      expect(recorded.diagnostics).toMatchObject({phase:"dispatch",upstreamStatus:503,cause:{systemCode:"ECONNRESET"}});
+      expect(JSON.stringify(body)).not.toMatch(/SECRET_SENTINEL|PRIVATE_SENTINEL/);
+      for (const email of [f.email,"member-management@example.com"]) expect((await request.get("/api/admin/assistant/failures",{headers:{"x-local-viewer-email":email}})).status()).toBe(403);
+      const personal=await request.get(`/api/v1/assistant/workspace?conversation=${ownerTurn.conversation.id}`);
+      expect(JSON.stringify(await personal.json())).not.toMatch(/error_diagnostics|upstreamStatus|ECONNRESET/);
+      await page.setViewportSize({width,height});
+      await gotoHealthy(page,`/assistant?conversation=${ownerTurn.conversation.id}`);
+      await expect(page.getByText("Không thể bắt đầu trả lời. Hãy thử lại.",{exact:true})).toBeVisible();
+      await expect(page.getByText("DISPATCH_FAILED",{exact:true})).toHaveCount(0);
+      await expect(page.getByRole("article").getByRole("alert")).toHaveCount(0);
+      await gotoHealthy(page,"/admin/assistant");await page.getByRole("tab",{name:"Nhật ký lỗi",exact:true}).click();
+      const entry=page.getByRole("article").filter({hasText:"Diagnostic owner test"});
+      await expect(entry).toBeVisible();await expect(entry.getByText(ownerTurn.turn.id,{exact:true})).toBeHidden();
+      await entry.getByText("Xem chi tiết lỗi",{exact:true}).click();
+      await expect(entry.getByText(ownerTurn.turn.id,{exact:true})).toBeVisible();
+      await expect(entry).toContainText("503");await expect(entry).toContainText("ECONNRESET");
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
+      await mkdir(".impeccable/review/owner-errors",{recursive:true});
+      await page.screenshot({path:`.impeccable/review/owner-errors/${width}.png`,fullPage:false});
+      await entry.locator("dl").scrollIntoViewIfNeeded();
+      await page.screenshot({path:`.impeccable/review/owner-errors/${width}-details.png`,fullPage:false});
+    } finally {if(ownerTurn) await f.sql`DELETE FROM assistant_conversations WHERE id=${ownerTurn.conversation.id}`;await f.close();}
+  });
+}
+
+test("deadline is diagnosed distinctly and late failure cannot overwrite it",async()=>{
+  const f=await fixture();
+  try {
+    const config={...resolveAgenticV1Config({NODE_ENV:"development",LOCAL_ADMIN_BYPASS:"true"}),turnDeadlineMs:20};
+    const assistant=createTravelAssistant({store:f.store,config,modelAdapter:{run:()=>new Promise(()=>{})},contextService:{assemble:async()=>[]}});
+    const run=await assistant.startTurn({actor:{email:f.email,isAdmin:true},clientTurnId:randomUUID(),message:"Deadline test"});
+    const events=[];for await(const event of run.events)events.push(event);
+    expect(events.at(-1).error.code).toBe("TURN_DEADLINE_EXCEEDED");
+    await f.store.failTurn(run.runId,"LATE_FAILURE",0,{phase:"worker"});
+    const recorded=(await f.service.failures()).items.find(item=>item.id===run.runId);
+    expect(recorded.code).toBe("TURN_DEADLINE_EXCEEDED");
+    expect(recorded.diagnostics).toMatchObject({phase:"deadline",deadlineMs:20});
+  }finally{await f.close();}
+});
+test("owner log includes recovered tool errors and paginates legacy failures without duplicates",async()=>{
+  const f=await fixture();let first;
+  try {
+    first=await f.accept({ownerEmail:owner});
+    const tool=await f.store.createToolRun({turnId:first.turn.id,toolName:"search_web"});
+    await f.store.finishToolRun(tool,{status:"failed",errorCode:"RESEARCH_UNAVAILABLE",resultMetadata:{diagnostics:{phase:"search_web",upstreamStatus:503}}});
+    await f.store.publishTurn({turnId:first.turn.id,output:"The source is unavailable",citations:[]});
+    expect((await f.service.failures()).items.find(item=>item.id===first.turn.id).tools[0].diagnostics.upstreamStatus).toBe(503);
+    await f.sql`INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,status,error_code,created_at,completed_at)
+      SELECT gen_random_uuid(),${first.conversation.id},gen_random_uuid(),'Legacy failure','failed','LEGACY','2020-01-01'::TIMESTAMPTZ+i*INTERVAL '1 second','2030-01-01'::TIMESTAMPTZ+i*INTERVAL '1 second' FROM generate_series(1,32) AS i`;
+    const a=await f.service.failures();const b=await f.service.failures(a.cursor);
+    expect(a.items).toHaveLength(30);expect(a.items.every(item=>item.diagnostics===null)).toBe(true);
+    expect(new Set([...a.items,...b.items].map(item=>item.id)).size).toBe(a.items.length+b.items.length);
+    expect(b.items.filter(item=>item.code==="LEGACY")).toHaveLength(2);
+  }finally{if(first)await f.sql`DELETE FROM assistant_conversations WHERE id=${first.conversation.id}`;await f.close();}
 });

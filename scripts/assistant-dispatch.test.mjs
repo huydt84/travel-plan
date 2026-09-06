@@ -8,7 +8,7 @@ function fixture() {
   const state = { starts: 0, failed: false, claimed: false, workflow: null };
   return { state, store: {
     async beginDispatch() { if (attempted) return false; attempted = true; return true; },
-    async failDispatch() { if (!state.claimed) state.failed = true; },
+    async failDispatch(id, segment, diagnostic) { if (!state.claimed) { state.failed = true; state.diagnostic = diagnostic; } },
     async dispatched(id, workflow) { state.workflow = workflow; },
   } };
 }
@@ -18,6 +18,8 @@ test("dispatch rejection becomes failure and is never automatically dispatched a
   await dispatchAttempt("turn", { ...f, start });
   await dispatchAttempt("turn", { ...f, start });
   assert.equal(f.state.starts, 1); assert.equal(f.state.failed, true);
+  assert.equal(f.state.diagnostic?.phase, "dispatch");
+  assert.equal(f.state.diagnostic?.errorType, "Error");
 });
 test("ambiguous timeout is bounded; a late acknowledgement does not dispatch again", async () => {
   const f = fixture(); let finish;

@@ -16,7 +16,7 @@
 .console :focus-visible,.editor :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 .console ::selection,.editor ::selection { background:#ccebdd; color:#152b42; }
 .content { padding:24px; }
-.tabs { display:flex; gap:24px; padding:0 24px; border-bottom:1px solid var(--rule); }
+.tabs { display:flex; flex-wrap:wrap; gap:0 24px; padding:0 24px; border-bottom:1px solid var(--rule); }
 .tabs button { background:transparent; border:0; border-bottom:2px solid transparent; color:var(--quiet); padding:16px 0 14px; min-height:48px; font-weight:500; }
 .tabs button[aria-selected="true"] { color:var(--accent); border-bottom-color:var(--accent); }
 .tabs button:hover { color:var(--accent); }
@@ -115,6 +115,13 @@
 @media(prefers-reduced-motion:reduce) { .editor { animation:none; }.console button,.editor button { transition:none; } }
 
 .accessControl { max-width:240px; }
+.failureEntry { padding:20px 0; border-bottom:1px solid var(--rule); }
+.console .failureEntry h3 { font-size:16px; }
+.failureDetails { margin-top:8px; }
+.failureDetails summary { cursor:pointer; min-height:44px; padding-block:12px; color:var(--accent); }
+.failureDetails pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; }
+.failureDetails dd { min-width:0; user-select:text; }
+.failureStep { padding:12px 0; border-top:1px solid var(--rule); }
 .switchButton { display:inline-flex; align-items:center; gap:9px; min-height:44px; min-width:100px; padding:0; border:0; background:transparent; color:var(--ink); font-size:13px !important; }
 .switchTrack { display:block; width:40px; height:24px; padding:3px; flex-shrink:0; border-radius:20px; background:#65727b; transition:background-color 160ms ease-out; }
 .switchTrack > span { display:block; width:18px; height:18px; border-radius:50%; background:white; transform:translateX(0); transition:transform 160ms ease-out; }

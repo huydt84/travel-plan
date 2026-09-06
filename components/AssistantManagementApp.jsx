@@ -1,5 +1,6 @@
 "use client";
 import { localizeAssistantMessage } from "../lib/i18n-assistant.mjs";
+import AssistantFailureLog from "./AssistantFailureLog";
 import BatchReview from "./v1/BatchReview";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -139,13 +140,13 @@ export default function AssistantManagementApp({ viewer,initial }) {
   return <main className={shell["admin-shell"]}>
     <header className={styles.header}><Link href="/">{t("common.backToSchedule")}</Link><div><h1>{t("nav.adminAssistant")}</h1><span>{viewer.email}</span></div><LanguageSwitcher /></header><AdminNav active="assistant" />
     <div className={styles.console}>
-    <Tabs value={section} onChange={changeSection} label={t("assistantExtra.management")} items={[["admins",t("assistantExtra.admins")],["defaults",t("assistantExtra.settings.shared")]]} />
+    <Tabs value={section} onChange={changeSection} label={t("assistantExtra.management")} items={[["admins",t("assistantExtra.admins")],["defaults",t("assistantExtra.settings.shared")],["failures",t("assistantLog.title")]]} />
     {!data.defaults.enabled && <p className={styles.warning}>{t("assistantExtra.access.globalWarning")}</p>}
     {overviewError && <div role="alert" className={styles.warning}>{localizeAssistantMessage(t, overviewError)} <button className={styles.secondary} onClick={refresh}>{t("assistantExtra.retry")}</button></div>}
     {notice && <p role="status" className={styles.success}>{localizeAssistantMessage(t, notice)}</p>}
     {error && <div role="alert" className={styles.warning}>{localizeAssistantMessage(t, error.message)} <button className={styles.secondary} onClick={error.retry}>{t("assistantExtra.retry")}</button></div>}
     <div className={styles.content}>
-    {section==="defaults" ? <PolicySummary accessControl={accessControl()} policy={data.defaults} effective={data.defaults} onEdit={event=>setEditor({policy:data.defaults,trigger:event.currentTarget})} /> : review ? <section aria-label={t("assistantExtra.reviewConversation")}>
+    {section==="failures" ? <AssistantFailureLog /> : section==="defaults" ? <PolicySummary accessControl={accessControl()} policy={data.defaults} effective={data.defaults} onEdit={event=>setEditor({policy:data.defaults,trigger:event.currentTarget})} /> : review ? <section aria-label={t("assistantExtra.reviewConversation")}>
       <button className={styles.back} onClick={()=>{++generation.current;setReview(null);setDetailTab("history");setError(null);setLoading(false);requestAnimationFrame(()=>heading.current?.focus());}}>{t("assistantExtra.backConversations")}</button>
       <div className={styles.sectionHead}><div><h2 ref={heading} tabIndex={-1}>{review.conversation.title}</h2><p className={styles.muted}>{review.email} {t("assistantExtra.readOnlySuffix")}</p></div></div>
       {review.cursor && <button className={styles.secondary} disabled={loading} onClick={()=>openConversation(reviewId,true)}>{loading ? t("assistantExtra.loadingEllipsis") : t("assistantExtra.previousRequests")}</button>}

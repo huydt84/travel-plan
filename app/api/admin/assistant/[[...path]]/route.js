@@ -22,6 +22,7 @@ async function handle(request, context) {
     }
     let result;
     if (request.method === "GET" && !path.length) result = await service.overview();
+    else if (request.method === "GET" && path.join("/") === "failures") result = await service.failures(cursor);
     else if (request.method === "GET" && path[0] === "admins" && path.length === 3 && path[2] === "conversations") result = await service.conversations(path[1],cursor);
     else if (request.method === "GET" && path[0] === "conversations" && path.length === 2) {
       validateSchema(workspaceQuerySchema.properties.conversationId,path[1]); result = await service.conversation(path[1],cursor);

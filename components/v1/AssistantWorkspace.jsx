@@ -170,7 +170,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
             {turn.output && <MessageContent text={turn.output} citations={turn.citations} onCitation={(citation) => inspect(turn, "evidence", citation)} />}
             {turn.status === "running" && chat.disconnected?.turnId !== turn.id && <p className={styles.running} role="status">{localizeAssistantMessage(t, chat.progress) || t("assistantExtra.answering")}</p>}
             {turn.status === "failed" && <div className={styles.interrupted}>
-              <p role="status">{turn.errorCode === "TURN_CANCELLED" ? t("assistantExtra.answerStopped") : turn.output ? t("assistantExtra.answerInterrupted") : t("assistantExtra.answerStartFailed")}</p>
+              <p role="status">{turn.errorCode === "TURN_CANCELLED" ? t("assistantExtra.answerStopped") : turn.errorCode === "TURN_DEADLINE_EXCEEDED" ? t("assistantExtra.answerTimedOut") : turn.output ? t("assistantExtra.answerInterrupted") : t("assistantExtra.answerStartFailed")}</p>
               {index === chat.turns.length - 1 && <button disabled={requestBlocked || running || chat.submitting || chat.loading} onClick={() => { retryFocus.current = turn.exchangeId || turn.id; void chat.retry(turn); }}>{chat.retrying === turn.id ? t("assistantExtra.retrying") : t("assistantExtra.retry")}</button>}
             </div>}
             {chat.disconnected?.turnId === turn.id && <div className={styles.interrupted}>
