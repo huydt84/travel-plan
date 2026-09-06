@@ -275,6 +275,7 @@
     overflow-x: auto;
   }
   .trip-list-item {
+    flex: 0 0 min(260px, 100%);
     min-width: 190px;
     max-width: 260px;
     border-right: 1px solid var(--line);

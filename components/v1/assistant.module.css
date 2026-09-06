@@ -368,3 +368,38 @@
   .shell { transition: none; }
   .historySidebar[data-state], .historyScrim[data-state] { animation-duration: 1ms; }
 }
+
+/* Resource context belongs to the conversation, independently of the tracker. */
+.contextRefs { list-style: none; padding: 0; margin: 8px 0; display: flex; flex-wrap: wrap; gap: 6px; max-height: 156px; overflow: auto; }
+.contextRefs li { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; border: 1px solid var(--v1-line); border-radius: 4px; padding: 2px 6px; background: var(--paper-bright); }
+.contextName { min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
+.contextName small { display: block; font-size: 12px; color: var(--muted); }
+.contextRefs button { flex-shrink: 0; min-height: 44px; padding: 4px 6px; font-size: 12px; color: var(--green-dark); }
+.contextRefs a { color: var(--navy); text-decoration: underline; text-underline-offset: 3px; }
+.contextPicker { background: var(--paper-bright); color: var(--navy); padding: 20px; width: min(560px, 100%); max-height: 90dvh; overflow: auto; border: 1px solid var(--v1-line); }
+.contextPicker header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.contextPicker h2 { font-size: 20px; }
+.contextPicker label { display: grid; gap: 6px; margin: 12px 0; font-size: 14px; }
+.contextPicker input, .contextPicker select { min-width: 0; width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--v1-line); background: var(--paper-bright); }
+.contextPicker button { min-height: 44px; }
+.contextResults { list-style: none; padding: 0; margin: 16px 0; }
+.contextResults li { border-top: 1px solid var(--v1-line); }
+.contextResults button { display: grid; width: 100%; text-align: left; padding: 12px 4px; gap: 4px; overflow-wrap: anywhere; }
+.contextResults small { color: var(--muted); }
+.contextResults button:hover { background: var(--green-soft); }
+.toolbar > button { margin: 2px 6px 2px 0; min-height: 44px; }
+
+.contextRefs button, .contextPicker button { border: 0; border-radius: 4px; background: transparent; color: var(--green-dark); font-family: inherit; cursor: pointer; min-width: 44px; }
+.contextRefs button:hover, .contextPicker button:hover { background: var(--green-soft); }
+.contextRefs button:disabled, .contextPicker button:disabled { opacity: .55; cursor: default; }
+.contextPicker .contextResults button { color: var(--navy); border-radius: 0; }
+.contextPicker strong { font-size: 15px; font-weight: 600; }
+.contextPicker small { font-size: 12px; }
+.contextPicker input::placeholder { color: var(--muted); }
+.contextRefs button:focus-visible, .contextPicker button:focus-visible, .contextPicker input:focus-visible, .contextPicker select:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+
+@container assistant-frame (max-width: 400px) {
+  .topbar { padding-block: 7px; }
+  .topbar h1 { font-size: 16px; line-height: 1.2; }
+  .toolbar > .secondaryButton { font-size: 13px; padding: 8px 10px; }
+}

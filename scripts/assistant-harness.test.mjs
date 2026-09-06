@@ -9,16 +9,16 @@ import { resolveAgenticV1Config } from "../lib/v1/config.mjs";
 import { readEvents } from "../components/v1/stream.mjs";
 import { snapshot, call, scriptedClient } from "./assistant-fixtures.mjs";
 
-const run = (client, options = {}) => createGeminiModelAdapter({ client, model: "test", ...options }).run({ message: "Help", snapshot });
+const run = (client, options = {}) => createGeminiModelAdapter({ client, model: "test", ...options }).run({ message: "Help", actor: { email: "test@example.com", isAdmin: true }, contextService: { targetSnapshot: async () => snapshot } });
 
 test("proposal validation reaches the model for repair before publication", async () => {
   const client = scriptedClient([
-    { steps: [call("stage_plan_changes", { operations: [{ kind: "activity.update", itemKey: "missing", set: { title: "New" } }] })] },
+    { steps: [call("stage_plan_changes", { trip: { kind: "trip", id: "1" }, operations: [{ kind: "activity.update", itemKey: "missing", set: { title: "New" } }] })] },
     (request) => {
       assert.ok(request.input[0].result.error);
       assert.match(request.system_instruction, /Never claim to have committed a plan/);
       assert.match(request.system_instruction, /activity.update/);
-      return { steps: [call("stage_plan_changes", { operations: [{ kind: "activity.update", itemKey: "museum", set: { title: "New" } }] })] };
+      return { steps: [call("stage_plan_changes", { trip: { kind: "trip", id: "1" }, operations: [{ kind: "activity.update", itemKey: "museum", set: { title: "New" } }] })] };
     },
     { output_text: "Ready to review" },
   ]);
@@ -61,7 +61,7 @@ test("parallel evidence is merged in call order with a maximum of two research c
 
 test("unknown tools, tool budget and fabricated citations fail closed", async () => {
   await assert.rejects(run(scriptedClient([{ steps: [call("send_email", {})] }])), { code: "TOOL_NOT_ALLOWED" });
-  await assert.rejects(run(scriptedClient([{ steps: Array.from({ length: 9 }, (_, i) => call("read_trip_context", {}, String(i))) }])), { code: "TOOL_BUDGET_EXCEEDED" });
+  await assert.rejects(run(scriptedClient([{ steps: Array.from({ length: 9 }, (_, i) => call("read_context", { ref: { kind: "trip", id: "1" } }, String(i))) }])), { code: "TOOL_BUDGET_EXCEEDED" });
   await assert.rejects(run(scriptedClient([{ output_text: "Invented [E9]" }])), { code: "INVALID_EVIDENCE" });
 });
 
@@ -141,7 +141,7 @@ test("model retries one transient failure and preserves proposal/evidence contex
 });
 
 test("proposal source additions require previously researched evidence", async () => {
-  const client = scriptedClient([{ steps: [call("stage_plan_changes", { operations: [
+  const client = scriptedClient([{ steps: [call("stage_plan_changes", { trip: { kind: "trip", id: "1" }, operations: [
     { kind: "source.add", draftId: "unknown", title: "Unknown", url: "https://example.com/unverified" },
   ] })] }, (request) => {
     assert.equal(request.input[0].result.error.code, "INVALID_EVIDENCE");

@@ -525,11 +525,11 @@ export default function TripTracker({
             <span className={navigationStyles["trip-picker-control"]}>
               <select
                 value={data.trip.slug}
-                onChange={(event) =>
-                  router.push(
-                    `/?trip=${encodeURIComponent(event.target.value)}`,
-                  )
-                }
+                onChange={(event) => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("trip", event.target.value);
+                  router.push(`/${url.search}`);
+                }}
               >
                 {trips.map((trip) => (
                   <option value={trip.slug} key={trip.slug}>

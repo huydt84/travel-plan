@@ -14,7 +14,7 @@ async function fixture() {
   const store = createAssistantStore({ sql });
   const accept = (overrides = {}) => store.acceptRequest({ ownerEmail, tripSlug: slug, conversationId: null,
     clientTurnId: randomUUID(), input: "Hello", title: "Harness", leaseMs: 60000, maxTurnsPerHour: 100, ...overrides });
-  return { sql, trip, store, accept, ownerEmail, cleanup: async () => { await sql`DELETE FROM trips WHERE id=${trip.id}`; await sql.end(); } };
+  return { sql, trip, store, accept, ownerEmail, cleanup: async () => { await sql`DELETE FROM assistant_conversations WHERE owner_email=${ownerEmail}`; await sql`DELETE FROM trips WHERE id=${trip.id}`; await sql.end(); } };
 }
 
 test("simultaneous first submissions create one conversation and one ledger entry", async () => {
@@ -24,7 +24,7 @@ test("simultaneous first submissions create one conversation and one ledger entr
     const [first, replay] = await Promise.all([f.accept({ clientTurnId }), f.accept({ clientTurnId })]);
     expect(first.turn.id).toBe(replay.turn.id);
     expect(first.conversation.id).toBe(replay.conversation.id);
-    expect(await f.sql`SELECT * FROM assistant_conversations WHERE trip_id=${f.trip.id}`).toHaveLength(1);
+    expect(await f.sql`SELECT * FROM assistant_conversations WHERE owner_email=${f.ownerEmail}`).toHaveLength(1);
     expect(await f.sql`SELECT * FROM assistant_requests WHERE owner_email=${f.ownerEmail}`).toHaveLength(1);
     await expect(f.accept({ clientTurnId, input: "Different" })).rejects.toMatchObject({ code: "IDEMPOTENCY_MISMATCH" });
     expect(await f.store.findRequest("outsider@example.com", clientTurnId)).toBeNull();
@@ -37,7 +37,7 @@ test("actor quota is atomic across simultaneous conversations", async () => {
     const results = await Promise.allSettled([f.accept({ maxTurnsPerHour: 1 }), f.accept({ maxTurnsPerHour: 1 })]);
     expect(results.filter((item) => item.status === "fulfilled")).toHaveLength(1);
     expect(results.find((item) => item.status === "rejected").reason.code).toBe("TURN_RATE_LIMIT");
-    expect(await f.sql`SELECT * FROM assistant_conversations WHERE trip_id=${f.trip.id}`).toHaveLength(1);
+    expect(await f.sql`SELECT * FROM assistant_conversations WHERE owner_email=${f.ownerEmail}`).toHaveLength(1);
   } finally { await f.cleanup(); }
 });
 
@@ -60,7 +60,7 @@ test("proposal publication rolls back its answer and concurrent confirms replay 
   const f = await fixture();
   try {
     const first = await f.accept();
-    const proposal = { id: randomUUID(), operations: [{ kind: "source.add", sourceNumber: 1, title: "Official", host: "example.com", url: "https://example.com" }],
+    const proposal = { id: randomUUID(), tripId: String(f.trip.id), operations: [{ kind: "source.add", sourceNumber: 1, title: "Official", host: "example.com", url: "https://example.com" }],
       preview: { summary: "Add source", changes: [] }, baseRevision: Number(f.trip.plan_revision), digest: "digest", tokenHash: "hash", expiresAt: new Date(Date.now() + 60000).toISOString() };
     await expect(f.store.publishTurn({ turnId: first.turn.id, output: "Answer", citations: [], proposal: { ...proposal, id: "bad-uuid" } })).rejects.toBeTruthy();
     expect((await f.sql`SELECT status,output_text FROM assistant_turns WHERE id=${first.turn.id}`)[0]).toEqual({ status: "running", output_text: null });
@@ -108,7 +108,7 @@ test("history cursors preserve microseconds and request lookup includes an old p
   const f = await fixture();
   try {
     const first = await f.accept();
-    const proposal = { id: randomUUID(), operations: [], preview: { changes: [], summary: "Old" },
+    const proposal = { id: randomUUID(), tripId: String(f.trip.id), operations: [], preview: { changes: [], summary: "Old" },
       baseRevision: Number(f.trip.plan_revision), digest: "digest", tokenHash: "hash", expiresAt: new Date(Date.now()+60000).toISOString() };
     await f.store.publishTurn({ turnId: first.turn.id, output: "Old", citations: [], proposal });
     for (let i = 0; i < 3; i++) await f.sql`INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,status,created_at)

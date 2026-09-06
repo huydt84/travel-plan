@@ -1,3 +1,4 @@
+import { cleanupAssistantTrips } from "./assistant-cleanup.mjs";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { createPostgresSql } from "../../lib/sql-adapter.mjs";
@@ -18,6 +19,7 @@ async function fixture(request) {
     clientTurnId: randomUUID(), input: "Tóm tắt chuyến đi", title: "Retry", leaseMs: 60000, maxTurnsPerHour: 100,
     conversationId: null, background: true, ...options });
   return { sql, slug, trip, store, background, accept, async close() {
+    await cleanupAssistantTrips(sql, [trip.id]);
     await request.delete(`/api/trips/${slug}`); await sql.end();
   } };
 }
@@ -54,8 +56,8 @@ test("retry is atomic, actor scoped, latest-only and paginated as one exchange",
     const [a, b] = await Promise.all([f.accept(body), f.accept(body)]);
     expect(a.turn.id).toBe(b.turn.id);
     await expect(f.accept({ ...body, clientTurnId: randomUUID() })).rejects.toMatchObject({ code: "RETRY_UNAVAILABLE" });
-    await expect(f.accept({ ...body, ownerEmail: "another@example.com", clientTurnId: randomUUID() })).rejects.toMatchObject({ code: "TURN_NOT_FOUND" });
-    await expect(f.accept({ ...body, tripSlug: "wrong-trip", clientTurnId: randomUUID() })).rejects.toMatchObject({ code: "IDEMPOTENCY_MISMATCH" });
+    await expect(f.accept({ ...body, ownerEmail: "another@example.com", clientTurnId: randomUUID() })).rejects.toMatchObject({ code: "CONVERSATION_NOT_FOUND" });
+    await expect(f.accept({ ...body, tripSlug: "wrong-trip", clientTurnId: randomUUID() })).rejects.toMatchObject({ code: "TRIP_NOT_FOUND" });
     await f.store.failTurn(a.turn.id, "TURN_CANCELLED");
     const next = await f.accept({ conversationId: original.conversation.id, retryOfTurnId: a.turn.id });
     await f.store.publishTurn({ turnId: next.turn.id, output: "Completed", citations: [] });
@@ -77,8 +79,9 @@ test("unconfirmed submission keeps its identity and does not overwrite a newer d
   try {
     await gotoHealthy(page, `/assistant?trip=${f.slug}`);
     const input = page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" });
+    await page.getByRole("button", { name: "Thêm chuyến đi này" }).click();
     const bodies = [];
-    await page.route("**/api/v1/trips/*/assistant/turns", async (route) => {
+    await page.route("**/api/v1/assistant/turns", async (route) => {
       bodies.push(route.request().postDataJSON());
       if (bodies.length === 1) await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
       else await route.continue();
@@ -110,7 +113,7 @@ for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) {
       await page.screenshot({ path: `.impeccable/review/manual-retry/${width}-failed.png` });
       let calls = 0;
       const hold = new Promise((resolve) => { release = resolve; });
-      await page.route("**/api/v1/trips/*/assistant/turns", async (route) => {
+      await page.route("**/api/v1/assistant/turns", async (route) => {
         calls++; await hold;
         if (width === 1440) {
           const response = await route.fetch(); expect(response.status()).toBe(202);

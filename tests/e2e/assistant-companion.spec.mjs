@@ -1,3 +1,4 @@
+import { cleanupAssistantTrips } from "./assistant-cleanup.mjs";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createPostgresSql } from "../../lib/sql-adapter.mjs";
@@ -26,6 +27,7 @@ async function fixture(request, persistent = false) {
     trips.push(trip);
   }
   return { sql, trips, store: createAssistantStore({ sql }), async close() {
+    await cleanupAssistantTrips(sql, trips.map((trip) => trip.id));
     for (const trip of trips) {
       if (request) await request.delete(`/api/trips/${trip.slug}`);
       else await sql`DELETE FROM trips WHERE id=${trip.id}`;
@@ -43,6 +45,7 @@ test("a real workflow streams before completion and survives switching trips and
     const input = page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" });
     await expect(page.getByRole("button", { name: "Trò chuyện mới" })).toBeEnabled();
     await page.getByRole("button", { name: "Trò chuyện mới" }).click();
+    await page.getByRole("button", { name: "Thêm chuyến đi này" }).click();
     const acceptance = page.waitForResponse((response) => response.request().method() === "POST" && response.url().endsWith("/assistant/turns"));
     // Multiple paragraphs give the explicitly simulated provider enough chunks
     // to observe real background progress without relying on subsecond navigation.
@@ -52,8 +55,7 @@ test("a real workflow streams before completion and survives switching trips and
     const { runId } = await acceptedResponse.json();
     await expect(page.getByText("Đây là chế độ mô phỏng cục bộ.", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Dừng", exact: true })).toBeVisible();
-    await page.getByRole("combobox", { name: "Chuyến đi", exact: true }).selectOption(f.trips[1].slug);
-    await expect(page.getByRole("combobox", { name: "Chuyến đi", exact: true })).toHaveValue(f.trips[1].slug);
+    await page.getByRole("combobox", { name: /^Chọn chuyến đi/ }).selectOption(f.trips[1].slug);
     await expect(input).toBeEnabled();
     const [duringSwitch] = await f.sql`SELECT status,output_text FROM assistant_turns WHERE id=${runId}`;
     expect(duringSwitch.status, "the worker must still be running after the trip actually changed").toBe("running");
@@ -70,12 +72,12 @@ test("a real workflow streams before completion and survives switching trips and
       (SELECT id FROM assistant_conversations WHERE trip_id=${f.trips[1].id})`).toHaveLength(0);
     await page.getByRole("button", { name: /Trợ lý/ }).click();
     await expect(input).toHaveValue("Bản nháp Kyoto");
-    await page.getByRole("combobox", { name: "Chuyến đi", exact: true }).selectOption(f.trips[0].slug);
+
     await expect(page.getByText("Yêu cầu của bạn: Tóm tắt Tokyo", { exact: false })).toBeVisible();
-    await expect(input).toHaveValue("");
+    await expect(input).toHaveValue("Bản nháp Kyoto");
     await page.reload();
     await expect(page.getByText("Yêu cầu của bạn: Tóm tắt Tokyo", { exact: false })).toBeVisible();
-    await expect(page.getByRole("combobox", { name: "Chuyến đi", exact: true })).toHaveValue(f.trips[0].slug);
+    await expect(input).toHaveValue("Bản nháp Kyoto");
     if (process.env.E2E_LOCAL_TRIP_SWITCH === "true") {
       await mkdir(".impeccable/review/trip-switch", { recursive: true });
       await writeFile(".impeccable/review/trip-switch/close-and-return.json", JSON.stringify({
@@ -178,38 +180,22 @@ test("intermediate widths keep chat controls inside the viewport", async ({ page
   expect(bounds.y + bounds.height).toBeLessThan(250);
 });
 
-test("Back and Forward cancel obsolete trip loads and preserve each draft", async ({ page }) => {
+test("Back and Forward preserve conversation drafts independently of the visible trip", async ({ page }) => {
   const f = await fixture(page.request);
-  let release;
   try {
-    await gotoHealthy(page, `/assistant?trip=${f.trips[0].slug}`);
+    const a = await f.store.createConversation({ ownerEmail, title: "Draft A" });
+    const b = await f.store.createConversation({ ownerEmail, title: "Draft B" });
+    await gotoHealthy(page, `/assistant?trip=${f.trips[0].slug}&conversation=${a.id}`);
     const input = page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" });
-    const selector = page.getByRole("combobox", { name: "Chuyến đi", exact: true });
     await expect(input).toBeEnabled(); await input.fill("Tokyo draft");
-    await selector.selectOption(f.trips[1].slug);
-    await expect(selector).toHaveValue(f.trips[1].slug);
+    await page.getByRole("button", { name: "Lịch sử", exact: true }).click();
+    await page.getByRole("button", { name: /Draft B/ }).click();
     await expect(input).toHaveValue(""); await input.fill("Kyoto draft");
-    await expect.poll(() => page.evaluate((slug) => sessionStorage.getItem(`assistant:local-admin@localhost.invalid:draft:${slug}`), f.trips[1].slug)).toBe("Kyoto draft");
-    await selector.selectOption(f.trips[0].slug);
-    await expect(input).toHaveValue("Tokyo draft");
-    let started;
-    const held = new Promise((resolve) => { release = resolve; });
-    const intercepted = new Promise((resolve) => { started = resolve; });
-    await page.route((url) => url.pathname === "/api/v1/assistant/workspace" && url.searchParams.get("trip") === f.trips[1].slug, async (route) => {
-      const response = await route.fetch(); started(); await held;
-      await route.fulfill({ response }).catch(() => {});
-    });
-    await page.goBack(); await intercepted;
-    await page.goForward();
-    await expect(input).toHaveValue("Tokyo draft");
-    release();
-    await expect(selector).toHaveValue(f.trips[0].slug);
-    await expect(input).toHaveValue("Tokyo draft");
-    await page.unrouteAll({ behavior: "wait" });
-    await page.goBack();
-    await expect(selector).toHaveValue(f.trips[1].slug);
-    await expect(input).toHaveValue("Kyoto draft");
-  } finally { release?.(); await f.close(); }
+    expect(new URL(page.url()).searchParams.get("trip")).toBe(f.trips[0].slug);
+    await page.goBack(); await expect(input).toHaveValue("Tokyo draft");
+    await page.goForward(); await expect(input).toHaveValue("Kyoto draft");
+    await f.sql`DELETE FROM assistant_conversations WHERE id=ANY(${[a.id,b.id]}::UUID[])`;
+  } finally { await f.close(); }
 });
 
 test("composer respects IME composition and Shift Enter", async ({ page }) => {

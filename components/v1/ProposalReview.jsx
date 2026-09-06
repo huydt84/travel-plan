@@ -41,6 +41,7 @@ export function ChangePanel({ changeSet, busy, onConfirm, onRegenerate }) {
     <div className={styles.changePanel}>
       <div className={styles.changeSummary} data-status={changeSet.status}>
         <h3>{statusTitle}</h3>
+        <p>Chuyến đi cần sửa: <Link href={`/?trip=${encodeURIComponent(changeSet.tripSlug)}`}>{changeSet.tripTitle || changeSet.tripSlug}</Link></p>
         <p>So với phiên bản {changeSet.baseRevision} · hết hạn {formatCheckedAt(changeSet.expiresAt)}</p>
       </div>
       {changeSet.preview.warnings?.map((warning) => <p className={styles.warning} key={warning}>{warning}</p>)}

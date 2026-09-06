@@ -32,7 +32,8 @@ test(`home recovers a deleted cached trip at ${viewport.width}`, async ({ page, 
     const selected = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
     await page.getByRole("button", { name: /^Trợ lý/ }).click();
     await expect(page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" })).toBeEnabled();
-    await expect(page.getByRole("combobox", { name: "Chuyến đi", exact: true })).toHaveValue(selected);
+    await expect(page.getByRole("button", { name: "Thêm chuyến đi này", exact: true })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Chọn chuyến đi", includeHidden: true })).toHaveValue(selected);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
     await page.screenshot({ path: testInfo.outputPath("recovered-companion.png") });
     await page.getByRole("button", { name: "Lịch sử", exact: true }).click();

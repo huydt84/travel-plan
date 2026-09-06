@@ -51,10 +51,11 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
     await page.screenshot({ path: testInfo.outputPath("panel-history.png"), fullPage: false });
     await page.getByRole("button", { name: /Hội thoại kiểm thử 2/ }).click();
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByRole("combobox", { name: "Chuyến đi", exact: true })).toHaveValue(trips[1].slug);
+    await expect.poll(() => new URL(page.url()).searchParams.get("conversation")).toBe("00000000-0000-4000-8000-000000000002");
+    expect(new URL(page.url()).searchParams.get("trip")).not.toBe(trips[1].slug);
     await expect(sidebar).toHaveCount(0);
     await expect(trigger).toBeFocused();
-    expect(requests.every((value) => value === "1")).toBe(true);
+    expect(requests.length).toBeGreaterThan(1);
     const events = await page.evaluate(() => window.assistantMotion);
     expect(events.some((event) => event.name.includes("history-in"))).toBe(true);
     expect(events.some((event) => event.name.includes("history-out"))).toBe(true);

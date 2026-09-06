@@ -2,11 +2,13 @@ import { expect, gotoHealthy, test } from "./fixtures.mjs";
 
 test("assistant persists a turn, stages a complete diff, and applies only after explicit confirmation", async ({ page }) => {
   const ready = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/v1/assistant/workspace" && response.ok());
-  await gotoHealthy(page, "/v1");
+  const trips = await (await page.request.get("/api/trips")).json();
+  await gotoHealthy(page, `/assistant?trip=${trips.trips?.[0]?.slug || trips[0]?.slug}`);
   await ready;
   await expect(page.getByRole("heading", { level: 1, name: "Trợ lý hành trình" })).toBeVisible();
 
   await expect(page.getByLabel("Yêu cầu cho trợ lý")).toBeEnabled();
+  await page.getByRole("button", { name: "Thêm chuyến đi này" }).click();
   await page.evaluate(() => Promise.all(document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {}))));
   const request = "Cập nhật hoạt động đầu tiên với một ghi chú thử nghiệm";
   await page.getByLabel("Yêu cầu cho trợ lý").fill(request);

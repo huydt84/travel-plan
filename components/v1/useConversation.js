@@ -2,10 +2,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiJson, observeRun } from "./transport.mjs";
 
-export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChange }) {
+export function useConversation({ initialWorkspace, viewer }) {
   const [workspace, setWorkspace] = useState(initialWorkspace || null);
   const [turns, setTurns] = useState(initialWorkspace?.turns || []);
   const [message, setMessageState] = useState("");
+  const [mentions, setMentionsState] = useState([]);
+  const [pinBusy, setPinBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [submissionFailure, setSubmissionFailure] = useState(null);
@@ -31,16 +33,47 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
   const prefix = `assistant:${viewer.email}:`;
   const persist = useCallback((key, value) => { try { sessionStorage.setItem(prefix + key, value); } catch { /* Draft storage is best-effort; pending submission below is required. */ } }, [prefix]);
   const read = useCallback((key) => { try { return sessionStorage.getItem(prefix + key) || ""; } catch { return ""; } }, [prefix]);
-  const setMessage = (value) => { setMessageState(value); persist(`draft:${workspace?.selectedTripSlug}`, value); };
+  const draftKey = workspace?.selectedConversation?.id || "new";
+  const setMessage = (value) => { setMessageState(value); persist(`draft:${draftKey}`, value); };
+  const setMentions = (items) => { setMentionsState(items); persist(`mentions:${draftKey}`, JSON.stringify(items)); };
+  const addMention = (item) => {
+    if (mentions.some((entry) => entry.ref.kind === item.ref.kind && entry.ref.id === item.ref.id)) return;
+    if (mentions.length >= 20) { setError("Mỗi tin nhắn tối đa 20 ngữ cảnh."); return; }
+    setMentions([...mentions, item]);
+  };
+  const changePins = async (items) => {
+    if (pinBusy || submitting) return;
+    if (items.length > 20) { setError("Mỗi cuộc trò chuyện tối đa 20 ghim."); return; }
+    const token = generation.current;
+    setPinBusy(true);
+    try {
+      if (workspace?.selectedConversation) {
+        const next = await apiJson(`/api/v1/assistant/conversations/${workspace.selectedConversation.id}/pins`, {
+          method: "PUT", body: JSON.stringify({ pins: items.map((item) => item.ref), version: workspace.selectedConversation.pinsVersion || 0 }),
+        });
+        if (token === generation.current) setWorkspace((current) => ({ ...current, pins: next.pins, selectedConversation: next.conversation }));
+      } else {
+        persist("pins:new", JSON.stringify(items));
+        setWorkspace((current) => ({ ...current, pins: items }));
+      }
+    } catch (failure) { if (token === generation.current) setError(failure.message); }
+    finally { setPinBusy(false); }
+  };
+  const pin = (item) => {
+    const pins = workspace?.pins || [];
+    if (!pins.some((entry) => entry.ref.kind === item.ref.kind && entry.ref.id === item.ref.id)) void changePins([...pins, item]);
+  };
+  const unpin = (item) => changePins((workspace?.pins || []).filter((entry) => entry.ref.kind !== item.ref.kind || entry.ref.id !== item.ref.id));
+
   const syncUrl = useCallback((trip, conversation, replace = false) => {
     const url = new URL(window.location.href);
     // A load finishing during the closing animation must not reopen the companion.
     if (url.pathname !== "/assistant" && url.searchParams.get("chat") !== "1") return;
-    url.searchParams.set("trip", trip);
+    void trip; // Tracker navigation is independent of conversation navigation.
     if (conversation) url.searchParams.set("conversation", conversation); else url.searchParams.delete("conversation");
     if (url.pathname !== "/assistant") url.searchParams.set("chat", "1");
     if (url.href !== window.location.href) window.history[replace ? "replaceState" : "pushState"]({}, "", url);
-    persist(`conversation:${trip}`, conversation || "new");
+    persist("conversation", conversation || "new");
   }, [persist]);
 
   const observe = useCallback((turn, token) => {
@@ -68,20 +101,25 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
     setLoading(true); setError(""); setProgress(""); setDisconnected(null); setSubmissionFailure(null);
     try {
       const params = new URLSearchParams({ allTrips: "1" });
-      if (trip) params.set("trip", trip);
+      const draftKey = conversation && conversation !== "new" ? conversation : "new";
       if (conversation && conversation !== "new") params.set("conversation", conversation);
       let pending;
-      try { pending = JSON.parse(read(`pending:${trip}`) || "null"); } catch { pending = null; }
-      if (pending && conversation !== "new" && (!conversation || conversation === pending.conversationId)) params.set("request", pending.clientTurnId);
+      try { pending = JSON.parse(read(`pending:${draftKey}`) || "null"); } catch { pending = null; }
+      if (pending && (!conversation || conversation === "new" || conversation === pending.conversationId)) params.set("request", pending.clientTurnId);
       const next = await apiJson(`/api/v1/assistant/workspace?${params}`, { signal: controller.signal });
       if (generation.current !== token) return;
       if (next.request?.found) {
-        persist(`pending:${trip}`, "");
-        if (!pending?.retryOfTurnId && read(`draft:${trip}`) === pending?.message) persist(`draft:${trip}`, "");
+        persist(`pending:${draftKey}`, "");
+        if (!pending?.retryOfTurnId) persist(`mentions:${draftKey}`, "[]");
+        if (!pending?.retryOfTurnId && read(`draft:${draftKey}`) === pending?.message) persist(`draft:${draftKey}`, "");
       } else if (pending) setSubmissionFailure({ body: pending, trip, message: "Chưa xác nhận được yêu cầu. Hãy thử lại." });
-      if (conversation === "new") { next.selectedConversation = null; next.turns = []; next.nextCursor = null; }
+      if (conversation === "new" && !next.request?.found) { next.selectedConversation = null; next.turns = []; next.nextCursor = null; }
       setWorkspace(next); setTurns(next.turns);
-      setMessageState(read(`draft:${next.selectedTripSlug}`));
+      const nextKey = next.selectedConversation?.id || "new";
+      if (next.request?.found && nextKey !== draftKey) { persist(`draft:${nextKey}`, read(`draft:${draftKey}`)); persist(`draft:${draftKey}`, ""); persist("pins:new", "[]"); }
+      if (!next.selectedConversation) { try { next.pins = JSON.parse(read("pins:new") || "[]"); } catch { next.pins = []; } }
+      setMessageState(read(`draft:${nextKey}`));
+      try { setMentionsState(JSON.parse(read(`mentions:${nextKey}`) || "[]")); } catch { setMentionsState([]); }
       if (navigation) syncUrl(next.selectedTripSlug, next.selectedConversation?.id, replace);
       const running = next.turns.find((turn) => turn.status === "running");
       if (running) { setTurns(next.turns.map((turn) => turn.id === running.id ? { ...turn, output: "" } : turn)); observe(running, token); }
@@ -91,54 +129,51 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
 
   useEffect(() => {
     const params = new URL(window.location.href).searchParams;
-    const trip = tripSlug || params.get("trip") || initialWorkspace?.selectedTripSlug;
+    const trip = params.get("trip");
     let active = true;
-    queueMicrotask(() => { if (active) void load({ trip, conversation: params.get("conversation") || read(`conversation:${trip}`) || null, replace: true }); });
+    queueMicrotask(() => { if (active) void load({ trip, conversation: params.get("conversation") || read("conversation") || null, replace: true }); });
     const pop = () => {
       const params = new URL(window.location.href).searchParams;
       void load({ trip: params.get("trip"), conversation: params.get("conversation") || "new", navigation: false });
     };
     window.addEventListener("popstate", pop);
     return () => { active = false; loadController.current?.abort(); streamController.current?.abort(); window.removeEventListener("popstate", pop); };
-  }, [tripSlug, initialWorkspace?.selectedTripSlug, load, read]);
+  }, [load, read]);
 
-  const selectTrip = (trip) => {
-    onTripChange?.(trip);
-    void load({ trip, conversation: read(`conversation:${trip}`) || null });
-  };
-  const selectConversation = (conversation) => {
-    if (conversation.tripSlug !== workspace.selectedTripSlug) onTripChange?.(conversation.tripSlug);
-    void load({ trip: conversation.tripSlug, conversation: conversation.id });
-  };
-  const newConversation = () => void load({ trip: workspace.selectedTripSlug, conversation: "new" });
+  const selectConversation = (conversation) => void load({ conversation: conversation.id });
+  const newConversation = () => void load({ conversation: "new" });
   const send = async (input = message.trim(), retryRequest = null) => {
-    if (!input || sending.current || submitting || loading || turns.some((turn) => turn.status === "running")) return;
+    if (!input || sending.current || submitting || pinBusy || loading || turns.some((turn) => turn.status === "running")) return;
     const token = generation.current;
-    const trip = workspace.selectedTripSlug;
-    const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input };
-    try { sessionStorage.setItem(prefix + `pending:${trip}`, JSON.stringify(body)); }
+    const trip = null;
+    const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input, mentions: mentions.map((item) => item.ref),
+      ...(!workspace.selectedConversation ? { initialPins: (workspace.pins || []).map((item) => item.ref) } : {}) };
+    try { sessionStorage.setItem(prefix + `pending:${draftKey}`, JSON.stringify(body)); }
     catch { setError("Hãy bật lưu trữ phiên để gửi yêu cầu có thể khôi phục."); return; }
     sending.current = true; setSubmitting(true); setError(""); setSubmissionFailure(null);
     setRetrying(body.retryOfTurnId || null);
     try {
       let accepted;
       try {
-        accepted = await apiJson(`/api/v1/trips/${encodeURIComponent(trip)}/assistant/turns`, { method: "POST", body: JSON.stringify(body) });
+        accepted = await apiJson("/api/v1/assistant/turns", { method: "POST", body: JSON.stringify(body) });
         if (!accepted.runId || !accepted.conversationId) throw new Error("Mất xác nhận tiếp nhận");
       } catch (failure) {
-        if (failure.status && failure.status < 500) { persist(`pending:${trip}`, ""); throw failure; }
-        const recovered = await apiJson(`/api/v1/assistant/workspace?trip=${encodeURIComponent(trip)}&request=${body.clientTurnId}`);
+        if (failure.status && failure.status < 500) { persist(`pending:${draftKey}`, ""); throw failure; }
+        const recovered = await apiJson(`/api/v1/assistant/workspace?request=${body.clientTurnId}`);
         if (!recovered.request?.found) throw failure;
         accepted = { runId: recovered.request.turn.id, conversationId: recovered.selectedConversation.id, turn: recovered.request.turn };
       }
-      persist(`pending:${trip}`, "");
-      if (!body.retryOfTurnId && read(`draft:${trip}`) === body.message) persist(`draft:${trip}`, "");
-      persist(`conversation:${trip}`, accepted.conversationId);
+      persist(`pending:${draftKey}`, "");
+      if (!body.retryOfTurnId && read(`draft:${draftKey}`) === body.message) persist(`draft:${draftKey}`, "");
+      persist("conversation", accepted.conversationId);
+      if (draftKey === "new") persist("pins:new", "[]");
       if (generation.current !== token) return;
       const saved = accepted.turn || { id: accepted.runId, clientTurnId: body.clientTurnId, input, output: "", citations: [], status: accepted.status || "running" };
       const turn = saved.status === "running" ? { ...saved, output: "" } : saved;
-      setMessageState(read(`draft:${trip}`));
-      setWorkspace((next) => ({ ...next, selectedConversation: { id: accepted.conversationId, tripSlug: trip, title: input } }));
+      if (draftKey !== accepted.conversationId) { persist(`draft:${accepted.conversationId}`, read(`draft:${draftKey}`)); persist(`draft:${draftKey}`, ""); }
+      setMessageState(read(`draft:${accepted.conversationId}`));
+      if (!body.retryOfTurnId) { setMentionsState([]); persist(`mentions:${draftKey}`, "[]"); }
+      setWorkspace((next) => ({ ...next, selectedConversation: { ...next.selectedConversation, id: accepted.conversationId, title: next.selectedConversation?.title || input, pinsVersion: next.selectedConversation?.pinsVersion || 0 } }));
       syncUrl(trip, accepted.conversationId, true);
       setTurns((items) => {
         const index = items.findIndex((item) => item.id === body.retryOfTurnId || item.id === turn.id);
@@ -155,10 +190,10 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
   };
   const retry = (turn) => {
     let pending;
-    try { pending = JSON.parse(read(`pending:${workspace.selectedTripSlug}`) || "null"); } catch { pending = null; }
+    try { pending = JSON.parse(read(`pending:${draftKey}`) || "null"); } catch { pending = null; }
     if (pending && pending.retryOfTurnId !== turn.id) { setError("Chưa xác nhận được yêu cầu trước. Hãy kết nối lại trước khi gửi yêu cầu khác."); return; }
     return send(turn.input, pending || { clientTurnId: crypto.randomUUID(),
-      conversationId: workspace.selectedConversation.id, message: turn.input, retryOfTurnId: turn.id });
+      conversationId: workspace.selectedConversation.id, message: turn.input, mentions: turn.mentions || [], retryOfTurnId: turn.id });
   };
   const reconnect = () => {
     const turn = turns.find((item) => item.id === disconnected?.turnId);
@@ -169,7 +204,7 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
   const retrySubmission = () => submissionFailure && send(submissionFailure.body.message, submissionFailure.body);
   const submit = () => {
     let pending;
-    try { pending = JSON.parse(read(`pending:${workspace.selectedTripSlug}`) || "null"); } catch { pending = null; }
+    try { pending = JSON.parse(read(`pending:${draftKey}`) || "null"); } catch { pending = null; }
     if (pending && pending.message !== message.trim()) {
       setSubmissionFailure({ body: pending, trip: workspace.selectedTripSlug, message: "Chưa xác nhận được yêu cầu trước. Thử lại yêu cầu đó trước khi gửi nội dung khác." });
       return;
@@ -190,7 +225,7 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
   const history = async (more = false) => {
     const token = generation.current;
     const request = ++historyGeneration.current;
-    const params = new URLSearchParams({ trip: workspace.selectedTripSlug, allTrips: "1" });
+    const params = new URLSearchParams();
     setHistoryLoading(true); setHistoryError("");
     if (more && workspace.historyCursor) params.set("historyBefore", workspace.historyCursor);
     try {
@@ -203,13 +238,13 @@ export function useConversation({ initialWorkspace, viewer, tripSlug, onTripChan
   };
   const older = async () => {
     const token = generation.current;
-    const params = new URLSearchParams({ trip: workspace.selectedTripSlug, conversation: workspace.selectedConversation.id, before: workspace.nextCursor });
+    const params = new URLSearchParams({ conversation: workspace.selectedConversation.id, before: workspace.nextCursor });
     try { const next = await apiJson(`/api/v1/assistant/workspace?${params}`); if (token !== generation.current) return;
       setWorkspace((current) => ({ ...current, nextCursor: next.nextCursor }));
       setTurns((current) => [...next.turns.filter((item) => !current.some((old) => old.id === item.id)), ...current]);
     } catch (failure) { if (token === generation.current) setError(failure.message); }
   };
   return { workspace, turns, setTurns, message, setMessage, loading, error, setError, progress, submitting, historyLoading, historyError,
-    load, selectTrip, selectConversation, newConversation, submit, send, stop, history, older,
+    mentions, addMention, setMentions, pin, unpin, pinBusy, load, selectConversation, newConversation, submit, send, stop, history, older,
     retry, retrying, submissionFailure, retrySubmission, disconnected, reconnect };
 }

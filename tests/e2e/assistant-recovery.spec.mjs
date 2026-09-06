@@ -1,3 +1,4 @@
+import { cleanupAssistantTrips } from "./assistant-cleanup.mjs";
 import { randomUUID } from "node:crypto";
 import { createPostgresSql } from "../../lib/sql-adapter.mjs";
 import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
@@ -12,11 +13,12 @@ async function setup(page) {
     VALUES(${slug},'Browser harness','2030-01-01','2030-01-01','Asia/Tokyo','Tokyo') RETURNING id`;
   await sql`INSERT INTO activities(trip_id,item_key,sort_order,start_date,start_time,end_date,end_time,type,icon,title,detail)
     VALUES(${trip.id},'museum',0,'2030-01-01','09:00','2030-01-01','10:00','Visit','pin','Museum','Original')`;
-  await gotoHealthy(page, "/v1");
-  await page.getByLabel("Chuyến đi", { exact: true }).selectOption(slug);
+  await gotoHealthy(page, `/assistant?trip=${slug}`);
+  await page.getByRole("button", { name: "Thêm chuyến đi này" }).click();
   await expect(page.getByLabel("Yêu cầu cho trợ lý")).toBeEnabled();
   return { sql, trip, slug, store: createAssistantStore({ sql }), cleanup: async () => {
     try {
+      await cleanupAssistantTrips(sql, [trip.id]);
       const response = await page.request.delete(`/api/trips/${slug}`);
       expect(response.status()).toBe(204);
     } finally { await sql.end(); }
@@ -31,7 +33,7 @@ test("lost acceptance and truncated responses recover without a second turn", as
   const f = await setup(page);
   try {
     let submissions = 0;
-    await page.route("**/api/v1/trips/*/assistant/turns", async (route) => {
+    await page.route("**/api/v1/assistant/turns", async (route) => {
       submissions++;
       const result = await route.fetch();
       expect(result.ok()).toBe(true);
@@ -41,9 +43,8 @@ test("lost acceptance and truncated responses recover without a second turn", as
     await send(page, "Tóm tắt lịch kiểm tra khôi phục");
     await expect(page.getByText("Đây là chế độ mô phỏng cục bộ.", { exact: false })).toBeVisible();
     expect(submissions).toBe(1);
-    expect(await f.sql`SELECT t.id FROM assistant_turns t JOIN assistant_conversations c ON c.id=t.conversation_id WHERE c.trip_id=${f.trip.id}`).toHaveLength(1);
+    expect(await f.sql`SELECT t.id FROM assistant_turns t JOIN assistant_conversations c ON c.id=t.conversation_id WHERE t.mentions @> ${JSON.stringify([{ kind: "trip", id: String(f.trip.id) }])}::JSONB`).toHaveLength(1);
     await page.reload();
-    await page.getByLabel("Chuyến đi", { exact: true }).selectOption(f.slug);
     await expect(page.getByText("Đây là chế độ mô phỏng cục bộ.", { exact: false })).toBeVisible();
   } finally { await f.cleanup(); }
 });
@@ -52,7 +53,7 @@ test("reload reconciles a running lease and explicit retry creates one new turn"
   const f = await setup(page);
   try {
     let accepted;
-    await page.route("**/api/v1/trips/*/assistant/turns", async (route) => {
+    await page.route("**/api/v1/assistant/turns", async (route) => {
       const body = route.request().postDataJSON();
       accepted = await f.store.acceptRequest({ ownerEmail, tripSlug: f.slug, conversationId: body.conversationId,
         clientTurnId: body.clientTurnId, input: body.message, title: "Recovery", leaseMs: 60000, maxTurnsPerHour: 30 });
@@ -64,7 +65,7 @@ test("reload reconciles a running lease and explicit retry creates one new turn"
     await expect(page.getByRole("button", { name: "Dừng", exact: true })).toBeVisible();
     await f.sql`UPDATE assistant_turns SET lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=${accepted.turn.id}`;
     await expect(page.getByRole("button", { name: "Thử lại" })).toBeVisible({ timeout: 10000 });
-    await page.unroute("**/api/v1/trips/*/assistant/turns");
+    await page.unroute("**/api/v1/assistant/turns");
     await page.getByRole("button", { name: "Thử lại" }).click();
     await expect(page.getByText("Đây là chế độ mô phỏng cục bộ.", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Dừng", exact: true })).toHaveCount(0);

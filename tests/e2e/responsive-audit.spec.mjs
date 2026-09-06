@@ -104,6 +104,13 @@ for (const viewport of viewports) {
           const clippedControls = controls
             .filter((element) => {
               const rect = element.getBoundingClientRect();
+              // A deliberate horizontal scroller can contain offscreen controls.
+              // Its viewport, and each control's width, must still fit the page.
+              for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+                const style = getComputedStyle(parent), box = parent.getBoundingClientRect();
+                if (["auto", "scroll"].includes(style.overflowX) && parent.scrollWidth > parent.clientWidth
+                  && box.left >= 0 && box.right <= innerWidth && rect.width <= parent.clientWidth) return false;
+              }
               return rect.left < -1 || rect.right > window.innerWidth + 1;
             })
             .map((element) => (element.getAttribute("aria-label") || element.textContent || element.tagName).trim().slice(0, 60));

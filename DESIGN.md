@@ -371,3 +371,8 @@ The live dot pulses on a 2.1-second ease-out cycle; countdown progress advances 
 - **Don't** let the owner control room drift into a different SaaS design language; it edits the same timetable infrastructure.
 - **Don't** hide citations, contribution context, or real schedule detail in pursuit of visual minimalism.
 - **Don't** reuse compact itinerary metadata sizes for chat paragraphs or restore the obsolete three-column assistant layout.
+
+
+## Assistant context references
+
+Assistant conversations are independent of itinerary selection. Replace the single-trip selector with explicit context attachment and pin controls, retaining the incumbent header, reading column, companion geometry, and history navigation. Message attachments and used-context lists use compact ruled rows, 14px names and 12px metadata; the search drawer uses 15px result names and 44px actions. Keep the textarea and expose the same context picker through `@`. Proposal review always names the target trip. Tracker navigation cannot silently change conversation context.

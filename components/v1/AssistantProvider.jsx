@@ -26,6 +26,8 @@ function AssistantLocation({ onChange }) {
 }
 export function AssistantLauncher({ tripSlug }) {
   const assistant = useContext(AssistantContext);
+  const setTrackerTrip = assistant?.setTrackerTrip;
+  useEffect(() => { if (tripSlug) setTrackerTrip?.(tripSlug); }, [tripSlug, setTrackerTrip]);
   if (!assistant?.enabled) return null;
   return <button type="button" className={styles.launcher} onClick={() => assistant.open(tripSlug)}>
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M5 4h14v12H9l-4 4V4Z" /><path d="M9 8h6M9 12h4" /></svg>
@@ -40,6 +42,7 @@ export default function AssistantProvider({ viewer, children }) {
   const enabled = !!viewer?.isAdmin;
   const visible = enabled && params.get("chat") === "1" && pathname !== "/assistant";
   const [count, setCount] = useState(0);
+  const [trackerTrip, setTrackerTrip] = useState(null);
   const [closing, setClosing] = useState(false);
   useEffect(() => {
     if (!closing) return;
@@ -77,7 +80,14 @@ export default function AssistantProvider({ viewer, children }) {
   const open = (trip) => {
     setClosing(false);
     const query = new URLSearchParams(); if (trip || params.get("trip")) query.set("trip", trip || params.get("trip")); query.set("chat", "1");
-    router.push(`/?${query}`, { scroll: false, transitionTypes: ["assistant-ui"] });
+    const conversation = params.get("conversation"); if (conversation) query.set("conversation", conversation);
+    if (pathname === "/" && (!trip || trip === trackerTrip)) {
+      startTransition(() => {
+        addTransitionType("assistant-ui");
+        window.history.pushState({}, "", `/?${query}`);
+        setLocation({ pathname, query: query.toString() });
+      });
+    } else router.push(`/?${query}`, { scroll: false, transitionTypes: ["assistant-ui"] });
   };
   const close = () => {
     const url = new URL(window.location.href); url.searchParams.delete("chat"); url.searchParams.delete("conversation");
@@ -86,14 +96,13 @@ export default function AssistantProvider({ viewer, children }) {
     setLocation({ pathname, query: url.searchParams.toString() });
     // Next native history integration updates useSearchParams without remounting the tracker.
   };
-  const switchTrip = (trip) => router.push(`/?trip=${encodeURIComponent(trip)}&chat=1`, { scroll: false });
-  const workspace = present ? <Workspace viewer={viewer} tripSlug={params.get("trip")} companion onClose={close} onTripChange={switchTrip} /> : null;
+  const workspace = present ? <Workspace viewer={viewer} tripSlug={trackerTrip || params.get("trip")} companion onClose={close} /> : null;
   // Prime the companion query before the route commits so both modes share one snapshot.
   const prepareCompanion = (href) => setLocation({ pathname: "/", query: new URL(href, window.location.origin).searchParams.toString() });
-  return <AssistantContext.Provider value={{ enabled, count, open, prepareCompanion }}>
+  return <AssistantContext.Provider value={{ enabled, count, open, prepareCompanion, setTrackerTrip }}>
     <Suspense fallback={null}><AssistantLocation onChange={setLocation} /></Suspense>
     <ViewTransition name="assistant-itinerary" default="none" update={{ "assistant-ui": "assistant-layout" }}><div className={`${styles.pageLayout} ${visible && !mobile ? styles.withCompanion : ""}`} style={panelStyle} data-resizing={dragging || undefined} data-closing={closing && !visible || undefined}>{children}</div></ViewTransition>
     {present && <ViewTransition name="trip-assistant" default="none" share="assistant-morph" enter="assistant-enter" exit="assistant-exit">{mobile ? <Dialog portal={false} onClose={close} overlayClassName={styles.mobileOverlay}><div className={styles.mobilePanel} data-closing={closing && !visible || undefined} onAnimationEnd={(event) => { if (event.target === event.currentTarget && !visible) setClosing(false); }}><DialogTitle asChild><span className="sr-only">Trợ lý hành trình</span></DialogTitle>{workspace}</div></Dialog>
-      : <aside id="trip-companion-panel" className={styles.panel} style={panelStyle} data-resizing={dragging || undefined} aria-label="Trợ lý cho chuyến đi hiện tại" data-closing={closing && !visible || undefined} onAnimationEnd={(event) => { if (event.target === event.currentTarget && !visible) setClosing(false); }}><div className={styles.resizeHandle} {...separatorProps} />{workspace}</aside>}</ViewTransition>}
+      : <aside id="trip-companion-panel" className={styles.panel} style={panelStyle} data-resizing={dragging || undefined} aria-label="Trợ lý hành trình" data-closing={closing && !visible || undefined} onAnimationEnd={(event) => { if (event.target === event.currentTarget && !visible) setClosing(false); }}><div className={styles.resizeHandle} {...separatorProps} />{workspace}</aside>}</ViewTransition>}
   </AssistantContext.Provider>;
 }

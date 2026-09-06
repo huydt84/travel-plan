@@ -8,6 +8,7 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
     await expect(input).toBeEnabled();
     await input.fill("Bản nháp giữ nguyên khi mở rộng và thu nhỏ");
     const before = new URL(page.url());
+    const visibleTrip = await page.getByRole("combobox", { name: "Chọn chuyến đi", includeHidden: true }).inputValue();
     await page.getByRole("link", { name: "Mở rộng", exact: true }).click();
     await expect(input).toHaveValue("Bản nháp giữ nguyên khi mở rộng và thu nhỏ");
     const collapse = page.getByRole("link", { name: "Thu nhỏ", exact: true });
@@ -16,7 +17,7 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
     await expect(page).toHaveURL(/\/\?.*chat=1/);
     await expect(input).toHaveValue("Bản nháp giữ nguyên khi mở rộng và thu nhỏ");
     expect(new URL(page.url()).searchParams.get("conversation")).toBe(before.searchParams.get("conversation"));
-    expect(new URL(page.url()).searchParams.get("trip")).toBe(before.searchParams.get("trip"));
+    expect(new URL(page.url()).searchParams.get("trip")).toBe(visibleTrip);
     await page.screenshot({ path: testInfo.outputPath("collapsed.png"), fullPage: false });
     if (viewport.width === 320) await expect(page.getByRole("separator", { name: "Độ rộng trợ lý" })).toHaveCount(0);
   });
@@ -26,7 +27,7 @@ for (const width of [1440, 1920]) {
   test(`desktop divider resizes, clamps and remembers at ${width}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: width === 1440 ? 900 : 1080 });
     await gotoHealthy(page, "/?chat=1");
-    const panel = page.getByRole("complementary", { name: "Trợ lý cho chuyến đi hiện tại" });
+    const panel = page.getByRole("complementary", { name: "Trợ lý hành trình" });
     const divider = page.getByRole("separator", { name: "Độ rộng trợ lý" });
     await expect(divider).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" })).toBeEnabled();
