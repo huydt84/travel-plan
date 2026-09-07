@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { ownerEmail } from "../../../../../auth";
 import { apiError } from "../../../../../lib/api-response";
 import { getViewer } from "../../../../../lib/auth";
-import { updateUserRole } from "../../../../../lib/user-repository";
-import { parseUserRole, readJsonBody, ValidationError } from "../../../../../lib/validation";
+import { updateUserDisplayName, updateUserRole } from "../../../../../lib/user-repository";
+import { parseDisplayName, parseUserRole, readJsonBody, ValidationError } from "../../../../../lib/validation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,12 +21,16 @@ export async function PATCH(request, context) {
   }
   try {
     const { email } = await context.params;
-    const { role } = parseUserRole(await readJsonBody(request));
-    return NextResponse.json(await updateUserRole({
-      email: emailFrom(email),
-      role,
-      ownerEmail: ownerEmail(),
-    }));
+    const body = await readJsonBody(request);
+    const targetEmail = emailFrom(email);
+    if (body && typeof body === "object" && Object.hasOwn(body, "displayName")) {
+      return NextResponse.json(await updateUserDisplayName({
+        email: targetEmail,
+        displayName: parseDisplayName(body).displayName,
+      }));
+    }
+    const { role } = parseUserRole(body);
+    return NextResponse.json(await updateUserRole({ email: targetEmail, role, ownerEmail: ownerEmail() }));
   } catch (error) {
     return apiError(error);
   }

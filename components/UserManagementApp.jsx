@@ -9,6 +9,7 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 import AdminNav from "./AdminNav";
 import ConfirmDialog from "./ConfirmDialog";
+import DisplayNameDialog from "./DisplayNameDialog";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useLocale } from "./LocaleProvider";
 import { adminErrorMessage } from "../lib/i18n-admin.mjs";
@@ -46,6 +47,7 @@ export default function UserManagementApp({
   const { t, locale } = useLocale();
   const [userRows, setUserRows] = useState(users);
   const [rolePrompt, setRolePrompt] = useState(null);
+  const [displayNamePrompt, setDisplayNamePrompt] = useState(null);
   const [busyEmail, setBusyEmail] = useState("");
   const [roleErrors, setRoleErrors] = useState({});
 
@@ -129,7 +131,7 @@ export default function UserManagementApp({
             <table className={invitationManagementStyles["admin-users-table"]}>
               <thead>
                 <tr>
-                  <th scope="col">{t("adminExtra.message109")}</th>
+                  <th scope="col">{t("profile.displayName")}</th>
                   <th scope="col">{t("adminExtra.message117")}</th>
                   <th scope="col">{t("adminExtra.message118")}</th>
                   <th scope="col">{t("adminExtra.message119")}</th>
@@ -139,8 +141,18 @@ export default function UserManagementApp({
               <tbody>
                 {userRows.map((loginUser) => (
                   <tr key={loginUser.email}>
-                    <td data-label={t("adminExtra.message109")}>
-                      <strong>{loginUser.name}</strong>
+                    <td data-label={t("profile.displayName")}>
+                      <strong>{loginUser.displayName || loginUser.name}</strong>
+                      {viewer.isOwner && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="small"
+                          onClick={() => setDisplayNamePrompt(loginUser)}
+                        >
+                          {t("profile.edit")}
+                        </Button>
+                      )}
                     </td>
                     <td data-label={t("adminExtra.message117")}>
                       {loginUser.email}
@@ -172,7 +184,7 @@ export default function UserManagementApp({
                             }
                           >
                             <span className="sr-only">
-                              {t("adminExtra.message123")} {loginUser.name}
+                              {t("adminExtra.message123")} {loginUser.displayName || loginUser.name}
                             </span>
                             <select
                               value={loginUser.role}
@@ -230,8 +242,8 @@ export default function UserManagementApp({
           }
           description={
             rolePrompt.role === "admin"
-              ? t("adminExtra.message129", { value0: rolePrompt.user.name })
-              : t("adminExtra.message130", { value0: rolePrompt.user.name })
+              ? t("adminExtra.message129", { value0: rolePrompt.user.displayName || rolePrompt.user.name })
+              : t("adminExtra.message130", { value0: rolePrompt.user.displayName || rolePrompt.user.name })
           }
           preview={rolePrompt.user.email}
           confirmLabel={
@@ -244,6 +256,19 @@ export default function UserManagementApp({
           error={roleErrors[rolePrompt.user.email] || ""}
           onCancel={() => setRolePrompt(null)}
           onConfirm={confirmRoleChange}
+        />
+      )}
+      {displayNamePrompt && (
+        <DisplayNameDialog
+          displayName={displayNamePrompt.displayName || displayNamePrompt.name}
+          endpoint={`/api/admin/users/${encodeURIComponent(displayNamePrompt.email)}`}
+          onCancel={() => setDisplayNamePrompt(null)}
+          onSaved={(nextDisplayName) => {
+            setUserRows((current) => current.map((item) => item.email === displayNamePrompt.email
+              ? { ...item, name: nextDisplayName, displayName: nextDisplayName }
+              : item));
+            setDisplayNamePrompt(null);
+          }}
         />
       )}
     </main>

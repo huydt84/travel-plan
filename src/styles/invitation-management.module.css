@@ -1041,6 +1041,12 @@
   color: var(--navy);
   font-size: 12px;
 }
+.admin-users-table td:first-child :global(.admin-ghost) {
+  display: block;
+  margin-top: 8px;
+  padding: 7px 9px;
+  font-size: 9px;
+}
 .admin-users-table time {
   display: flex;
   align-items: baseline;

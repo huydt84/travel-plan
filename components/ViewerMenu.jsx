@@ -8,17 +8,19 @@ import { signOut } from "next-auth/react";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { ActionIcon } from "./Icons";
 import { useLocale } from "./LocaleProvider";
+import DisplayNameDialog from "./DisplayNameDialog";
 
 const MENU_ID = "viewer-account-menu";
 
 export default function ViewerMenu({ viewer }) {
   const { t, locale } = useLocale();
   const [open, setOpen] = useState(false);
+  const [displayName, setDisplayName] = useState(viewer.displayName || viewer.name || viewer.email);
+  const [editNameOpen, setEditNameOpen] = useState(false);
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const localDev = viewer.authMode === "local-dev";
-  const label =
-    localDev && viewer.isOwner ? "Local admin" : viewer.name || viewer.email;
+  const label = localDev && viewer.isOwner ? "Local admin" : displayName;
   const initial = label?.trim().charAt(0).toLocaleUpperCase(locale) || "T";
   const manageClassName = localDev
     ? navigationStyles["viewer-menu-item"]
@@ -93,6 +95,16 @@ export default function ViewerMenu({ viewer }) {
           >
             {t("nav.myRequests")}
           </Link>
+          <button
+            className={navigationStyles["viewer-menu-item"]}
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setEditNameOpen(true);
+            }}
+          >
+            {t("profile.editTitle")}
+          </button>
           {viewer.isAdmin && (
             <Link
               className={manageClassName}
@@ -112,6 +124,17 @@ export default function ViewerMenu({ viewer }) {
             </button>
           )}
         </div>
+      )}
+      {editNameOpen && (
+        <DisplayNameDialog
+          displayName={displayName}
+          endpoint="/api/profile"
+          onCancel={() => setEditNameOpen(false)}
+          onSaved={(nextDisplayName) => {
+            setDisplayName(nextDisplayName);
+            setEditNameOpen(false);
+          }}
+        />
       )}
     </div>
   );
