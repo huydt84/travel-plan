@@ -69,14 +69,22 @@
 .empty { padding:48px 16px; max-width:65ch; margin:auto; text-align:center; color:var(--quiet); }
 .empty h2 { color:var(--ink); }
 .empty a { display:inline-block; margin-top:12px; color:var(--accent); }
-.review { max-width:850px; margin:0 auto; }
+.review { max-width:1180px; margin:0 auto; }
 .turn { border-top:1px solid var(--rule); padding:24px 0; }
 .turn > header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; color:var(--quiet); font-size:12px; margin-bottom:20px; }
 .turn > header .danger { margin-left:auto; }
 .question { background:#f4f7f6; padding:16px 20px; border-radius:6px; }
 .question p { white-space:pre-wrap; }
-.answer { padding:24px 0 0; }
+.turnBody { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,360px); gap:32px; align-items:start; }
+.answer { min-width:0; padding:24px 0 0; }
 .answer pre { max-width:100%; overflow:auto; }
+.sources { min-width:0; margin-top:24px; border-top:1px solid var(--rule); }
+.sources summary { display:flex; align-items:center; min-height:48px; padding:10px 0; cursor:pointer; color:var(--accent); font-size:13px; font-weight:600; }
+.sources :global(.evidenceList) { display:grid; }
+.sources :global(.evidenceList article) { padding:14px 0; border-bottom:1px solid var(--rule); }
+.sources :global(.evidenceList h3) { margin:6px 0 4px; font:600 17px/1.35 var(--body),sans-serif; }
+.sources :global(.evidenceList p),.sources :global(.evidenceList a),.sources :global(.evidenceList time) { font-size:12px; }
+.sources :global(.evidenceList a) { min-height:44px; display:inline-flex; align-items:center; margin-top:8px; }
 .overlay { position:fixed; inset:0; z-index:100; background:rgb(20 34 46 / .32); }
 .editor { position:fixed; inset:0 0 0 auto; z-index:101; width:min(480px,100%); display:flex; flex-direction:column; box-shadow:-12px 0 40px rgb(20 34 46 / .16); animation:enter 180ms ease-out; }
 .editorHead { padding:24px; border-bottom:1px solid var(--rule); }
@@ -111,6 +119,8 @@
   .history,.history tbody,.history tr,.history td { display:block; }.history thead { display:none; }.history tr { padding:12px 0; border-bottom:1px solid var(--rule); }.history td { border:0; padding:3px 0; }.history td:not(:first-child) { font-size:12px; color:var(--quiet); }
   .warning,.success { margin:12px 16px !important; }.primary,.secondary,.danger { min-height:44px; }
   .editorHead,.editorBody { padding:20px; }.editorFooter { padding:16px 20px; }.editorFooter button { flex:1; }.question { padding:14px; }
+  .turnBody { grid-template-columns:1fr; gap:0; }
+  .sources { margin-top:18px; }
 }
 @media(prefers-reduced-motion:reduce) { .editor { animation:none; }.console button,.editor button { transition:none; } }
 

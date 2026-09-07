@@ -180,3 +180,9 @@ test("proposal source additions require previously researched evidence", async (
 test("incomplete provider output never becomes a completed answer", async () => {
   await assert.rejects(run(scriptedClient([{ status: "incomplete", output_text: "Partial answer" }])), { code: "MODEL_INCOMPLETE" });
 });
+
+test("completed interaction with a token-limited model step never becomes a completed answer", async () => {
+  await assert.rejects(run(scriptedClient([{ status: "completed", output_text: "Partial **answer", steps: [
+    { type: "model_output", status: "completed", finish_reason: "MAX_TOKENS" },
+  ] }])), { code: "MODEL_INCOMPLETE" });
+});

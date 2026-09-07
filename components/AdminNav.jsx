@@ -1,4 +1,4 @@
-import { AssistantLauncher, useAssistantNavigation } from "./v1/AssistantProvider";
+import { useAssistantNavigation } from "./v1/AssistantProvider";
 import adminShellStyles from "../src/styles/admin-shell.module.css";
 import Link from "next/link";
 import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
@@ -13,7 +13,7 @@ export default function AdminNav({
   const assistant = useAssistantNavigation();
   const { t } = useLocale();
   return (
-    <nav className={adminShellStyles["admin-nav"]} data-owner={assistant?.isOwner || undefined} style={{ "--admin-columns": assistant?.enabled ? (assistant.isOwner ? 6 : 5) : 4 }} aria-label={t("nav.adminArea")}>
+    <nav className={adminShellStyles["admin-nav"]} data-owner={assistant?.isOwner || undefined} style={{ "--admin-columns": assistant?.enabled && assistant.isOwner ? 5 : 4 }} aria-label={t("nav.adminArea")}>
       <Link
         href={ADMIN_ROUTES.trips}
         aria-current={active === "trips" ? "page" : undefined}
@@ -54,7 +54,6 @@ export default function AdminNav({
       >
         {t("nav.adminUsers")}
       </Link>
-      <AssistantLauncher tripSlug={tripSlug} />
       {assistant?.isOwner && <Link href={ADMIN_ROUTES.assistant} aria-current={active === "assistant" ? "page" : undefined}>{t("nav.adminAssistant")}</Link>}
     </nav>
   );

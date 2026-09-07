@@ -109,8 +109,13 @@ for(const [width,height] of [[320,760],[1440,900],[1920,1080]]) test(`owner mana
     await other.service.save(owner,other.email,{...inheritedPolicy,enabled:false});
     const old=await former.accept();await former.store.failTurn(old.turn.id,"TURN_CANCELLED");
     await former.sql`UPDATE users SET name='Trần Minh Anh',role='member' WHERE email=${former.email}`;
-    const first=await f.accept();await f.store.publishTurn({turnId:first.turn.id,output:"Gợi ý Tokyo cho cuối tuần.",citations:[]});
+    const first=await f.accept();await f.store.publishTurn({turnId:first.turn.id,output:"Gợi ý Tokyo cho cuối tuần. [E1]\n\n**Chánh điện (Honden):** Kiểm tra giờ mở cửa trước khi khởi hành và giữ phần nguồn tham khảo có thể mở khi cần.",citations:[
+      {id:"E1",kind:"web",title:"Đền thờ Thiên hoàng Minh Trị",publisher:"Google Maps",host:"maps.google.com",url:"https://maps.google.com",checkedAt:"2026-09-06T00:06:00.000Z"},
+      {id:"E2",kind:"web",title:"Hàng thùng rượu Sake",publisher:"Kazaridaru",host:"example.com",url:"https://example.com/sake",checkedAt:"2026-09-06T00:06:00.000Z"},
+      {id:"E3",kind:"web",title:"Thông tin tham khảo về khu phố",publisher:"Tokyo Guide",host:"example.com",url:"https://example.com/guide",checkedAt:"2026-09-06T00:06:00.000Z"},
+    ]});
     await page.setViewportSize({width,height});await gotoHealthy(page,"/admin/assistant");
+    await expect(page.getByRole("button",{name:"Trợ lý",exact:true})).toHaveCount(0);
     await page.screenshot({path:testInfo.outputPath("overview.png"),fullPage:true,animations:"disabled"});
     await page.locator(`[id="admin-${f.email}"]:visible`).click();
     await page.getByRole("link",{name:"Chỉnh sửa",exact:true}).click();
@@ -121,7 +126,11 @@ for(const [width,height] of [[320,760],[1440,900],[1920,1080]]) test(`owner mana
     await page.screenshot({path:testInfo.outputPath("settings.png"),fullPage:true,animations:"disabled"});
     await page.getByRole("link",{name:"Cuộc trò chuyện",exact:true}).click();
     await page.getByRole("link",{name:/Lên kế hoạch Tokyo/}).click();
-    const review=page.getByRole("region",{name:"Xem lại cuộc trò chuyện"});await expect(review.getByText("Gợi ý Tokyo cho cuối tuần.")).toBeVisible();await review.scrollIntoViewIfNeeded();
+    const review=page.getByRole("region",{name:"Xem lại cuộc trò chuyện"});await expect(review.getByText("Gợi ý Tokyo cho cuối tuần.")).toBeVisible();await expect(review.getByText("**Chánh điện (Honden):**",{exact:false})).toHaveCount(0);await expect(review.getByText("Chánh điện (Honden):",{exact:false})).toBeVisible();
+    const sources=review.locator("details").filter({hasText:"Nguồn · 3"});await expect(sources).toHaveJSProperty("open",false);
+    await review.getByRole("button",{name:"[E1]",exact:true}).click();await expect(sources).toHaveJSProperty("open",true);await expect(review.locator(`[id="${first.turn.id}-evidence-E1"]`)).toBeFocused();
+    if(width>=1100){const answer=review.locator("[class*='answer']").first(),sourceBox=sources;const answerBox=await answer.boundingBox(),sourceBoxRect=await sourceBox.boundingBox();expect(sourceBoxRect.x).toBeGreaterThan(answerBox.x+answerBox.width/2);}
+    await review.scrollIntoViewIfNeeded();
     await page.screenshot({path:testInfo.outputPath("review.png"),fullPage:true,animations:"disabled"});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
     const controls=await page.locator("main select,main input,main button").evaluateAll(elements=>elements.filter(e=>e.checkVisibility()).map(e=>e.getBoundingClientRect().toJSON()));

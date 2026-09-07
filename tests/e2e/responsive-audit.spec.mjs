@@ -67,6 +67,9 @@ for (const viewport of viewports) {
         await gotoHealthy(page, surface.path);
         await surface.setup?.(page);
         await expect(surface.ready(page)).toBeVisible();
+        if (surface.name === "assistant management") {
+          await expect(page.getByRole("button", { name: "Trợ lý", exact: true })).toHaveCount(0);
+        }
         if (surface.name === "public tracker" && viewport.touch) {
           await expect(page.locator(".desktop-manage-link")).toBeHidden();
         }
