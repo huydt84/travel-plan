@@ -112,23 +112,23 @@ for(const [width,height] of [[320,760],[1440,900],[1920,1080]]) test(`owner mana
     const first=await f.accept();await f.store.publishTurn({turnId:first.turn.id,output:"Gợi ý Tokyo cho cuối tuần.",citations:[]});
     await page.setViewportSize({width,height});await gotoHealthy(page,"/admin/assistant");
     await page.screenshot({path:testInfo.outputPath("overview.png"),fullPage:true,animations:"disabled"});
-    await page.locator(`[id="admin-${f.email}"]`).click();
-    await page.getByRole("button",{name:"Chỉnh sửa",exact:true}).click();
+    await page.locator(`[id="admin-${f.email}"]:visible`).click();
+    await page.getByRole("link",{name:"Chỉnh sửa",exact:true}).click();
     await expect(page.getByRole("button",{name:"Lưu thay đổi",exact:true})).toBeDisabled();
     await page.getByRole("combobox",{name:"Mô hình",exact:true}).selectOption("gemini-3.6-flash");await page.getByRole("combobox",{name:"Mức suy nghĩ",exact:true}).selectOption("minimal");
     await page.getByRole("combobox",{name:"Mô hình",exact:true}).selectOption("gemini-3.8-flash");await expect(page.getByRole("combobox",{name:"Mức suy nghĩ",exact:true})).toHaveValue("default");
     await page.getByRole("button",{name:"Lưu thay đổi",exact:true}).click();await expect(page.getByText("Đã lưu thay đổi. Áp dụng từ yêu cầu tiếp theo.")).toBeVisible();
     await page.screenshot({path:testInfo.outputPath("settings.png"),fullPage:true,animations:"disabled"});
-    await page.getByRole("tab",{name:"Cuộc trò chuyện",exact:true}).click();
-    await page.getByRole("button",{name:/Lên kế hoạch Tokyo/}).click();
+    await page.getByRole("link",{name:"Cuộc trò chuyện",exact:true}).click();
+    await page.getByRole("link",{name:/Lên kế hoạch Tokyo/}).click();
     const review=page.getByRole("region",{name:"Xem lại cuộc trò chuyện"});await expect(review.getByText("Gợi ý Tokyo cho cuối tuần.")).toBeVisible();await review.scrollIntoViewIfNeeded();
     await page.screenshot({path:testInfo.outputPath("review.png"),fullPage:true,animations:"disabled"});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
     const controls=await page.locator("main select,main input,main button").evaluateAll(elements=>elements.filter(e=>e.checkVisibility()).map(e=>e.getBoundingClientRect().toJSON()));
     for(const rect of controls){expect(rect.x).toBeGreaterThanOrEqual(0);expect(rect.x+rect.width).toBeLessThanOrEqual(width);}
-    await page.getByRole("tab",{name:"Cài đặt chung",exact:true}).click();
-    await page.getByRole("button",{name:"Chỉnh sửa",exact:true}).click();
-    expect(await page.getByRole("combobox",{name:"Mô hình",exact:true}).locator("option").allTextContents()).toEqual(ASSISTANT_MODELS);
+    await page.getByRole("link",{name:"Cài đặt chung",exact:true}).click();
+    await page.getByRole("link",{name:"Chỉnh sửa",exact:true}).click();
+    await expect(page.getByRole("combobox",{name:"Mô hình",exact:true}).locator("option")).toHaveText(ASSISTANT_MODELS);
     const panel=await page.getByRole("dialog").boundingBox();expect(panel.x).toBeGreaterThanOrEqual(0);expect(panel.x+panel.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
     await page.screenshot({path:testInfo.outputPath("defaults.png"),fullPage:true,animations:"disabled"});
@@ -151,8 +151,8 @@ test("editor preserves drafts on refresh and conflict, validates limits, and res
   const f=await fixture();
   try {
     await gotoHealthy(page,"/admin/assistant");
-    await page.locator(`[id="admin-${f.email}"]`).click();
-    const edit=page.getByRole("button",{name:"Chỉnh sửa",exact:true});await edit.click();
+    await page.locator(`[id="admin-${f.email}"]:visible`).click();
+    const edit=page.getByRole("link",{name:"Chỉnh sửa",exact:true});await edit.click();
     const dialog=page.getByRole("dialog");
     await dialog.getByRole("combobox",{name:"Yêu cầu/ngày",exact:true}).selectOption("limited");
     const daily=dialog.getByRole("spinbutton",{name:"Số yêu cầu/ngày",exact:true});await daily.fill("0");
@@ -175,22 +175,23 @@ test("editor preserves drafts on refresh and conflict, validates limits, and res
   }finally{await f.close();}
 });
 
-test("paginated review keeps earlier requests while active status refreshes and stops",async({page})=>{
+test("paginated review links preserve older pages while active requests refresh and stop",async({page})=>{
   const f=await fixture();
   try {
     const conversation=randomUUID();
     await f.sql`INSERT INTO assistant_conversations(id,owner_email,title) VALUES(${conversation},${f.email},'Lịch sử dài')`;
     for(let i=0;i<32;i++) await f.sql`INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,output_text,status,created_at) VALUES(${randomUUID()},${conversation},${randomUUID()},${`Câu hỏi cũ ${i}`},${`Trả lời cũ ${i}`},'completed',NOW()-INTERVAL '2 days'+${i}*INTERVAL '1 second')`;
     const active=await f.accept({conversationId:conversation,input:"Câu hỏi đang chạy"});
-    await gotoHealthy(page,"/admin/assistant");await page.locator(`[id="admin-${f.email}"]`).click();
-    await page.getByRole("tab",{name:"Cuộc trò chuyện",exact:true}).click();await page.getByRole("button",{name:"Lịch sử dài",exact:true}).click();
-    await page.getByRole("button",{name:"Xem yêu cầu trước"}).click();await expect(page.getByText("Trả lời cũ 0",{exact:true})).toBeVisible();
+    await gotoHealthy(page,"/admin/assistant");await page.locator(`[id="admin-${f.email}"]:visible`).click();
+    await page.getByRole("link",{name:"Cuộc trò chuyện",exact:true}).click();await page.getByRole("link",{name:"Lịch sử dài",exact:true}).click();
+    await page.getByRole("link",{name:"Trang sau",exact:true}).click();await expect(page.getByText("Trả lời cũ 0",{exact:true})).toBeVisible();
+    await expect(page).toHaveURL(/page=2/);await page.reload();await expect(page.getByText("Trả lời cũ 0",{exact:true})).toBeVisible();
+    await page.getByRole("link",{name:"Trang trước",exact:true}).click();
     await f.store.publishTurn({turnId:active.turn.id,output:"Hoàn tất tự động",citations:[]});
-    await expect(page.getByText("Hoàn tất tự động",{exact:true})).toBeVisible({timeout:7000});await expect(page.getByText("Trả lời cũ 0",{exact:true})).toBeVisible();
-    await expect(page.getByRole("button",{name:"Xem yêu cầu trước"})).toHaveCount(0);
-    await page.getByRole("button",{name:"Về cuộc trò chuyện",exact:true}).click();
+    await expect(page.getByText("Hoàn tất tự động",{exact:true})).toBeVisible({timeout:7000});
+    await page.getByRole("link",{name:"Về cuộc trò chuyện",exact:true}).click();
     const next=await f.accept({conversationId:conversation,input:"Yêu cầu cần dừng"});
-    await page.getByRole("button",{name:"Lịch sử dài",exact:true}).click();await page.getByRole("button",{name:"Dừng yêu cầu",exact:true}).click();
+    await page.getByRole("link",{name:"Lịch sử dài",exact:true}).click();await page.getByRole("button",{name:"Dừng yêu cầu",exact:true}).click();
     await expect(page.getByText("Đã dừng",{exact:true})).toBeVisible();expect((await f.store.getTurn(next.turn.id,f.email)).errorCode).toBe("TURN_CANCELLED");
   }finally{await f.close();}
 });
@@ -243,16 +244,17 @@ for (const [width,height] of [[320,760],[1440,900],[1920,1080]]) {
       await expect(page.getByText("Không thể bắt đầu trả lời. Hãy thử lại.",{exact:true})).toBeVisible();
       await expect(page.getByText("DISPATCH_FAILED",{exact:true})).toHaveCount(0);
       await expect(page.getByRole("article").getByRole("alert")).toHaveCount(0);
-      await gotoHealthy(page,"/admin/assistant");await page.getByRole("tab",{name:"Nhật ký lỗi",exact:true}).click();
+      await gotoHealthy(page,"/admin/assistant");await page.getByRole("link",{name:"Nhật ký lỗi",exact:true}).click();
       const entry=page.getByRole("article").filter({hasText:"Diagnostic owner test"});
-      await expect(entry).toBeVisible();await expect(entry.getByText(ownerTurn.turn.id,{exact:true})).toBeHidden();
-      await entry.getByText("Xem chi tiết lỗi",{exact:true}).click();
-      await expect(entry.getByText(ownerTurn.turn.id,{exact:true})).toBeVisible();
-      await expect(entry).toContainText("503");await expect(entry).toContainText("ECONNRESET");
+      await expect(entry).toBeVisible();await expect(entry.getByText(ownerTurn.turn.id,{exact:true})).toHaveCount(0);
+      await entry.getByRole("link",{name:"Xem chi tiết lỗi",exact:true}).click();
+      const detail=page.locator("main");
+      await expect(detail.getByText(ownerTurn.turn.id,{exact:true})).toBeVisible();
+      await expect(detail).toContainText("503");await expect(detail).toContainText("ECONNRESET");
       expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
       await mkdir(".impeccable/review/owner-errors",{recursive:true});
       await page.screenshot({path:`.impeccable/review/owner-errors/${width}.png`,fullPage:false});
-      await entry.locator("dl").scrollIntoViewIfNeeded();
+      await detail.locator("dl").scrollIntoViewIfNeeded();
       await page.screenshot({path:`.impeccable/review/owner-errors/${width}-details.png`,fullPage:false});
     } finally {if(ownerTurn) await f.sql`DELETE FROM assistant_conversations WHERE id=${ownerTurn.conversation.id}`;await f.close();}
   });
@@ -287,4 +289,71 @@ test("owner log includes recovered tool errors and paginates legacy failures wit
     expect(new Set([...a.items,...b.items].map(item=>item.id)).size).toBe(a.items.length+b.items.length);
     expect(b.items.filter(item=>item.code==="LEGACY")).toHaveLength(2);
   }finally{if(first)await f.sql`DELETE FROM assistant_conversations WHERE id=${first.conversation.id}`;await f.close();}
+});
+
+for(const [width,height] of [[320,760],[1440,900],[1920,1080]]) test(`addressable history, request and error navigation at ${width}`,async({page,context,request},testInfo)=>{
+ const f=await fixture();
+ try {
+  await f.service.save(owner,f.email,{...inheritedPolicy,daily:null,weekly:null});
+  const first=await f.accept({input:"Kiểm tra lỗi từ người dùng",title:"Hội thoại cần kiểm tra"});
+  await f.store.failTurn(first.turn.id,"RESEARCH_UNAVAILABLE");
+  await f.sql`UPDATE assistant_turns SET created_at=NOW()-INTERVAL '3 days' WHERE id=${first.turn.id}`;
+  for(let i=0;i<35;i++) await f.sql`INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,output_text,status,created_at) VALUES(${randomUUID()},${first.conversation.id},${randomUUID()},${`Câu hỏi tiếp theo ${i}`},${`Câu trả lời tiếp theo ${i}`},'completed',NOW()-INTERVAL '2 days'+${i+1}*INTERVAL '1 second')`;
+  const base="/admin/assistant", user=`${base}/users/${encodeURIComponent(f.email)}`, history=`${user}/conversations`,conversation=`${base}/conversations/${first.conversation.id}`,turn=`${conversation}/turns/${first.turn.id}`,failure=`${base}/failures/${first.turn.id}`;
+  await page.setViewportSize({width,height});
+  await gotoHealthy(page,base);
+  const row=page.locator("tr").filter({hasText:f.email});
+  await expect(row.getByRole("link",{name:"Xem hội thoại",exact:true})).toHaveAttribute("href",history);
+  await row.getByRole("link",{name:"Xem hội thoại",exact:true}).click();await expect(page).toHaveURL(new RegExp("/conversations$"));
+  await page.getByRole("link",{name:"Hội thoại cần kiểm tra",exact:true}).click();await expect(page).toHaveURL(new RegExp(first.conversation.id+"$"));
+  await page.goBack();await expect(page.getByRole("link",{name:"Hội thoại cần kiểm tra",exact:true})).toBeVisible();await page.goForward();
+  await gotoHealthy(page,turn);await expect(page.getByRole("article").getByText("Kiểm tra lỗi từ người dùng",{exact:true})).toBeVisible();
+  await expect(page.getByRole("link",{name:"Yêu cầu sau",exact:true})).toBeVisible();
+  await page.getByRole("link",{name:"Toàn bộ hội thoại",exact:true}).click();await expect(page.getByRole("article").getByText("Kiểm tra lỗi từ người dùng",{exact:true})).toBeVisible();
+  const targetResponse=await request.get(`/api/admin/assistant/conversations/${first.conversation.id}?target=${first.turn.id}`);
+  expect(targetResponse.status()).toBe(200);const target=await targetResponse.json();expect(target.page).toBe(2);expect(target.turns.some(t=>t.id===first.turn.id)).toBe(true);
+  const tab=await context.newPage();await gotoHealthy(tab,turn);await expect(tab.getByRole("article").getByText("Kiểm tra lỗi từ người dùng",{exact:true})).toBeVisible();await tab.close();
+  for(const [label,url] of [["users",base],["settings",`${base}/settings`],["user",user],["history",history],["conversation",conversation],["request",turn],["failures",`${base}/failures`],["failure",failure],["editor",`${user}?edit=1`]]) {
+   await gotoHealthy(page,url);await page.reload();
+   if(label!=="editor")await expect(page.getByRole("heading",{level:1,name:"Quản lý trợ lý",exact:true})).toBeVisible();
+   if(["conversation","request"].includes(label))await expect(page.getByRole("region",{name:"Xem lại cuộc trò chuyện"})).toBeVisible();
+   if(label==="editor")await expect(page.getByRole("dialog")).toBeVisible();
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth),label).toBe(width);
+   const clipped=await page.locator("main a,main button").evaluateAll(nodes=>nodes.filter(n=>n.checkVisibility()).filter(n=>{const r=n.getBoundingClientRect();return r.left<0||r.right>innerWidth+1;}).map(n=>n.textContent));expect(clipped,label).toEqual([]);
+   await page.screenshot({path:testInfo.outputPath(`${label}.png`),fullPage:false});
+  }
+  await gotoHealthy(page,failure);await page.getByRole("link",{name:"Xem yêu cầu",exact:true}).click();await expect(page).toHaveURL(new RegExp("/turns/"+first.turn.id+"$"));await page.goBack();await expect(page).toHaveURL(new RegExp("/failures/"+first.turn.id+"$"));
+  for(const route of [base,`${base}/settings`,user,history,conversation,turn,`${base}/failures`,failure])expect((await request.get(route,{headers:{"x-local-viewer-email":f.email}})).status()).toBe(404);
+  for(const route of [`/api/admin/assistant/conversations/${first.conversation.id}/turns/${first.turn.id}`,`/api/admin/assistant/failures/${first.turn.id}`]){
+   const response=await request.get(route);expect(response.status()).toBe(200);expect(await response.text()).not.toMatch(/confirmationToken|tokenHash/);
+   expect((await request.get(route,{headers:{"x-local-viewer-email":f.email}})).status()).toBe(403);
+  }
+  expect((await request.get(`${conversation}/turns/${randomUUID()}`)).status()).toBe(404);
+  expect((await request.get(`/api/admin/assistant/conversations/${randomUUID()}/turns/${first.turn.id}`)).status()).toBe(404);
+  expect((await request.get(`${base}/conversations/not-a-uuid`)).status()).toBe(404);
+  expect((await request.get(`${base}/failures/${randomUUID()}`)).status()).toBe(404);
+  expect((await request.get(`${history}?page=invalid`)).status()).toBe(404);
+  await f.sql`UPDATE users SET role='member' WHERE email=${f.email}`;
+  await gotoHealthy(page,history);await expect(page.getByRole("link",{name:"Hội thoại cần kiểm tra",exact:true})).toBeVisible();
+ } finally {await f.close();}
+});
+
+test("routed history empty state, pending navigation and refresh retry",async({page,runtimeHealth})=>{
+ const f=await fixture();let release=()=>{};
+ try {
+  await gotoHealthy(page,`/admin/assistant/users/${encodeURIComponent(f.email)}/conversations`);
+  await expect(page.getByText("Chưa có cuộc trò chuyện của quản trị viên này.",{exact:true})).toBeVisible();
+  const gate=new Promise(resolve=>{release=resolve;});
+  await page.route("**/admin/assistant/settings**",async route=>{await gate;await route.continue();});
+  await page.getByRole("link",{name:"Cài đặt chung",exact:true}).click();
+  await expect(page.getByRole("status",{name:"Đang tải"})).toBeVisible();release();
+  await expect(page).toHaveURL(/\/admin\/assistant\/settings$/);
+  await page.unroute("**/admin/assistant/settings**");
+  await page.route("**/api/admin/assistant",route=>route.fulfill({status:503,json:{error:"Không tải được dữ liệu. Hãy thử lại."}}));
+  await page.evaluate(()=>window.dispatchEvent(new Event("focus")));
+  await expect(page.locator("main").getByRole("alert")).toBeVisible();
+  await page.unroute("**/api/admin/assistant");await page.getByRole("button",{name:"Thử lại",exact:true}).click();
+  await expect(page.locator("main").getByRole("alert")).toHaveCount(0);
+  for(let i=runtimeHealth.length-1;i>=0;i--)if(runtimeHealth[i].includes("503"))runtimeHealth.splice(i,1);
+ }finally{release();await f.close();}
 });

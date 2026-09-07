@@ -130,3 +130,16 @@
 .switchButton:hover:not(:disabled) .switchTrack { box-shadow:0 0 0 4px #08694f14; }
 .console .switchError { color:#a12929; }
 @media(prefers-reduced-motion:reduce) { .switchTrack,.switchTrack > span { transition:none; } }
+
+.tabs a { display:inline-flex; align-items:center; min-height:48px; padding:14px 0; color:var(--quiet); border-bottom:2px solid transparent; text-decoration:none; font-weight:500; }
+.tabs a[aria-current="page"] { color:var(--accent); border-bottom-color:var(--accent); }
+.console a { color:var(--accent); text-underline-offset:3px; }
+.console a:hover { text-decoration:underline; }
+.console a.secondary { display:inline-flex; align-items:center; text-decoration:none; }
+.routeActions { display:flex; flex-wrap:wrap; gap:8px 24px; margin:0 0 20px; }
+.routeActions a { display:inline-flex; align-items:center; min-height:44px; }
+.turn:target,.turn:focus { outline:2px solid var(--accent); outline-offset:6px; }
+.historyAction { white-space:nowrap; }
+@media(max-width:760px) { .historyAction { grid-column:1 / -1; white-space:normal; }.tabs a { font-size:13px; }.routeActions { gap:4px 16px; } }
+
+@media(max-width:760px) { .console > .tabs { gap:0 8px; padding-inline:12px; }.routeActions { margin-bottom:12px; } }

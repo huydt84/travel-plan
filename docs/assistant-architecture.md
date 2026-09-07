@@ -93,3 +93,27 @@ A successful commit stores created IDs, affected resource links and resulting re
 The additive batch migration preserves historical proposals/receipts, introduces saved places and same-trip activity relationships, and invalidates unresolved legacy proposals. Production rollout remains separate: pause admission, drain active workers and resolve pending approvals, inspect migration status, migrate/deploy through the existing runbook, verify, then resume. Never resume an older worker that bypasses this gate.
 
 Interaction references: [Claude Code tool permission handling](https://code.claude.com/docs/en/agent-sdk/user-input) and [OpenCode permission prompts](https://opencode.ai/docs/permissions/). This application uses permission for one complete call only; remembered consent is deliberately unavailable.
+
+
+## Owner review navigation
+
+Owner management uses addressable server-rendered routes under `/admin/assistant`.
+The overview links to `/users/[email]` settings and `/users/[email]/conversations` history.
+Shared settings live at `/settings`; either settings editor is addressable with `?edit=1`.
+Conversations live at `/conversations/[id]`, with individual request/reply permalinks at
+`/conversations/[id]/turns/[turnId]`. Error history lives at `/failures`, with diagnostics
+at `/failures/[turnId]` and links back to the exact request and its user's history.
+
+Collection pages use `?page=N`, 30 items per page. The service resolves each page's
+boundary using deterministic timestamp/UUID ordering, then reuses the existing cursor
+queries. Lists reflect current data, so new activity can move page boundaries. A
+conversation `?target=[turnId]` computes the containing page and focuses the request;
+request permalinks retrieve one turn with adjacent request IDs, without loading the
+entire history. The management API supports GET `/conversations/[id]/turns/[turnId]`,
+GET `/failures/[turnId]`, and the `target` parameter on conversation detail.
+
+Every page and API independently requires the owner. Review payloads retain safe
+proposal views, exclude confirmation credentials, and cannot approve or edit another
+user's request. The existing explicit Stop operation remains available. Review links
+disable speculative prefetching. Browser history handles return navigation; page URLs
+and query parameters preserve the selected destination through refresh and new tabs.
