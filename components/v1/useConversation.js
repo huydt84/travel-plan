@@ -10,7 +10,7 @@ const currentTurn = (turn) => ({ ...turn, actions: turn.actions?.map((action) =>
     ? { ...action, status: "expired", confirmationToken: null } : action) });
 
 export function useConversation({ initialWorkspace, viewer }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [workspace, setWorkspace] = useState(initialWorkspace || null);
   const [turns, setTurns] = useState(initialWorkspace?.turns || []);
   const [message, setMessageState] = useState("");
@@ -199,7 +199,7 @@ export function useConversation({ initialWorkspace, viewer }) {
     if (!input || sending.current || submitting || pinBusy || loading || turns.some((turn) => ["running", "awaiting_approval"].includes(turn.status))) return;
     const token = generation.current;
     const trip = null;
-    const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input, mentions: mentions.map((item) => item.ref),
+    const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input, locale, mentions: mentions.map((item) => item.ref),
       ...(!workspace.selectedConversation ? { initialPins: (workspace.pins || []).map((item) => item.ref) } : {}) };
     try { sessionStorage.setItem(prefix + `pending:${draftKey}`, JSON.stringify(body)); }
     catch { setError("assistantExtra.error.storage"); return; }

@@ -160,6 +160,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
         <p>{t("assistant.remainingToday", { count: access.daily === null ? t("assistant.unlimited") : Math.max(0,access.daily-access.dailyUsed) })}; {t("assistant.remainingWeek", { count: access.weekly === null ? t("assistant.unlimited") : Math.max(0,access.weekly-access.weeklyUsed) })}.</p>
         <p>{t("assistant.resetAt", { daily: new Date(access.dailyReset).toLocaleString(intlLocale, { timeZone:"Asia/Tokyo", hour12: false }), weekly: new Date(access.weeklyReset).toLocaleString(intlLocale, { timeZone:"Asia/Tokyo", hour12: false }) })}</p>
       </details>}
+      {chat.turns.filter((turn) => turn.status === "completed").length >= 8 && <div role="status" className={styles.errorBanner} style={{ background: "var(--surface-muted, #fff8e1)" }}>{t("assistant.longConversationWarning")} <button className={styles.secondaryButton} onClick={chat.newConversation}>{t("assistant.newSession")}</button></div>}
       {chat.loading ? <p role="status">{t("assistant.loadingConversation")}</p> : <>
         {chat.workspace?.nextCursor && <button className={styles.secondaryButton} onClick={() => { olderAnchor.current = listRef.current.scrollHeight; void chat.older(); }}>{t("assistant.olderTurns")}</button>}
         {!chat.turns.length && <div className={styles.firstRun}><h2>{t("assistant.firstRunTitle")}</h2><p>{t("assistant.firstRunDescription")}</p>

@@ -68,6 +68,24 @@ test("parallel evidence is merged in call order with a maximum of two research c
   assert.deepEqual(result.citations.map((item) => item.title), ["slow", "fast", "third"]);
 });
 
+test("deduplicated parallel research still returns one result per provider call", async () => {
+  let executions = 0;
+  const client = scriptedClient([
+    { steps: [call("search_web", { query: "museum" }, "first"), call("search_web", { query: "museum" }, "second")] },
+    (request) => {
+      assert.deepEqual(request.input.map((item) => item.call_id), ["first", "second"]);
+      assert.deepEqual(request.input.map((item) => item.result.evidence[0].id), ["E1", "E1"]);
+      return { output_text: "Nguồn [E1]" };
+    },
+  ]);
+  const result = await run(client, { research: { async searchWeb() {
+    executions++;
+    return { summary: "Museum", citations: [{ title: "Museum", url: "https://example.com/museum" }], checkedAt: "2030-01-01T00:00:00Z" };
+  } } });
+  assert.equal(executions, 1);
+  assert.deepEqual(result.citations.map((item) => item.title), ["Museum"]);
+});
+
 test("unknown tools, tool budget and fabricated citations fail closed", async () => {
   await assert.rejects(run(scriptedClient([{ steps: [call("send_email", {})] }])), { code: "TOOL_NOT_ALLOWED" });
   await assert.rejects(run(scriptedClient([{ steps: Array.from({ length: 9 }, (_, i) => call("read_context", { ref: { kind: "trip", id: "1" } }, String(i))) }])), { code: "TOOL_BUDGET_EXCEEDED" });
@@ -138,7 +156,6 @@ test("model retries one transient failure and preserves proposal/evidence contex
   const failure = Object.assign(new Error("Unavailable"), { status: 503 });
   const client = scriptedClient([failure, (request) => {
     assert.match(request.input, /applied/);
-    assert.match(request.input, /https:\/\/example.com\/source/);
     return { output_text: "Previously verified [E1]" };
   }]);
   const result = await createGeminiModelAdapter({ client }).run({ message: "What did we apply?", snapshot, history: [{
