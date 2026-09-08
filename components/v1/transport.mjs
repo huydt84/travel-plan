@@ -27,7 +27,7 @@ export async function observeRun(runId, onEvent, signal) {
             if (event.seq !== cursor + 1) throw new Error("assistantExtra.error.missingResponse");
             cursor = event.seq; failures = 0;
             onEvent(event);
-            if (["completed", "failed", "cancelled", "awaiting_approval"].includes(event.type)) return;
+            if (["completed", "failed", "cancelled", "awaiting_approval", "awaiting_input"].includes(event.type)) return;
           }
           if (done) break;
         }

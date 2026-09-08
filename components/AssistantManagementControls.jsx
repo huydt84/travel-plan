@@ -13,7 +13,7 @@ function useManagementLocale() {
 const effortLabel = { default: t("assistantExtra.effort.auto"), minimal: t("assistantExtra.effort.minimal"), low: t("assistantExtra.effort.low"), medium: t("assistantExtra.effort.medium"), high: t("assistantExtra.effort.high") };
 const date = (value) => new Intl.DateTimeFormat(intlLocale, { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Tokyo", hour12: false }).format(new Date(value));
 const quota = (value) => value === null ? t("assistantExtra.unlimited") : value;
-const status = (turn) => turn.status === "awaiting_approval" ? t("assistantExtra.status.awaiting") : turn.status === "running" ? t("assistantExtra.status.running") : turn.status === "completed" ? t("assistantExtra.status.completed") : turn.status === "failed" ? turn.errorCode === "TURN_CANCELLED" ? t("assistantExtra.status.cancelled") : t("assistantExtra.status.failed") : t("assistantExtra.status.empty");
+const status = (turn) => turn.status === "awaiting_approval" ? t("assistantExtra.status.awaiting") : turn.status === "awaiting_input" ? t("assistantExtra.status.awaitingInput") : turn.status === "running" ? t("assistantExtra.status.running") : turn.status === "completed" ? t("assistantExtra.status.completed") : turn.status === "failed" ? turn.errorCode === "TURN_CANCELLED" ? t("assistantExtra.status.cancelled") : t("assistantExtra.status.failed") : t("assistantExtra.status.empty");
   return { t, effortLabel, date, quota, status };
 }
 function Rules() {

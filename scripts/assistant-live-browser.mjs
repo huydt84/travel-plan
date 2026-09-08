@@ -55,7 +55,7 @@ try {
   process.exitCode = 1;
 } finally {
   await browser?.close();
-  if (runId) await sql`UPDATE assistant_turns SET status='failed',error_code='TURN_CANCELLED' WHERE id=${runId} AND status IN ('running','awaiting_approval')`;
+  if (runId) await sql`UPDATE assistant_turns SET status='failed',error_code='TURN_CANCELLED' WHERE id=${runId} AND status IN ('running','awaiting_approval','awaiting_input')`;
   await sql`DELETE FROM assistant_conversations WHERE owner_email=${email}`;
   await sql`DELETE FROM users WHERE email=${email}`;
   await sql.end();

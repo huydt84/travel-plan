@@ -7,6 +7,7 @@ import { useAssistantNavigation } from "./AssistantProvider";
 import { useConversation } from "./useConversation";
 import { apiJson } from "./transport.mjs";
 import BatchReview from "./BatchReview";
+import QuestionPrompt from "./QuestionPrompt";
 import MessageContent from "./MessageContent";
 import Composer from "./Composer";
 import { ContextPicker, ReferenceList } from "./ContextReferences";
@@ -38,7 +39,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
   }, [frame]);
   const [newResponse, setNewResponse] = useState(false);
   const listRef = useRef(null), nearEnd = useRef(true), olderAnchor = useRef(null), focusCitation = useRef(null), citationFocus = useRef(null);
-  const retryFocus = useRef(null);
+  const retryFocus = useRef(null), announcedQuestion = useRef(null);
   const access = chat.workspace?.access;
   const restricted = access?.enabled === false;
   const quotaBlocked = access && ((access.daily !== null && access.dailyUsed >= access.daily) || (access.weekly !== null && access.weeklyUsed >= access.weekly));
@@ -47,6 +48,8 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
   const selected = chat.turns.find((turn) => turn.id === selectedId) || chat.turns.at(-1);
   const changeSet = selected?.changeSet;
   const awaiting = chat.turns.some((t) => t.status === "awaiting_approval");
+  const awaitingInput = chat.turns.some((t) => t.status === "awaiting_input");
+  const pendingQuestionId = chat.turns.flatMap((turn) => turn.questions || []).find((question) => question.status === "pending")?.id || null;
   useEffect(() => {
     if (!chat.retrying && retryFocus.current) {
       const target = listRef.current?.querySelector(`[data-exchange="${retryFocus.current}"]`);
@@ -58,9 +61,15 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     const element = listRef.current;
     if (!element) return;
     if (olderAnchor.current !== null) { element.scrollTop += element.scrollHeight - olderAnchor.current; olderAnchor.current = null; return; }
-    if (nearEnd.current) element.scrollTop = element.scrollHeight;
+    if (nearEnd.current && !pendingQuestionId) element.scrollTop = element.scrollHeight;
     else if (running) { const timer = setTimeout(() => setNewResponse(true), 0); return () => clearTimeout(timer); }
-  }, [chat.turns, running, chat.disconnected, chat.retrying]);
+  }, [chat.turns, running, chat.disconnected, chat.retrying, pendingQuestionId]);
+  useEffect(() => {
+    if (!pendingQuestionId) { announcedQuestion.current = null; return; }
+    if (announcedQuestion.current === pendingQuestionId) return;
+    listRef.current?.querySelector(`[data-question-id="${pendingQuestionId}"]`)?.scrollIntoView({ block: "start" });
+    announcedQuestion.current = pendingQuestionId;
+  }, [pendingQuestionId]);
   useEffect(() => {
     nearEnd.current = true;
     const element = listRef.current;
@@ -132,6 +141,19 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
       throw failure;
     } finally { setApplying(false); }
   };
+  const answerQuestion = async (question, input) => {
+    const conversationId = chat.workspace?.selectedConversation?.id;
+    try {
+      await apiJson(`/api/v1/assistant/questions/${question.id}/answer`, { method: "POST", body: JSON.stringify(input) });
+      await chat.refreshConversation(conversationId);
+    } catch (failure) {
+      let recovered;
+      try { recovered = await chat.refreshConversation(conversationId); } catch { /* Keep the selected answers available for another attempt. */ }
+      const resolved = recovered?.turns.flatMap((turn) => turn.questions || []).find((item) => item.id === question.id);
+      if (resolved?.status === "answered") return;
+      throw failure;
+    }
+  };
   const trackerTrip = tripSlug || initialWorkspace?.selectedTripSlug || null;
   const navigationQuery = new URLSearchParams();
   if (trackerTrip) navigationQuery.set("trip", trackerTrip);
@@ -201,6 +223,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
               <p role="status">{[401, 403, 404].includes(chat.disconnected.status) ? t("assistantExtra.answerAccessError") : t("assistantExtra.answerDisconnected")}</p>
               {![401, 403, 404].includes(chat.disconnected.status) && <button onClick={chat.reconnect}>{t("assistantExtra.reconnect")}</button>}
             </div>}
+            {turn.questions?.map((question) => <QuestionPrompt key={question.id} prompt={question} readOnly={restricted} onSubmit={answerQuestion} />)}
             {turn.actions?.map((item) => <BatchReview key={item.id} action={item} busy={applying} readOnly={restricted} onApprove={() => decideBatch(item, "approve")} onReject={() => decideBatch(item, "reject")} onRevise={(action, edits) => edits ? reviseBatch(action, edits) : (() => { chat.setMessage(`Tạo lại đề xuất: ${turn.input}`); document.getElementById("assistant-message")?.focus(); })()} />)}
             <ReferenceList items={turn.usedContext} label={t("assistantExtra.usedContext")} onPin={chat.pin} disabled={restricted || chat.pinBusy} />
             <div className={styles.messageActions}>
@@ -221,7 +244,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     <div className={styles.composerDock}>
     {newResponse && <button className={styles.newResponse} onClick={() => { nearEnd.current = true; listRef.current.scrollTop = listRef.current.scrollHeight; setNewResponse(false); }}>{t("assistantExtra.newAnswer")}</button>}
     <ReferenceList items={chat.mentions} label={t("assistantExtra.pendingContext")} onPin={chat.pin} onRemove={(item) => chat.setMentions(chat.mentions.filter((entry) => entry !== item))} disabled={restricted || chat.submitting || chat.pinBusy} />
-    <Composer onMention={() => setPickerOpen(true)} message={chat.message} setMessage={chat.setMessage} onSubmit={chat.submit} onStop={chat.stop} running={running || awaiting} disabled={requestBlocked || chat.submitting || chat.loading || chat.pinBusy} />
+    <Composer onMention={() => setPickerOpen(true)} message={chat.message} setMessage={chat.setMessage} onSubmit={chat.submit} onStop={chat.stop} running={running || awaiting || awaitingInput} disabled={requestBlocked || chat.submitting || chat.loading || chat.pinBusy || awaitingInput} />
     </div>
     </div>
     {!historyWide && <HistorySidebar {...historyProps} wide={false} />}

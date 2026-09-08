@@ -124,7 +124,7 @@ export function useConversation({ initialWorkspace, viewer }) {
     return next;
   };
 
-  const waitingTurnId = turns.find((turn) => turn.status === "awaiting_approval")?.id;
+  const waitingTurnId = turns.find((turn) => ["awaiting_approval", "awaiting_input"].includes(turn.status))?.id;
   const waitingConversationId = workspace?.selectedConversation?.id;
   useEffect(() => {
     if (!waitingTurnId || !waitingConversationId) return;
@@ -196,7 +196,7 @@ export function useConversation({ initialWorkspace, viewer }) {
   const selectConversation = (conversation) => void load({ conversation: conversation.id });
   const newConversation = () => void load({ conversation: "new" });
   const send = async (input = message.trim(), retryRequest = null) => {
-    if (!input || sending.current || submitting || pinBusy || loading || turns.some((turn) => ["running", "awaiting_approval"].includes(turn.status))) return;
+    if (!input || sending.current || submitting || pinBusy || loading || turns.some((turn) => ["running", "awaiting_approval", "awaiting_input"].includes(turn.status))) return;
     const token = generation.current;
     const trip = null;
     const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input, locale, mentions: mentions.map((item) => item.ref),
@@ -265,7 +265,7 @@ export function useConversation({ initialWorkspace, viewer }) {
     return send(pending?.message || message.trim(), pending);
   };
   const stop = async () => {
-    const turn = turns.find((item) => ["running", "awaiting_approval"].includes(item.status));
+    const turn = turns.find((item) => ["running", "awaiting_approval", "awaiting_input"].includes(item.status));
     if (!turn) return;
     const token = generation.current;
     try {

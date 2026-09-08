@@ -459,3 +459,42 @@
 .batchSummary p:last-child { margin-bottom: 0; }
 .batchReview[data-status="applied"] { border-left-color: var(--green); }
 .batchReview[data-status="rejected"], .batchReview[data-status="cancelled"] { border-left-color: var(--muted); }
+
+/* Questions are inline conversation work, not a modal or detached card. */
+.questionPrompt { min-width: 0; margin-block: 18px; border: 1px solid var(--line); border-left-color: var(--green); border-radius: 6px; background: var(--paper-bright); color: var(--navy); font-size: 14px; }
+.questionPrompt[data-status="cancelled"] { border-left-color: var(--muted); }
+.questionPromptHeading { padding: 16px; border-bottom: 1px solid var(--line); }
+.questionPromptHeading h3 { margin: 0 0 5px; font-size: 18px; line-height: 1.4; }
+.questionPromptHeading p { margin: 0; color: var(--muted); line-height: 1.55; }
+.questionPromptList { padding-inline: 16px; }
+.questionPrompt fieldset, .questionReceipt { min-width: 0; margin: 0; padding: 18px 0; border: 0; border-bottom: 1px solid var(--line); }
+.questionPrompt fieldset:last-child, .questionReceipt:last-child { border-bottom: 0; }
+.questionPrompt legend { display: grid; width: 100%; margin: 0 0 12px; padding: 0; font-size: 16px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.questionPrompt legend > span, .questionReceipt h4 { margin-bottom: 4px; color: var(--green-dark); font-size: 12px; font-style: normal; font-weight: 700; line-height: 1.4; }
+.questionOptions { display: grid; gap: 7px; }
+.questionOptions > label { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; gap: 10px; min-height: 44px; padding: 10px 11px; border: 1px solid color-mix(in srgb, var(--line) 72%, var(--paper-bright)); border-radius: 4px; background: var(--paper-bright); cursor: pointer; transition: border-color 140ms ease-out, background-color 140ms ease-out; }
+.questionOptions > label:hover { border-color: var(--green); background: color-mix(in srgb, var(--green-soft) 45%, var(--paper-bright)); }
+.questionOptions > label[data-selected] { border-color: var(--green-dark); background: var(--green-soft); }
+.questionOptions input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--green-dark); }
+.questionOptions label > span { min-width: 0; }
+.questionOptions strong { display: inline; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.questionOptions small { display: inline-block; margin-left: 8px; color: var(--green-dark); font-size: 11px; font-weight: 700; }
+.questionOptions em { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; font-style: normal; line-height: 1.5; overflow-wrap: anywhere; }
+.questionOptions input:focus-visible { outline: 2px solid var(--yellow); outline-offset: 3px; }
+.questionOptions > label:has(input:disabled) { cursor: default; }
+.questionOptions > label:has(input:disabled):hover { border-color: color-mix(in srgb, var(--line) 72%, var(--paper-bright)); background: var(--paper-bright); }
+.questionOptions > label[data-selected]:has(input:disabled), .questionOptions > label[data-selected]:has(input:disabled):hover { border-color: var(--green-dark); background: var(--green-soft); }
+.questionCustom { display: grid; gap: 7px; margin-top: 10px; animation: question-custom-in 160ms ease-out both; }
+.questionCustom label { font-weight: 600; }
+.questionCustom textarea { box-sizing: border-box; width: 100%; min-height: 88px; resize: vertical; padding: 11px 12px; border: 1px solid var(--navy); border-radius: 3px; background: var(--paper-bright); color: var(--navy); font: inherit; line-height: 1.5; }
+.questionCustom textarea:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; border-color: var(--green-dark); }
+.questionCustom small { justify-self: end; color: var(--muted); font-size: 11px; }
+.questionActions { padding: 14px 16px; border-top: 1px solid var(--line); }
+.questionActions .applyButton { position: static; width: 100%; min-height: 44px; margin: 0; font-weight: 600; }
+.questionActions .applyButton:disabled { opacity: .55; cursor: default; }
+.questionError { margin: 0 16px 14px; padding: 10px; border: 1px solid var(--red); background: var(--red-soft); color: var(--v1-red); line-height: 1.5; overflow-wrap: anywhere; }
+.questionReceipt h4 { margin-top: 0; }
+.questionReceipt p { margin: 0 0 8px; line-height: 1.55; }
+.questionReceipt strong { display: block; padding: 9px 10px; border-left: 1px solid var(--green); background: var(--green-soft); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+@keyframes question-custom-in { from { opacity: .25; clip-path: inset(0 0 100%); } to { opacity: 1; clip-path: inset(0); } }
+@media (prefers-reduced-motion: reduce) { .questionOptions > label { transition: none; } .questionCustom { animation-duration: 1ms; } }

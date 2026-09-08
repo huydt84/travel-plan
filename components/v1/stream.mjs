@@ -17,12 +17,12 @@ export async function readEvents(response, onEvent) {
         (event.type === "progress" && typeof event.label !== "string") ||
         (event.type === "completed" && (event.turn?.id !== event.runId || event.turn?.status !== "completed")) ||
         (event.type === "failed" && (!event.error?.code || event.turn?.id !== event.runId || event.turn?.status !== "failed")) ||
-        !["accepted", "progress", "answer-delta", "evidence", "completed", "failed"].includes(event.type)) {
+        !["accepted", "progress", "answer-delta", "evidence", "completed", "failed", "awaiting_approval", "awaiting_input", "cancelled", "checkpoint"].includes(event.type)) {
       throw new Error("assistantExtra.error.streamInterrupted");
     }
     sequence = event.seq;
     runId = event.runId;
-    terminal = ["completed", "failed"].includes(event.type);
+    terminal = ["completed", "failed", "cancelled", "awaiting_approval", "awaiting_input"].includes(event.type);
     onEvent(event);
   };
   try {

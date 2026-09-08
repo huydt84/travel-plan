@@ -47,7 +47,7 @@ try {
     results.push({ prompt, retry, ...turn, tools });
     console.log(JSON.stringify({ scenario: results.length, retry, status: turn.status, code: turn.code, diagnostics: turn.diagnostics, tools: tools.map(({ name, status, code, diagnostics }) => ({ name, status, code, diagnostics })) }));
     await writeFile(`${output}/results.json`, JSON.stringify(results, null, 2));
-    if (turn.status === "awaiting_approval") {
+    if (["awaiting_approval", "awaiting_input"].includes(turn.status)) {
       await page.getByRole("button", { name: "Từ chối", exact: true }).click({ timeout: 10000 });
       await page.getByRole("heading", { name: "Đã từ chối", exact: true }).waitFor();
     }
@@ -64,13 +64,13 @@ try {
     }
   }
   console.log(`Scenarios recorded: ${results.length}. See ${output}/results.json.`);
-  if (results.some(result => !["completed", "awaiting_approval"].includes(result.status))) process.exitCode = 1;
+  if (results.some(result => !["completed", "awaiting_approval", "awaiting_input"].includes(result.status))) process.exitCode = 1;
 } catch {
   console.error("Scenario harness interrupted. Review saved results and owner diagnostics; provider payloads withheld.");
   process.exitCode = 1;
 } finally {
   await browser?.close();
-  await sql`UPDATE assistant_turns SET status='failed',error_code='TURN_CANCELLED' WHERE conversation_id IN (SELECT id FROM assistant_conversations WHERE owner_email=${email}) AND status IN ('running','awaiting_approval')`;
+  await sql`UPDATE assistant_turns SET status='failed',error_code='TURN_CANCELLED' WHERE conversation_id IN (SELECT id FROM assistant_conversations WHERE owner_email=${email}) AND status IN ('running','awaiting_approval','awaiting_input')`;
   // Keep the test account and conversations for owner log review; no trip writes.
   await sql.end();
 }

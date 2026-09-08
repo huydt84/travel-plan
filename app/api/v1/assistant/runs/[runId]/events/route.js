@@ -29,12 +29,14 @@ export async function GET(request, context) {
         const page = await background.events(runId, cursor);
         for (const event of page) {
           cursor = event.seq;
-          if ((event.segment != null && event.segment < state.segment) || (event.type === "awaiting_approval" && state.status !== "awaiting_approval")) {
+          if ((event.segment != null && event.segment < state.segment) ||
+              (event.type === "awaiting_approval" && state.status !== "awaiting_approval") ||
+              (event.type === "awaiting_input" && state.status !== "awaiting_input")) {
             // Preserve the contiguous replay cursor without replaying an old segment.
             yield { runId, seq: event.seq, type: "checkpoint" };
             continue;
           }
-          if (["completed", "failed", "cancelled", "awaiting_approval"].includes(event.type)) {
+          if (["completed", "failed", "cancelled", "awaiting_approval", "awaiting_input"].includes(event.type)) {
             const turn = await getDefaultTravelAssistant().getTurn({ actor, turnId: runId });
             yield { ...event, type: turn.errorCode === "TURN_CANCELLED" ? "cancelled" : turn.status, turn };
             return;
