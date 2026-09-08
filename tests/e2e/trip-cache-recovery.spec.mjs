@@ -20,7 +20,13 @@ test(`home recovers a deleted cached trip at ${viewport.width}`, async ({ page, 
     await expect.poll(async () => (await (await request.get("/api/trips")).json()).trips.some((trip) => trip.slug === slug)).toBe(true);
     await page.goto(`/?trip=${original[0].slug}`);
     await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" }).locator(`option[value="${slug}"]`)).toHaveCount(1);
+    await page.goto(`/admin/trips?trip=${slug}`);
+    await expect(page.locator(".plan-summary .plan-slug")).toHaveText(slug);
     await sql`DELETE FROM trips WHERE slug=${slug}`;
+    const adminResponse = await page.goto(`/admin/trips?trip=${slug}`);
+    expect(adminResponse.status()).toBe(200);
+    await expect(page.locator(".plan-summary .plan-slug")).not.toHaveText(slug);
+    await expect(page.locator(".trip-list-item code").filter({ hasText: slug })).toHaveCount(0);
     const response = await page.goto("/");
     expect(response.status()).toBe(200);
     await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toBeVisible();

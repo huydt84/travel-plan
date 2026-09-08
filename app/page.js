@@ -11,6 +11,11 @@ export default async function HomePage({ searchParams }) {
   const [params, cachedTrips, viewer] = await Promise.all([searchParams, listCachedTrips(), getViewer()]);
   let trips = cachedTrips;
   const { trip: requestedTrip, invite, gmail } = params;
+  // A receipt/import can link to a trip created outside this process's cache.
+  // Do not silently replace that explicit destination with the default trip.
+  if (typeof requestedTrip === "string" && !trips.some((trip) => trip.slug === requestedTrip)) {
+    trips = await listTrips();
+  }
   const requestedSlug = typeof requestedTrip === "string" && trips.some((trip) => trip.slug === requestedTrip)
     ? requestedTrip
     : null;

@@ -1,7 +1,7 @@
 export async function apiJson(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { accept: "application/json", ...(options.body ? { "content-type": "application/json" } : {}), ...options.headers } });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw Object.assign(new Error(data.error || "assistantExtra.error.load"), { code: data.code, status: response.status });
+  if (!response.ok) throw Object.assign(new Error(data.error || "assistantExtra.error.load"), { code: data.code, status: response.status, details: data.details });
   return data;
 }
 

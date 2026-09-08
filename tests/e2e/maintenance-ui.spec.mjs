@@ -1,4 +1,4 @@
-import { expect, gotoHealthy, test } from "./fixtures.mjs";
+import { expect, gotoHealthy, itineraryTest as test } from "./fixtures.mjs";
 
 for (const viewport of [{ name: "phone", width: 320, height: 760 }, { name: "macbook", width: 1440, height: 900 }, { name: "dell", width: 1920, height: 1080 }]) {
   test(`${viewport.name} completed trips omit timers and target trip-level feedback`, async ({ page }, testInfo) => {
@@ -22,17 +22,13 @@ for (const viewport of [{ name: "phone", width: 320, height: 760 }, { name: "mac
     await page.screenshot({ path: testInfo.outputPath("completed-feedback.png"), fullPage: true });
   });
 
-  test(`${viewport.name} active descriptions preserve production typography and alignment`, async ({ page }, testInfo) => {
+  test(`${viewport.name} active descriptions preserve production typography and alignment`, async ({ page, request, tripSlug }, testInfo) => {
     await page.setViewportSize(viewport);
-    await page.clock.install({ time: new Date("2026-08-09T05:00:30.000Z") });
+    await page.clock.install({ time: new Date("2030-04-01T00:00:30.000Z") });
     const description = "Di chuyển vào khu nhà hàng và chọn phương án dinner theo kết quả gọi lúc 11:00. Nếu cả Red Lobster và TGI FRIDAYS đều không nhận reservation, walk-in hỏi bàn sau drone #1; The Oven là backup cuối.";
-    await page.route("**/api/itinerary?slug=*", async (route) => {
-      const response = await route.fetch();
-      const itinerary = await response.json();
-      itinerary.itinerary[0].detail = description;
-      await route.fulfill({ response, json: itinerary });
-    });
-    await gotoHealthy(page, "/?trip=kamakura-2026-08-09");
+    const itinerary = await (await request.get(`/api/trips/${tripSlug}`)).json();
+    expect((await request.patch(`/api/trips/${tripSlug}/schedule/${itinerary.backbone[0].id}`, { data: { detail: description } })).status()).toBe(200);
+    await gotoHealthy(page, `/?trip=${tripSlug}`);
     const detail = page.locator(viewport.width === 320 ? ".mobile-foldout-detail" : ".now-detail");
     await expect(detail).toBeVisible();
     await expect(detail).toHaveText(description);
@@ -45,9 +41,9 @@ for (const viewport of [{ name: "phone", width: 320, height: 760 }, { name: "mac
     await detail.screenshot({ path: testInfo.outputPath("active-description.png") });
   });
 
-  test(`${viewport.name} schedule nodes align and request rows contain their text`, async ({ page }, testInfo) => {
+  test(`${viewport.name} schedule nodes align and request rows contain their text`, async ({ page, tripSlug }, testInfo) => {
     await page.setViewportSize(viewport);
-    await gotoHealthy(page, "/admin/trips");
+    await gotoHealthy(page, `/admin/trips?trip=${tripSlug}`);
     const alignment = await page.locator(".admin-schedule-item").first().evaluate((item) => {
       const list = item.closest(".admin-schedule-list");
       const line = getComputedStyle(list, "::before"), node = getComputedStyle(item, "::before");
@@ -66,9 +62,9 @@ for (const viewport of [{ name: "phone", width: 320, height: 760 }, { name: "mac
   });
 }
 
-test("desktop route has no end padding and connects the focused stop to the station notch", async ({ page }) => {
+test("desktop route has no end padding and connects the focused stop to the station notch", async ({ page, tripSlug }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await gotoHealthy(page, "/");
+  await gotoHealthy(page, `/?trip=${tripSlug}`);
   const padding = await page.locator(".route-stops").evaluate((element) => [getComputedStyle(element).paddingTop, getComputedStyle(element).paddingBottom]);
   expect(padding).toEqual(["0px", "0px"]);
   await expect(page.locator(".now-station")).toHaveAttribute("style", /--station-notch-y:.*px/);

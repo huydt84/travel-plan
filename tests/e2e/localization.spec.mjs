@@ -1,12 +1,12 @@
-import { test, expect, gotoHealthy } from "./fixtures.mjs";
+import { itineraryTest as test, expect, gotoHealthy } from "./fixtures.mjs";
 
 test.describe("localization", () => {
   test.beforeEach(async ({ context }) => {
     await context.clearCookies();
   });
 
-  test("keeps Vietnamese as the default and persists English and Japanese", async ({ page }) => {
-    await gotoHealthy(page, "/");
+  test("keeps Vietnamese as the default and persists English and Japanese", async ({ page, tripSlug }) => {
+    await gotoHealthy(page, `/?trip=${tripSlug}`);
     const selector = page.getByTestId("language-switcher");
 
     await expect(selector).toHaveValue("vi");

@@ -353,6 +353,8 @@ Phê duyệt thay đổi and Từ chối remain directly below the disclosure in
 
 **The Inline Decision Rule.** Keep each tool-batch request, complete expandable review, Approve/Reject controls, and receipt together in the originating chat message. Never move that decision into a drawer or sidebar or remember its approval for another batch.
 
+Editable approval revisions extend this same section, not a new trip editor. Chỉnh sửa replaces decisions with grouped, labeled scalar controls and Lưu bản chỉnh sửa / Hủy. Resource legends and protected values remain visible; source relationships, identifiers and activity keys are not editable. Native date/time, numeric, text/URL and multiline controls use the existing paper/navy field treatment with 44px targets and yellow keyboard focus. Decisions share a row on wide screens and stack on phones and narrow companions. Field errors use the assistant's stronger service-red text at 14px; review-level errors preserve the draft. Saving disables controls, then restores the canonical review and focuses its heading with the explicit “not yet saved to itinerary” announcement. Applied status replaces that announcement. No decorative motion is added.
+
 ### Saved Places
 
 Saved places continue the tracker’s navy source region. Each place has a thin top rule, an 18px name, 14px detail at 1.6 line-height, and wrapping links to its website, map, and linked activities. The grid fits as many columns as available width allows with a 280px preferred minimum; narrow containers remain a single contained column. Each place is an addressable, focusable receipt destination.

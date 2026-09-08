@@ -2,7 +2,7 @@ import AdminApp from "../../../components/AdminApp";
 import { getViewer } from "../../../lib/auth";
 import { listSuggestions } from "../../../lib/suggestion-repository";
 import { countPendingInvitationRequests } from "../../../lib/invitation-permission-repository";
-import { getCachedItinerary, listCachedTrips } from "../../../lib/trip-cache";
+import { getItinerary, listTrips } from "../../../lib/itinerary-repository";
 import { countOpenTripRequests } from "../../../lib/trip-request-repository";
 
 import { localizedMetadata } from "../../../lib/locale-server";
@@ -21,7 +21,8 @@ export default async function TripsAdminPage({ searchParams }) {
   if (viewer?.isAdmin) {
     const [{ trip: requestedTrip }, trips, invitationCount, requestCount] = await Promise.all([
       searchParams,
-      listCachedTrips(),
+      // Management must not open a cached trip deleted by another process.
+      listTrips(),
       countPendingInvitationRequests(),
       countOpenTripRequests(),
     ]);
@@ -33,7 +34,7 @@ export default async function TripsAdminPage({ searchParams }) {
       : initialTrips[0]?.slug || "";
     if (initialSelectedSlug) {
       [initialPlan, initialSuggestions] = await Promise.all([
-        getCachedItinerary(initialSelectedSlug),
+        getItinerary(initialSelectedSlug),
         listSuggestions(initialSelectedSlug, viewer),
       ]);
     }

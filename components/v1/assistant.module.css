@@ -425,7 +425,7 @@
 .batchField ins { font-weight: 500; }
 .batchField del { opacity: .8; }
 .batchApproval { padding: 14px 0; background: var(--paper-bright); border-top: 1px solid var(--line); }
-.batchApproval > div { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.batchApproval > div { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; }
 .batchApproval p { font-size: 12px; margin: 0 0 10px; }
 .batchApproval .applyButton { position: static; width: 100%; margin: 0; padding: 8px 12px; font-weight: 600; }
 .batchApproval .secondaryButton { margin: 0; padding: 8px 12px; }
@@ -434,7 +434,25 @@
 .batchReceipt li { display: flex; flex-wrap: wrap; gap: 10px; margin-block: 10px; overflow-wrap: anywhere; }
 .batchReceipt li span { font-size: 12px; }
 .batchPending { font-size: 14px; line-height: 1.6; font-weight: 600; }
-@media(max-width: 600px) { .batchField dd { grid-template-columns: 1fr; } .batchApproval > div { display: grid; grid-template-columns: 1fr; } }
+.batchEditor { padding-block: 18px; border-bottom: 1px solid var(--line); }
+.batchEditGroup { min-width: 0; margin: 0 0 20px; padding: 12px 0; border: 0; border-top: 1px solid var(--line); }
+.batchEditGroup legend { max-width: 100%; font-weight: 700; overflow-wrap: anywhere; }
+.batchEditHelp { margin: 0 0 16px; line-height: 1.6; }
+.batchEditField { display: grid; gap: 7px; padding-block: 10px; min-width: 0; }
+.batchEditField label { font-weight: 600; }
+.batchEditField input, .batchEditField textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 11px 12px; border: 1px solid var(--navy); border-radius: 3px; background: var(--paper-bright); color: var(--navy); font: inherit; line-height: 1.5; }
+.batchEditField textarea { min-height: 88px; resize: vertical; }
+.batchEditField input:focus-visible, .batchEditField textarea:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; border-color: var(--green); box-shadow: 0 0 0 3px rgb(0 143 104 / .18); }
+.batchEditField input:disabled, .batchEditField textarea:disabled { opacity: .65; cursor: wait; }
+.batchEditBefore { display: grid; gap: 3px; padding: 8px 10px; border-left: 2px solid var(--line); color: var(--muted); overflow-wrap: anywhere; }
+.batchEditBefore span:first-child, .batchEditAfter { font-size: 12px; }
+.batchEditAfter { color: var(--green-dark); }
+.batchEditError { margin: 10px 0; padding: 10px; border: 1px solid var(--red); background: var(--red-soft); color: var(--v1-red); overflow-wrap: anywhere; }
+.batchFieldError { margin: 0; color: var(--v1-red); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.batchEditActions { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding-top: 14px; }
+.batchEditActions button { min-height: 44px; }
+@media(max-width: 600px) { .batchField dd { grid-template-columns: 1fr; } .batchApproval > div, .batchEditActions { display: grid; grid-template-columns: 1fr; } }
+@container assistant (max-width: 600px) { .batchApproval > div, .batchEditActions { grid-template-columns: 1fr; } }
 
 .batchDetails > summary { min-height: 44px; padding-block: 12px; cursor: pointer; font-weight: 600; }
 .batchReview summary:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }

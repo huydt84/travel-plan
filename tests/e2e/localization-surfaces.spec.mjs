@@ -1,4 +1,4 @@
-import { test, expect, gotoHealthy } from "./fixtures.mjs";
+import { itineraryTest as test, expect, gotoHealthy } from "./fixtures.mjs";
 import { LOCALE_COOKIE, translate } from "../../lib/i18n.mjs";
 
 const viewports = [
@@ -57,12 +57,12 @@ async function auditTranslatedSurface(page, viewport, testInfo, name, requireSel
 
 for (const locale of ["en", "ja"]) {
   for (const viewport of viewports) {
-    test(`${locale} interface and responsive coverage at ${viewport.width}`, async ({ page, context, baseURL }, testInfo) => {
+    test(`${locale} interface and responsive coverage at ${viewport.width}`, async ({ page, context, baseURL, tripSlug }, testInfo) => {
       const t = (key) => translate(locale, key);
       await context.addCookies([{ name: LOCALE_COOKIE, value: locale, url: baseURL }]);
       await page.setViewportSize(viewport);
       for (const [name, path, heading] of [
-        ["admin-trips", "/admin/trips", "admin.tripManagement"],
+        ["admin-trips", `/admin/trips?trip=${tripSlug}`, "admin.tripManagement"],
         ["admin-users", "/admin/users", "admin.userActivity"],
         ["admin-requests", "/admin/requests", "requests.title"],
         ["invitation-permissions", "/admin/invitations", "invitationsExtra.permissionTitle"],
@@ -70,8 +70,8 @@ for (const locale of ["en", "ja"]) {
         ["requests", "/requests", "requests.title"],
         ["assistant-management", "/admin/assistant", "nav.adminAssistant"],
         ["assistant", "/assistant", "assistant.title"],
-        ["companion", "/?chat=1", "assistant.title"],
-        ["tracker", "/", "tracker.fullSchedule"],
+        ["companion", `/?trip=${tripSlug}&chat=1`, "assistant.title"],
+        ["tracker", `/?trip=${tripSlug}`, "tracker.fullSchedule"],
       ]) {
         await test.step(name, async () => {
           await gotoHealthy(page, path);
@@ -89,8 +89,8 @@ for (const locale of ["en", "ja"]) {
             await expect(editor).toHaveCount(0);
           }
           if (name === "assistant-management") {
-            await page.getByRole("tab", { name: t("assistantExtra.settings.shared"), exact: true }).click();
-            await page.getByRole("button", { name: t("assistantExtra.edit"), exact: true }).click();
+            await page.getByRole("link", { name: t("assistantExtra.settings.shared"), exact: true }).click();
+            await page.getByRole("link", { name: t("assistantExtra.edit"), exact: true }).click();
             const editor = page.getByRole("dialog");
             await expect(editor).toBeVisible();
             await expect(editor.locator("#mode-daily")).toBeVisible();

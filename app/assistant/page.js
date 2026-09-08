@@ -19,6 +19,12 @@ export default async function AgenticTravelPage({ searchParams }) {
   if (!viewer?.email || !viewer.isAdmin) return <AssistantAccess viewer={viewer} />;
 
   const params = await searchParams;
-  const workspace = await getDefaultTravelAssistant().loadWorkspace({ actor: viewer, tripSlug: typeof params.trip === "string" ? params.trip : null, conversationId: typeof params.conversation === "string" ? params.conversation : null });
+  let workspace;
+  try {
+    workspace = await getDefaultTravelAssistant().loadWorkspace({ actor: viewer, tripSlug: typeof params.trip === "string" ? params.trip : null, conversationId: typeof params.conversation === "string" ? params.conversation : null });
+  } catch (error) {
+    if (error.status === 404) notFound();
+    throw error;
+  }
   return <AssistantWorkspace initialWorkspace={workspace} viewer={viewer} />;
 }

@@ -344,13 +344,190 @@ export default function TripTracker({
     };
   }, [displayState?.anchor?.id, selectedItinerary.length]);
 
+  const clock = new Intl.DateTimeFormat(intlLocale, {
+    timeZone: data.trip.timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(now);
+  const tripDateLabel = formatTripDateRange(data.trip, {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }, intlLocale);
+  const tripHeader = (
+      <header className={navigationStyles["trip-bar"]} id="top">
+        <a
+          className={navigationStyles["product-mark"]}
+          href="#top"
+          aria-label={t("common.backToTrip")}
+        >
+          <TypeIcon type="Transit" />
+          <span>{t("app.title")}</span>
+        </a>
+        <div className={navigationStyles["trip-context"]}>
+          <label className={navigationStyles["trip-picker"]}>
+            <span className="sr-only">{t("nav.selectTrip")}</span>
+            <span className={navigationStyles["trip-picker-control"]}>
+              <select
+                value={data.trip.slug}
+                onChange={(event) => {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set("trip", event.target.value);
+                  router.push(`/${url.search}`);
+                }}
+              >
+                {trips.map((trip) => (
+                  <option value={trip.slug} key={trip.slug}>
+                    {formatTripTitle(
+                      trip.title,
+                      trip.startDate,
+                      trip.timezone,
+                      now,
+                      trip.endDate,
+                      locale,
+                    )}
+                  </option>
+                ))}
+              </select>
+              <span
+                className={navigationStyles["trip-picker-affordance"]}
+                aria-hidden="true"
+              >
+                <span>{t("nav.change")}</span>
+                <ActionIcon name="down" />
+              </span>
+            </span>
+            <small>
+              {tripDateLabel} · {data.trip.location}
+            </small>
+          </label>
+          <AssistantLauncher tripSlug={data.trip.slug} />
+          <button
+            className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`}
+            type="button"
+            onClick={() => setInvitationOpen(true)}
+          >
+            <ActionIcon name="invite" />
+            <span>{t("nav.invite")}</span>
+          </button>
+        </div>
+        <div className={navigationStyles["viewer-utilities"]}>
+          <LanguageSwitcher />
+          {viewer?.isAdmin && (
+            <Link
+              className={`${navigationStyles["admin-link"]} ${trackerStyles["desktop-manage-link"]}`}
+              href={ADMIN_ROUTES.trips}
+            >
+              {t("common.manage")}
+            </Link>
+          )}
+          {viewer && <NotificationCenter />}
+          {viewer ? (
+            <ViewerMenu viewer={viewer} />
+          ) : (
+            <button
+              className={`${navigationStyles["admin-link"]} ${navigationStyles["user-link"]}`}
+              type="button"
+              onClick={() => signIn("google", { redirectTo: "/" })}
+            >
+              {t("common.login")}
+            </button>
+          )}
+        </div>
+        <div
+          className={trackerStyles["live-clock"]}
+          aria-label={t("nav.currentTimeAt", { timezone: data.trip.timezone })}
+        >
+          <span className={trackerStyles["live-dot"]} aria-hidden="true" />
+          <small>
+            {data.trip.timezone === "Asia/Tokyo" ? "JST" : data.trip.timezone}
+          </small>
+          <span>{clock}</span>
+        </div>
+      </header>
+  );
+  const invitation = invitationOpen && (
+        <InvitationDialog
+          open
+          onClose={() => {
+            setInvitationOpen(false);
+            setGmailReturn(false);
+          }}
+          viewer={viewer}
+          trip={data.trip}
+          itinerary={data.itinerary}
+          gmailReturn={gmailReturn}
+        />
+      );
+  const tripSupplement = <>
+      <section
+        className={contributionsStyles["trip-suggestions"]}
+        aria-labelledby="trip-suggestions-title"
+      >
+        <h2 id="trip-suggestions-title">{t("tracker.notesForTrip")}</h2>
+        <button
+          className={trackerStyles["jump-button"]}
+          type="button"
+          onClick={() => openSuggestion(null, t("trackerExtra.wholeTrip"))}
+        >
+          {t("tracker.addNote")}
+        </button>
+        <SuggestionList
+          suggestions={suggestionsByActivity.get("trip") || []}
+          {...suggestionListProps}
+        />
+      </section>
+
+      <section
+        className={contributionsStyles["sources"]}
+        aria-labelledby="sources-title"
+      >
+        <div className={`${trackerStyles["section-heading"]} compact`}>
+          <h2 id="sources-title">{t("tracker.placeSources")}</h2>
+        </div>
+        <div className={contributionsStyles["source-list"]}>
+          {data.sources.map((source) => (
+            <a
+              className={contributionsStyles["source-card"]}
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              key={source.number}
+            >
+              <span className={contributionsStyles["source-number"]}>
+                {String(source.number).padStart(2, "0")}
+              </span>
+              <span>
+                <strong>{source.title}</strong>
+                <small>{source.host}</small>
+              </span>
+              <span className="source-arrow">
+                <ActionIcon name="external" />
+              </span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <SavedPlaces places={data.places} activities={data.itinerary} />
+      <Footer>
+        <span>{tripTitle}</span>
+        <span>{t("trackerExtra.footer")}</span>
+      </Footer>
+
+      {contributionDialogs}
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </p>
+      {invitation}
+  </>;
   if (!itinerary.length) {
     return (
       <main className="shell">
-        <header className={`${navigationStyles["trip-bar"]} ${navigationStyles["empty-trip-bar"]}`} id="top">
-          <Link className={navigationStyles["product-mark"]} href="/">{t("app.title")}</Link>
-          <div className={navigationStyles["viewer-utilities"]}><LanguageSwitcher /></div>
-        </header>
+        {tripHeader}
         <section className="now-card error-card">
           <h1>{t("tracker.noActivities")}</h1>
           <p>{t("tracker.noActivitiesDescription")}</p>
@@ -358,7 +535,7 @@ export default function TripTracker({
             {t("tracker.chooseTrip")}
           </Link>
         </section>
-        <SavedPlaces places={data.places} activities={data.itinerary} />
+        {tripSupplement}
       </main>
     );
   }
@@ -411,19 +588,6 @@ export default function TripTracker({
     countdownLabel = state.mode === "gap" ? t("tracker.untilActivity") : t("tracker.remaining");
   }
 
-  const clock = new Intl.DateTimeFormat(intlLocale, {
-    timeZone: data.trip.timezone,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(now);
-  const tripDateLabel = formatTripDateRange(data.trip, {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }, intlLocale);
   const scheduleHeading = browsingDay
       ? `${t("tracker.day", { number: tripDays.indexOf(selectedDay) + 1 })} · ${formatDateLabel(selectedDay, data.trip.timezone, { weekday: "long", day: "2-digit", month: "2-digit" }, intlLocale)}`
     : formatScheduleHeading(
@@ -526,96 +690,7 @@ export default function TripTracker({
 
   return (
     <main className="shell" data-trip-mode={state.mode}>
-      <header className={navigationStyles["trip-bar"]} id="top">
-        <a
-          className={navigationStyles["product-mark"]}
-          href="#top"
-          aria-label={t("common.backToTrip")}
-        >
-          <TypeIcon type="Transit" />
-          <span>{t("app.title")}</span>
-        </a>
-        <div className={navigationStyles["trip-context"]}>
-          <label className={navigationStyles["trip-picker"]}>
-            <span className="sr-only">{t("nav.selectTrip")}</span>
-            <span className={navigationStyles["trip-picker-control"]}>
-              <select
-                value={data.trip.slug}
-                onChange={(event) => {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("trip", event.target.value);
-                  router.push(`/${url.search}`);
-                }}
-              >
-                {trips.map((trip) => (
-                  <option value={trip.slug} key={trip.slug}>
-                    {formatTripTitle(
-                      trip.title,
-                      trip.startDate,
-                      trip.timezone,
-                      now,
-                      trip.endDate,
-                      locale,
-                    )}
-                  </option>
-                ))}
-              </select>
-              <span
-                className={navigationStyles["trip-picker-affordance"]}
-                aria-hidden="true"
-              >
-                <span>{t("nav.change")}</span>
-                <ActionIcon name="down" />
-              </span>
-            </span>
-            <small>
-              {tripDateLabel} · {data.trip.location}
-            </small>
-          </label>
-          <AssistantLauncher tripSlug={data.trip.slug} />
-          <button
-            className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`}
-            type="button"
-            onClick={() => setInvitationOpen(true)}
-          >
-            <ActionIcon name="invite" />
-            <span>{t("nav.invite")}</span>
-          </button>
-        </div>
-        <div className={navigationStyles["viewer-utilities"]}>
-          <LanguageSwitcher />
-          {viewer?.isAdmin && (
-            <Link
-              className={`${navigationStyles["admin-link"]} ${trackerStyles["desktop-manage-link"]}`}
-              href={ADMIN_ROUTES.trips}
-            >
-              {t("common.manage")}
-            </Link>
-          )}
-          {viewer && <NotificationCenter />}
-          {viewer ? (
-            <ViewerMenu viewer={viewer} />
-          ) : (
-            <button
-              className={`${navigationStyles["admin-link"]} ${navigationStyles["user-link"]}`}
-              type="button"
-              onClick={() => signIn("google", { redirectTo: "/" })}
-            >
-              {t("common.login")}
-            </button>
-          )}
-        </div>
-        <div
-          className={trackerStyles["live-clock"]}
-          aria-label={t("nav.currentTimeAt", { timezone: data.trip.timezone })}
-        >
-          <span className={trackerStyles["live-dot"]} aria-hidden="true" />
-          <small>
-            {data.trip.timezone === "Asia/Tokyo" ? "JST" : data.trip.timezone}
-          </small>
-          <span>{clock}</span>
-        </div>
-      </header>
+      {tripHeader}
 
       <nav
         className={trackerStyles["trip-day-selector"]}
@@ -1097,78 +1172,7 @@ export default function TripTracker({
         </section>
       )}
 
-      <section
-        className={contributionsStyles["trip-suggestions"]}
-        aria-labelledby="trip-suggestions-title"
-      >
-        <h2 id="trip-suggestions-title">{t("tracker.notesForTrip")}</h2>
-        <button
-          className={trackerStyles["jump-button"]}
-          type="button"
-          onClick={() => openSuggestion(null, t("trackerExtra.wholeTrip"))}
-        >
-          {t("tracker.addNote")}
-        </button>
-        <SuggestionList
-          suggestions={suggestionsByActivity.get("trip") || []}
-          {...suggestionListProps}
-        />
-      </section>
-
-      <section
-        className={contributionsStyles["sources"]}
-        aria-labelledby="sources-title"
-      >
-        <div className={`${trackerStyles["section-heading"]} compact`}>
-          <h2 id="sources-title">{t("tracker.placeSources")}</h2>
-        </div>
-        <div className={contributionsStyles["source-list"]}>
-          {data.sources.map((source) => (
-            <a
-              className={contributionsStyles["source-card"]}
-              href={source.url}
-              target="_blank"
-              rel="noreferrer"
-              key={source.number}
-            >
-              <span className={contributionsStyles["source-number"]}>
-                {String(source.number).padStart(2, "0")}
-              </span>
-              <span>
-                <strong>{source.title}</strong>
-                <small>{source.host}</small>
-              </span>
-              <span className="source-arrow">
-                <ActionIcon name="external" />
-              </span>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      <SavedPlaces places={data.places} activities={data.itinerary} />
-      <Footer>
-        <span>{tripTitle}</span>
-        <span>{t("trackerExtra.footer")}</span>
-      </Footer>
-
-      {contributionDialogs}
-      <p className="sr-only" aria-live="polite" aria-atomic="true">
-        {announcement}
-      </p>
-      {invitationOpen && (
-        <InvitationDialog
-          open
-          onClose={() => {
-            setInvitationOpen(false);
-            setGmailReturn(false);
-          }}
-          viewer={viewer}
-          trip={data.trip}
-          itinerary={data.itinerary}
-          gmailReturn={gmailReturn}
-        />
-      )}
+      {tripSupplement}
     </main>
   );
 }

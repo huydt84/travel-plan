@@ -25,6 +25,17 @@ test("explicit multiple targets and coordinated final dates preserve activity ke
   assert.equal(result.preview.groups.length, 2); assert.equal(result.operations[1].value.key, activity.key);
   assert.deepEqual(result.revisions, { 1: 1, 2: 1 });
 });
+test("revision recompilation keeps server-reserved activity keys when titles change", () => {
+  const args = { operations: [create("trip", "trip", trip), create("activity", "visit", { ...a, title: "Original title" })] };
+  const original = compileBatch(args, []);
+  const key = original.operations.find((op) => op.kind === "activity.create").value.key;
+  args.operations[1].value.title = "New title";
+  const revised = compileBatch(args, [], [], { activityKeys: { "activity:draft:visit": key } });
+  assert.equal(revised.operations[1].value.key, key);
+  assert.equal(revised.operations[1].value.title, "New title");
+  const collision = { operations: [create("activity", "visit", a, { id: "1" })] };
+  assert.throws(() => compileBatch(collision, [snapshot], [], { activityKeys: { "activity:draft:visit": activity.key } }), { code: "BATCH_INVALID" });
+});
 test("missing, circular, wrong-kind, and cross-trip references fail closed", () => {
   for (const args of [
     { operations: [create("place", "place", { name: "Museum", address: "Tokyo" })] },

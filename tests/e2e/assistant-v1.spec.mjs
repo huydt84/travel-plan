@@ -1,9 +1,13 @@
-import { expect, gotoHealthy, test } from "./fixtures.mjs";
+import { expect, gotoHealthy, itineraryTest as test } from "./fixtures.mjs";
+import { randomUUID } from "node:crypto";
 
-test("assistant persists a turn, stages a complete diff, and applies only after explicit confirmation", async ({ page }) => {
+test("a deleted or inaccessible conversation is a not-found page, not a server failure", async ({ request }) => {
+  expect((await request.get(`/assistant?conversation=${randomUUID()}`)).status()).toBe(404);
+});
+
+test("assistant persists a turn, stages a complete diff, and applies only after explicit confirmation", async ({ page, tripSlug }) => {
   const ready = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/v1/assistant/workspace" && response.ok());
-  const trips = await (await page.request.get("/api/trips")).json();
-  await gotoHealthy(page, `/assistant?trip=${trips.trips?.[0]?.slug || trips[0]?.slug}`);
+  await gotoHealthy(page, `/assistant?trip=${tripSlug}`);
   await ready;
   await expect(page.getByRole("heading", { level: 1, name: "Trợ lý hành trình" })).toBeVisible();
 

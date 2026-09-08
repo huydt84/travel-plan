@@ -1,4 +1,4 @@
-import { expect, gotoHealthy, test } from "./fixtures.mjs";
+import { expect, gotoHealthy, itineraryTest as test } from "./fixtures.mjs";
 
 const ownerRoutes = [
   {
@@ -34,31 +34,27 @@ test("public tracker renders its primary controls", async ({ page }) => {
   await expect(page.getByText("Local admin", { exact: true })).toBeVisible();
 });
 
-test("public tracker title reflects the current trip state", async ({ page }) => {
-  await gotoHealthy(page, "/");
+test("public tracker title reflects the current trip state", async ({ page, tripSlug }) => {
+  await gotoHealthy(page, `/?trip=${tripSlug}`);
 
   await expect(page).toHaveTitle(/^(Sắp bắt đầu|Đang diễn ra|Đang chờ|Đã kết thúc) · /);
 });
 
-test("active activity uses activity-neutral feedback terminology", async ({ page }) => {
-  await page.clock.install({ time: new Date("2026-08-09T05:00:30.000Z") });
-  await gotoHealthy(page, "/");
+test("active activity uses activity-neutral feedback terminology", async ({ page, tripSlug }) => {
+  await page.clock.install({ time: new Date("2030-04-01T00:00:30.000Z") });
+  await gotoHealthy(page, `/?trip=${tripSlug}`);
 
   await expect(page.locator(".now-station .station-actions button")).toHaveText("Góp ý cho hoạt động này");
   await expect(page.locator(".timeline .suggestion-trigger").first()).toHaveText("Góp ý cho hoạt động này");
 });
 
-test("reservation activity uses a dedicated icon instead of the visit fallback", async ({ page }) => {
-  await page.route("**/api/itinerary?slug=*", async (route) => {
-    const response = await route.fetch();
-    const itinerary = await response.json();
-    itinerary.itinerary[0].type = "Reservation";
-    itinerary.itinerary[0].title = "Reservation icon probe";
-    itinerary.itinerary[1].type = "Visit";
-    itinerary.itinerary[1].title = "Visit icon probe";
-    await route.fulfill({ response, json: itinerary });
-  });
-  await gotoHealthy(page, "/");
+test("reservation activity uses a dedicated icon instead of the visit fallback", async ({ page, request, tripSlug }) => {
+  await page.clock.install({ time: new Date("2040-01-01T00:00:00Z") });
+  const itinerary = await (await request.get(`/api/trips/${tripSlug}`)).json();
+  for (const [index, type, title] of [[0, "Reservation", "Reservation icon probe"], [1, "Visit", "Visit icon probe"]]) {
+    expect((await request.patch(`/api/trips/${tripSlug}/schedule/${itinerary.backbone[index].id}`, { data: { type, title } })).status()).toBe(200);
+  }
+  await gotoHealthy(page, `/?trip=${tripSlug}`);
 
   const reservationIcon = page.getByRole("heading", { name: "Reservation icon probe", exact: true }).locator("..").locator(".type-icon");
   const visitIcon = page.getByRole("heading", { name: "Visit icon probe", exact: true }).locator("..").locator(".type-icon");
@@ -69,15 +65,11 @@ test("reservation activity uses a dedicated icon instead of the visit fallback",
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
-test("reservation phone directory stays compact and copies the selected number", async ({ page, context }) => {
+test("reservation phone directory stays compact and copies the selected number", async ({ page, context, request, tripSlug }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.route("**/api/itinerary?slug=*", async (route) => {
-    const response = await route.fetch();
-    const itinerary = await response.json();
-    itinerary.itinerary[0].detail = "Red Lobster — 03-3599-5521\nTGI FRIDAYS — 050-3196-3586";
-    await route.fulfill({ response, json: itinerary });
-  });
-  await gotoHealthy(page, "/");
+  const itinerary = await (await request.get(`/api/trips/${tripSlug}`)).json();
+  expect((await request.patch(`/api/trips/${tripSlug}/schedule/${itinerary.backbone[0].id}`, { data: { detail: "Red Lobster — 03-3599-5521\nTGI FRIDAYS — 050-3196-3586" } })).status()).toBe(200);
+  await gotoHealthy(page, `/?trip=${tripSlug}`);
 
   const firstActivity = page.locator(".timeline-item").first();
   const directory = firstActivity.getByLabel("Số điện thoại đặt bàn");
@@ -149,9 +141,9 @@ test("activity heartbeat pauses in hidden tabs and resumes when visible", async 
   await expect.poll(() => activityRequests).toBe(visibleRequestCount + 1);
 });
 
-test("mobile clock stays in its cell and the focused route connector shares the rail axis", async ({ page }) => {
+test("mobile clock stays in its cell and the focused route connector shares the rail axis", async ({ page, tripSlug }) => {
   await page.setViewportSize({ width: 590, height: 844 });
-  await gotoHealthy(page, "/");
+  await gotoHealthy(page, `/?trip=${tripSlug}`);
 
   const geometry = await page.evaluate(() => {
     const clock = document.querySelector(".live-clock").getBoundingClientRect();
@@ -184,16 +176,12 @@ test("mobile clock stays in its cell and the focused route connector shares the 
   expect(Math.abs(geometry.connectorCenter - geometry.railCenter)).toBeLessThanOrEqual(0.5);
 });
 
-test("mobile active-station title wraps inside its foldout", async ({ page }) => {
+test("mobile active-station title wraps inside its foldout", async ({ page, request, tripSlug }) => {
   await page.setViewportSize({ width: 320, height: 760 });
-  await page.clock.install({ time: new Date("2026-08-09T04:50:00.000Z") });
-  await page.route("**/api/itinerary?slug=*", async (route) => {
-    const response = await route.fetch();
-    const itinerary = await response.json();
-    itinerary.itinerary[0].title = "Nishifunabashi → Toyosu";
-    await route.fulfill({ response, json: itinerary });
-  });
-  await gotoHealthy(page, "/");
+  await page.clock.install({ time: new Date("2030-04-01T00:00:30.000Z") });
+  const itinerary = await (await request.get(`/api/trips/${tripSlug}`)).json();
+  expect((await request.patch(`/api/trips/${tripSlug}/schedule/${itinerary.backbone[0].id}`, { data: { title: "Nishifunabashi → Toyosu" } })).status()).toBe(200);
+  await gotoHealthy(page, `/?trip=${tripSlug}`);
 
   const title = page.locator(".mobile-foldout-title h1");
   await expect(title).toHaveText("Nishifunabashi → Toyosu");

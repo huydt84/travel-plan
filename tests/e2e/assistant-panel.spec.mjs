@@ -1,9 +1,9 @@
-import { expect, gotoHealthy, test } from "./fixtures.mjs";
+import { expect, gotoHealthy, itineraryTest as test } from "./fixtures.mjs";
 
 for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
-  test(`expand and collapse keep chat and draft open at ${viewport.width}`, async ({ page }, testInfo) => {
+  test(`expand and collapse keep chat and draft open at ${viewport.width}`, async ({ page, tripSlug }, testInfo) => {
     await page.setViewportSize(viewport);
-    await gotoHealthy(page, "/?chat=1");
+    await gotoHealthy(page, `/?trip=${tripSlug}&chat=1`);
     const input = page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" });
     await expect(input).toBeEnabled();
     await input.fill("Bản nháp giữ nguyên khi mở rộng và thu nhỏ");
@@ -24,9 +24,9 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
 }
 
 for (const width of [1440, 1920]) {
-  test(`desktop divider resizes, clamps and remembers at ${width}`, async ({ page }, testInfo) => {
+  test(`desktop divider resizes, clamps and remembers at ${width}`, async ({ page, tripSlug }, testInfo) => {
     await page.setViewportSize({ width, height: width === 1440 ? 900 : 1080 });
-    await gotoHealthy(page, "/?chat=1");
+    await gotoHealthy(page, `/?trip=${tripSlug}&chat=1`);
     const panel = page.getByRole("complementary", { name: "Trợ lý hành trình" });
     const divider = page.getByRole("separator", { name: "Độ rộng trợ lý" });
     await expect(divider).toBeVisible();

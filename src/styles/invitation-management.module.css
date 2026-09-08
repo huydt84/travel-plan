@@ -1451,6 +1451,8 @@
   }
   .admin-users-table time {
     display: block;
+    font-size: 20px;
+    line-height: 1.2;
   }
   .admin-users-table time small {
     display: block;

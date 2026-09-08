@@ -73,6 +73,18 @@ for (const viewport of viewports) {
         if (surface.name === "public tracker" && viewport.touch) {
           await expect(page.locator(".desktop-manage-link")).toBeHidden();
         }
+        if (surface.name === "admin users" && viewport.touch) {
+          const splitDates = await page.locator(".admin-users-table time").evaluateAll((times) => times.flatMap((time) => {
+            const text = [...time.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+            if (!text) return [];
+            return [...text.textContent.matchAll(/\S+/g)].filter((match) => {
+              const range = document.createRange();
+              range.setStart(text, match.index); range.setEnd(text, match.index + match[0].length);
+              return range.getClientRects().length > 1;
+            }).map((match) => match[0]);
+          }));
+          expect(splitDates, "dates must not split their year across lines").toEqual([]);
+        }
         if (["trip companion", "agentic assistant"].includes(surface.name)) {
           const shell = page.getByRole("region", { name: "Trợ lý hành trình", exact: true });
           const header = await shell.locator("header").first().boundingBox();

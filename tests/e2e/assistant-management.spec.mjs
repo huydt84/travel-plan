@@ -301,6 +301,9 @@ test("owner log includes recovered tool errors and paginates legacy failures wit
 });
 
 for(const [width,height] of [[320,760],[1440,900],[1920,1080]]) test(`addressable history, request and error navigation at ${width}`,async({page,context,request},testInfo)=>{
+ // This matrix visits and reloads nine distinct routes; cold Next compilation
+ // shares the budget with every navigation and authorization assertion.
+ test.slow();
  const f=await fixture();
  try {
   await f.service.save(owner,f.email,{...inheritedPolicy,daily:null,weekly:null});

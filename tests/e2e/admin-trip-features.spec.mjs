@@ -5,13 +5,13 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
   const activityTitle = `E2E picnic ${runId}`;
   const sourceTitle = `E2E source ${runId}`;
   const updatedSourceTitle = `${sourceTitle} updated`;
-  let slug;
+  const slug = `admin-features-${runId}`;
   let activityId;
   let sourceNumber;
 
   try {
-    await gotoHealthy(page, "/admin/trips");
-    slug = (await page.locator(".trip-list-item.active code").textContent()).trim();
+    expect((await request.post("/api/trips", { data: { slug, title: "Admin features", startDate: "2030-04-01", endDate: "2030-04-01", timezone: "Asia/Tokyo", location: "Kyoto" } })).status()).toBe(201);
+    await gotoHealthy(page, `/admin/trips?trip=${slug}`);
     await expect(page.locator(".trip-list-item.active code")).toHaveText(slug);
     await expect(page.locator(".plan-summary .plan-slug")).toHaveText(slug);
 
@@ -61,5 +61,6 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
   } finally {
     if (sourceNumber && slug) await request.delete(`/api/trips/${encodeURIComponent(slug)}/sources/${sourceNumber}`);
     if (activityId && slug) await request.delete(`/api/trips/${encodeURIComponent(slug)}/schedule/${activityId}`);
+    await request.delete(`/api/trips/${slug}`);
   }
 });

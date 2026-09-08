@@ -109,6 +109,29 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
       else if (resolved?.status !== "rejected") chat.setError(failure.message);
     } finally { setApplying(false); }
   };
+  const reviseBatch = async (action, edits) => {
+    if (!action || applying || restricted) return;
+    setApplying(true); chat.setError("");
+    try {
+      const result = await apiJson(`/api/v1/assistant/actions/${action.id}/revise`, {
+        method: "POST", body: JSON.stringify({ expectedDigest: action.digest, edits }),
+      });
+      chat.setTurns((items) => items.map((turn) => ({
+        ...turn,
+        actions: turn.actions?.map((item) => item.id === action.id ? result.action : item),
+      })));
+      return result.action;
+    } catch (failure) {
+      // A lost response may follow a committed revision. Reconcile before showing an error.
+      let recovered;
+      if (!failure.status || failure.status >= 500) {
+        try { recovered = await chat.refreshConversation(chat.workspace?.selectedConversation?.id); } catch { /* Keep the local draft available for retry. */ }
+        const replacement = recovered?.turns.flatMap((turn) => turn.actions || []).find((item) => item.supersedesActionId === action.id);
+        if (replacement) return replacement;
+      }
+      throw failure;
+    } finally { setApplying(false); }
+  };
   const trackerTrip = tripSlug || initialWorkspace?.selectedTripSlug || null;
   const navigationQuery = new URLSearchParams();
   if (trackerTrip) navigationQuery.set("trip", trackerTrip);
@@ -178,7 +201,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
               <p role="status">{[401, 403, 404].includes(chat.disconnected.status) ? t("assistantExtra.answerAccessError") : t("assistantExtra.answerDisconnected")}</p>
               {![401, 403, 404].includes(chat.disconnected.status) && <button onClick={chat.reconnect}>{t("assistantExtra.reconnect")}</button>}
             </div>}
-            {turn.actions?.map((item) => <BatchReview key={item.id} action={item} busy={applying} readOnly={restricted} onApprove={() => decideBatch(item, "approve")} onReject={() => decideBatch(item, "reject")} onRevise={() => { chat.setMessage(`Tạo lại đề xuất: ${turn.input}`); document.getElementById("assistant-message")?.focus(); }} />)}
+            {turn.actions?.map((item) => <BatchReview key={item.id} action={item} busy={applying} readOnly={restricted} onApprove={() => decideBatch(item, "approve")} onReject={() => decideBatch(item, "reject")} onRevise={(action, edits) => edits ? reviseBatch(action, edits) : (() => { chat.setMessage(`Tạo lại đề xuất: ${turn.input}`); document.getElementById("assistant-message")?.focus(); })()} />)}
             <ReferenceList items={turn.usedContext} label={t("assistantExtra.usedContext")} onPin={chat.pin} disabled={restricted || chat.pinBusy} />
             <div className={styles.messageActions}>
               {!!turn.citations?.length && <button onClick={() => inspect(turn, "evidence")}>{t("assistantExtra.sourceCount", { count: turn.citations.length })}</button>}
