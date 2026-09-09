@@ -153,3 +153,41 @@
 @media(max-width:760px) { .historyAction { grid-column:1 / -1; white-space:normal; }.tabs a { font-size:13px; }.routeActions { gap:4px 16px; } }
 
 @media(max-width:760px) { .console > .tabs { gap:0 8px; padding-inline:12px; }.routeActions { margin-bottom:12px; } }
+
+.handoffInbox { margin-bottom:32px; padding-bottom:32px; border-bottom:1px solid var(--rule); }
+.handoffInbox .sectionHead { margin-bottom:12px; }
+.handoffCount { display:inline-grid; place-items:center; min-width:28px; min-height:28px; padding:2px 8px; border-radius:4px; background:#d7ebe2; color:#006e52; font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; }
+.handoffEmpty { color:var(--quiet); }
+.handoffList { display:grid; border-top:1px solid var(--rule); }
+.handoffRow { display:grid; grid-template-columns:minmax(180px,.8fr) minmax(240px,1.4fr) auto; gap:20px; align-items:center; min-height:72px; padding:12px 0; border-bottom:1px solid var(--rule); color:var(--ink) !important; text-decoration:none; }
+.handoffRow:hover { background:#fffdf7; text-decoration:none !important; }
+.handoffRow strong,.handoffRow small { display:block; }
+.handoffRow p { min-width:0; margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--quiet); }
+.handoffRow > div:last-child { display:grid; justify-items:end; gap:4px; }
+.handoffRow time { color:var(--quiet); font-size:12px; }
+.handoffRow b { color:#006e52; font-size:12px; }
+.adminSection { min-width:0; }
+.handoffThread { max-width:880px; margin:0 auto; }
+.handoffHead { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; padding-bottom:20px; border-bottom:1px solid var(--rule); }
+.handoffHead p { margin-bottom:0; }
+.handoffHead small { margin-top:2px; }
+.handoffDelivery { padding:10px 0; color:var(--quiet); font-size:12px; border-bottom:1px solid var(--rule); }
+.handoffTranscript { display:grid; gap:12px; max-height:56vh; overflow-y:auto; padding:20px 0; scrollbar-color:#b9c6ca #fff; }
+.handoffTranscript article { width:min(78%,680px); padding:12px 14px; border:1px solid var(--rule); border-radius:4px; background:#fffdf7; }
+.handoffTranscript article[data-role="owner"] { justify-self:end; border-color:#008f68; background:#d7ebe2; }
+.handoffTranscript article[data-role="assistant"] { border-color:#a8aa9f; background:#f4f1e8; }
+.handoffTranscript header { display:flex; justify-content:space-between; gap:16px; color:var(--quiet); font-size:12px; }
+.handoffTranscript article p { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.handoffComposer { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; padding-top:16px; border-top:1px solid var(--rule); }
+.handoffComposer label { grid-column:1 / -1; font-size:14px; font-weight:600; }
+.handoffComposer textarea { width:100%; min-height:88px; resize:vertical; border:1px solid #a8aa9f; border-radius:4px; padding:12px; color:var(--ink); background:white; font:inherit; }
+.handoffComposer button { align-self:end; min-height:44px; }
+@media(max-width:760px) {
+  .handoffInbox { margin-bottom:24px; padding-bottom:24px; }
+  .handoffRow { grid-template-columns:minmax(0,1fr) auto; gap:6px 12px; }
+  .handoffRow > p { grid-column:1 / -1; grid-row:2; }
+  .handoffRow > div:last-child { grid-column:2; grid-row:1; }
+  .handoffHead { display:grid; gap:16px; }.handoffHead button { width:100%; }
+  .handoffTranscript article { width:90%; }
+  .handoffComposer { grid-template-columns:1fr; }.handoffComposer button { width:100%; }
+}

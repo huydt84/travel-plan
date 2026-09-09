@@ -63,7 +63,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     if (olderAnchor.current !== null) { element.scrollTop += element.scrollHeight - olderAnchor.current; olderAnchor.current = null; return; }
     if (nearEnd.current && !pendingQuestionId) element.scrollTop = element.scrollHeight;
     else if (running) { const timer = setTimeout(() => setNewResponse(true), 0); return () => clearTimeout(timer); }
-  }, [chat.turns, running, chat.disconnected, chat.retrying, pendingQuestionId]);
+  }, [chat.turns, chat.workspace?.handoffMessages, chat.workspace?.activeHandoff, running, chat.disconnected, chat.retrying, pendingQuestionId]);
   useEffect(() => {
     if (!pendingQuestionId) { announcedQuestion.current = null; return; }
     if (announcedQuestion.current === pendingQuestionId) return;
@@ -174,6 +174,43 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     onMore: () => chat.history(true), hasMore: !!chat.workspace?.historyCursor,
     loading: chat.historyLoading, error: chat.historyError, onRetry: () => chat.history(),
   };
+  const timeline = [
+    ...chat.turns.map((turn) => ({ kind:"turn",id:turn.exchangeId || turn.id,at:turn.createdAt,value:turn,rank:1 })),
+    ...(chat.workspace?.handoffMessages || []).map((message) => ({ kind:"handoff-message",id:message.id,at:message.createdAt,value:message,rank:1,order:message.ordinal || 0 })),
+    ...(chat.workspace?.handoffs || []).flatMap((handoff) => [
+      { kind:"handoff-start",id:`${handoff.id}-start`,at:handoff.startedAt,value:handoff,rank:0 },
+      ...(handoff.closedAt ? [{ kind:"handoff-end",id:`${handoff.id}-end`,at:handoff.closedAt,value:handoff,rank:2 }] : []),
+    ]),
+  ].sort((left,right) => left.order&&right.order ? left.order-right.order : Date.parse(left.at)-Date.parse(right.at) || left.rank-right.rank || left.id.localeCompare(right.id));
+  const renderTimeline = (entry,index) => {
+    if (entry.kind === "handoff-start" || entry.kind === "handoff-end") return <div key={entry.id} className={styles.handoffNotice} role="status">
+      <strong>{entry.kind === "handoff-start" ? t("assistantExtra.handoff.active") : t("assistantExtra.handoff.closed")}</strong>
+      <span>{entry.kind === "handoff-start" ? t("assistantExtra.handoff.activeHelp") : t("assistantExtra.handoff.closedHelp")}</span>
+    </div>;
+    if (entry.kind === "handoff-message") {
+      const item=entry.value,owner=item.author.role === "owner";
+      return <article key={entry.id} className={styles.turn} aria-label={owner ? t("assistantExtra.handoff.ownerMessage") : t("assistantExtra.handoff.userMessage")}>
+        <div className={owner ? `${styles.assistantMessage} ${styles.ownerMessage}` : styles.userMessage}><span>{owner ? t("assistantExtra.handoff.owner") : t("assistantExtra.you")}</span><p>{item.body}</p>
+          {!owner && <ReferenceList label={t("assistantExtra.messageContext")} items={(item.contextRefs || []).map(ref=>({ref}))} onPin={chat.pin} disabled={restricted || chat.pinBusy} />}
+        </div>
+      </article>;
+    }
+    const turn=entry.value;
+    return <article key={entry.id} className={styles.turn} aria-label={t("assistantExtra.exchange", { input: turn.input })}>
+      <div className={styles.userMessage}><span>{t("assistantExtra.you")}</span><p>{turn.input}</p><ReferenceList label={t("assistantExtra.messageContext")} items={(turn.mentions || []).map((ref) => turn.resolvedContext?.find((item) => item.ref.kind === ref.kind && item.ref.id === ref.id) || { ref })} onPin={chat.pin} disabled={restricted || chat.pinBusy} /></div>
+      <div className={styles.assistantMessage} data-exchange={turn.exchangeId || turn.id} tabIndex={-1}><span>{t("assistantExtra.assistant")}</span>
+        {turn.output && <MessageContent turnId={turn.id} text={turn.output} citations={turn.citations} streaming={turn.status === "running"} onCitation={inspectCitation} />}
+        {turn.status === "running" && chat.disconnected?.turnId !== turn.id && <p className={styles.running} role="status">{localizeAssistantMessage(t, chat.progress) || t("assistantExtra.answering")}</p>}
+        {turn.status === "failed" && <div className={styles.interrupted}><p role="status">{turn.errorCode === "TURN_CANCELLED" ? t("assistantExtra.answerStopped") : turn.errorCode === "TURN_DEADLINE_EXCEEDED" ? t("assistantExtra.answerTimedOut") : turn.output ? t("assistantExtra.answerInterrupted") : t("assistantExtra.answerStartFailed")}</p>
+          {index === timeline.length-1 && <button disabled={requestBlocked || running || chat.submitting || chat.loading} onClick={() => { retryFocus.current=turn.exchangeId || turn.id;void chat.retry(turn); }}>{chat.retrying === turn.id ? t("assistantExtra.retrying") : t("assistantExtra.retry")}</button>}</div>}
+        {chat.disconnected?.turnId === turn.id && <div className={styles.interrupted}><p role="status">{[401,403,404].includes(chat.disconnected.status) ? t("assistantExtra.answerAccessError") : t("assistantExtra.answerDisconnected")}</p>{![401,403,404].includes(chat.disconnected.status) && <button onClick={chat.reconnect}>{t("assistantExtra.reconnect")}</button>}</div>}
+        {turn.questions?.map((question) => <QuestionPrompt key={question.id} prompt={question} readOnly={restricted} onSubmit={answerQuestion} />)}
+        {turn.actions?.map((item) => <BatchReview key={item.id} action={item} busy={applying} readOnly={restricted} onApprove={() => decideBatch(item,"approve")} onReject={() => decideBatch(item,"reject")} onRevise={(action,edits) => edits ? reviseBatch(action,edits) : (() => { chat.setMessage(`Tạo lại đề xuất: ${turn.input}`);document.getElementById("assistant-message")?.focus(); })()} />)}
+        <ReferenceList items={turn.usedContext} label={t("assistantExtra.usedContext")} onPin={chat.pin} disabled={restricted || chat.pinBusy} />
+        <div className={styles.messageActions}>{!!turn.citations?.length && <button onClick={() => inspect(turn,"evidence")}>{t("assistantExtra.sourceCount",{count:turn.citations.length})}</button>}{turn.status === "completed" && turn.changeSet && <button data-status={turn.changeSet.status} className={styles.reviewButton} onClick={() => inspect(turn,"changes")}>{turn.changeSet.status === "applied" ? t("assistantExtra.viewApplied") : ["expired","conflicted"].includes(turn.changeSet.status) ? t("assistantExtra.viewStale") : t("assistantExtra.viewProposed",{count:turn.changeSet.preview.changes.length})}</button>}</div>
+      </div>
+    </article>;
+  };
   const content = <section ref={setFrame} data-history-open={historyOpen && historyWide || undefined} className={`${styles.shell} ${companion ? styles.companion : ""}`} aria-label={t("assistant.title")}>
     <div className={styles.historySlot}>
       {historyWide && <HistorySidebar {...historyProps} wide />}
@@ -213,30 +250,9 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
       {chat.turns.filter((turn) => turn.status === "completed").length >= 8 && <div role="status" className={styles.errorBanner} style={{ background: "var(--surface-muted, #fff8e1)" }}>{t("assistant.longConversationWarning")} <button className={styles.secondaryButton} onClick={chat.newConversation}>{t("assistant.newSession")}</button></div>}
       {chat.loading ? <p role="status">{t("assistant.loadingConversation")}</p> : <>
         {chat.workspace?.nextCursor && <button className={styles.secondaryButton} onClick={() => { olderAnchor.current = listRef.current.scrollHeight; void chat.older(); }}>{t("assistant.olderTurns")}</button>}
-        {!chat.turns.length && <div className={styles.firstRun}><h2>{t("assistant.firstRunTitle")}</h2><p>{t("assistant.firstRunDescription")}</p>
+        {!timeline.length && <div className={styles.firstRun}><h2>{t("assistant.firstRunTitle")}</h2><p>{t("assistant.firstRunDescription")}</p>
           <div>{[t("assistant.promptDestination"), t("assistant.promptExisting"), t("assistant.promptCompare")].map((prompt) => <button key={prompt} onClick={() => { chat.setMessage(prompt); document.getElementById("assistant-message")?.focus(); }}><AssistantIcon name="prompt" /><span>{prompt}</span></button>)}</div></div>}
-        {chat.turns.map((turn, index) => <article key={turn.exchangeId || turn.id} className={styles.turn} aria-label={t("assistantExtra.exchange", { input: turn.input })}>
-          <div className={styles.userMessage}><span>{t("assistantExtra.you")}</span><p>{turn.input}</p><ReferenceList label={t("assistantExtra.messageContext")} items={(turn.mentions || []).map((ref) => turn.resolvedContext?.find((item) => item.ref.kind === ref.kind && item.ref.id === ref.id) || { ref })} onPin={chat.pin} disabled={restricted || chat.pinBusy} /></div>
-          <div className={styles.assistantMessage} data-exchange={turn.exchangeId || turn.id} tabIndex={-1}><span>{t("assistantExtra.assistant")}</span>
-            {turn.output && <MessageContent turnId={turn.id} text={turn.output} citations={turn.citations} streaming={turn.status === "running"} onCitation={inspectCitation} />}
-            {turn.status === "running" && chat.disconnected?.turnId !== turn.id && <p className={styles.running} role="status">{localizeAssistantMessage(t, chat.progress) || t("assistantExtra.answering")}</p>}
-            {turn.status === "failed" && <div className={styles.interrupted}>
-              <p role="status">{turn.errorCode === "TURN_CANCELLED" ? t("assistantExtra.answerStopped") : turn.errorCode === "TURN_DEADLINE_EXCEEDED" ? t("assistantExtra.answerTimedOut") : turn.output ? t("assistantExtra.answerInterrupted") : t("assistantExtra.answerStartFailed")}</p>
-              {index === chat.turns.length - 1 && <button disabled={requestBlocked || running || chat.submitting || chat.loading} onClick={() => { retryFocus.current = turn.exchangeId || turn.id; void chat.retry(turn); }}>{chat.retrying === turn.id ? t("assistantExtra.retrying") : t("assistantExtra.retry")}</button>}
-            </div>}
-            {chat.disconnected?.turnId === turn.id && <div className={styles.interrupted}>
-              <p role="status">{[401, 403, 404].includes(chat.disconnected.status) ? t("assistantExtra.answerAccessError") : t("assistantExtra.answerDisconnected")}</p>
-              {![401, 403, 404].includes(chat.disconnected.status) && <button onClick={chat.reconnect}>{t("assistantExtra.reconnect")}</button>}
-            </div>}
-            {turn.questions?.map((question) => <QuestionPrompt key={question.id} prompt={question} readOnly={restricted} onSubmit={answerQuestion} />)}
-            {turn.actions?.map((item) => <BatchReview key={item.id} action={item} busy={applying} readOnly={restricted} onApprove={() => decideBatch(item, "approve")} onReject={() => decideBatch(item, "reject")} onRevise={(action, edits) => edits ? reviseBatch(action, edits) : (() => { chat.setMessage(`Tạo lại đề xuất: ${turn.input}`); document.getElementById("assistant-message")?.focus(); })()} />)}
-            <ReferenceList items={turn.usedContext} label={t("assistantExtra.usedContext")} onPin={chat.pin} disabled={restricted || chat.pinBusy} />
-            <div className={styles.messageActions}>
-              {!!turn.citations?.length && <button onClick={() => inspect(turn, "evidence")}>{t("assistantExtra.sourceCount", { count: turn.citations.length })}</button>}
-              {turn.status === "completed" && turn.changeSet && <button data-status={turn.changeSet.status} className={styles.reviewButton} onClick={() => inspect(turn, "changes")}>{turn.changeSet.status === "applied" ? t("assistantExtra.viewApplied") : ["expired", "conflicted"].includes(turn.changeSet.status) ? t("assistantExtra.viewStale") : t("assistantExtra.viewProposed", { count: turn.changeSet.preview.changes.length })}</button>}
-            </div>
-          </div>
-        </article>)}
+        {timeline.map(renderTimeline)}
       </>}
     </div>
     {chat.submissionFailure && <div role="alert" className={styles.errorBanner}>
@@ -249,7 +265,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     <div className={styles.composerDock}>
     {newResponse && <button className={styles.newResponse} onClick={() => { nearEnd.current = true; listRef.current.scrollTop = listRef.current.scrollHeight; setNewResponse(false); }}>{t("assistantExtra.newAnswer")}</button>}
     <ReferenceList items={chat.mentions} label={t("assistantExtra.pendingContext")} onPin={chat.pin} onRemove={(item) => chat.setMentions(chat.mentions.filter((entry) => entry !== item))} disabled={restricted || chat.submitting || chat.pinBusy} />
-    <Composer onMention={() => setPickerOpen(true)} message={chat.message} setMessage={chat.setMessage} onSubmit={chat.submit} onStop={chat.stop} running={running || awaiting || awaitingInput} disabled={requestBlocked || chat.submitting || chat.loading || chat.pinBusy || awaitingInput} />
+    <Composer onMention={() => setPickerOpen(true)} message={chat.message} setMessage={chat.setMessage} onSubmit={chat.submit} onStop={chat.stop} running={running || awaiting || awaitingInput} disabled={(!chat.workspace?.activeHandoff && requestBlocked) || chat.submitting || chat.loading || chat.pinBusy || awaitingInput} />
     </div>
     </div>
     {!historyWide && <HistorySidebar {...historyProps} wide={false} />}

@@ -119,10 +119,25 @@ export function useConversation({ initialWorkspace, viewer }) {
     if (token !== generation.current) return;
     const latest = new Map(next.turns.map((turn) => [turn.id, currentTurn(turn)]));
     setTurns((items) => items.map((turn) => latest.get(turn.id) || turn));
+    setWorkspace((current) => current ? { ...current, activeHandoff: next.activeHandoff,
+      handoffs: next.handoffs, handoffMessages: next.handoffMessages } : current);
     const resumed = next.turns.find((turn) => turn.status === "running");
     if (resumed) observe(resumed, token);
     return next;
   };
+
+  const activeHandoffId = workspace?.activeHandoff?.id;
+  const activeConversationId = workspace?.selectedConversation?.id;
+  useEffect(() => {
+    if (!activeHandoffId || !activeConversationId) return;
+    let disposed=false,inFlight=false;
+    const refresh=async()=>{if(inFlight)return;inFlight=true;try{
+      const next=await apiJson(`/api/v1/assistant/workspace?conversation=${activeConversationId}`);
+      if(!disposed){setWorkspace(current=>current ? {...current,activeHandoff:next.activeHandoff,handoffs:next.handoffs,handoffMessages:next.handoffMessages} : current);setTurns(next.turns.map(currentTurn));}
+    }catch{/* Keep the local transcript visible and retry on the next interval. */}finally{inFlight=false;}};
+    const timer=setInterval(refresh,3000);window.addEventListener("focus",refresh);
+    return()=>{disposed=true;clearInterval(timer);window.removeEventListener("focus",refresh);};
+  },[activeHandoffId,activeConversationId]);
 
   const waitingTurnId = turns.find((turn) => ["awaiting_approval", "awaiting_input"].includes(turn.status))?.id;
   const waitingConversationId = workspace?.selectedConversation?.id;
@@ -209,31 +224,37 @@ export function useConversation({ initialWorkspace, viewer }) {
       let accepted;
       try {
         accepted = await apiJson("/api/v1/assistant/turns", { method: "POST", body: JSON.stringify(body) });
-        if (!accepted.runId || !accepted.conversationId) throw new Error("assistantExtra.error.acceptance");
+        if (!accepted.conversationId || (accepted.mode !== "handoff" && !accepted.runId)) throw new Error("assistantExtra.error.acceptance");
       } catch (failure) {
         if (failure.status && failure.status < 500) { persist(`pending:${draftKey}`, ""); throw failure; }
         const recovered = await apiJson(`/api/v1/assistant/workspace?request=${body.clientTurnId}`);
         if (!recovered.request?.found) throw failure;
-        accepted = { runId: recovered.request.turn.id, conversationId: recovered.selectedConversation.id, turn: recovered.request.turn };
+        accepted = recovered.request.mode === "handoff"
+          ? { mode:"handoff",conversationId:recovered.selectedConversation.id,message:recovered.request.message,handoff:recovered.request.handoff }
+          : { mode:"assistant",runId:recovered.request.turn.id,conversationId:recovered.selectedConversation.id,turn:recovered.request.turn };
       }
       persist(`pending:${draftKey}`, "");
       if (!body.retryOfTurnId && read(`draft:${draftKey}`) === body.message) persist(`draft:${draftKey}`, "");
       persist("conversation", accepted.conversationId);
       if (draftKey === "new") persist("pins:new", "[]");
       if (generation.current !== token) return;
-      const saved = accepted.turn || { id: accepted.runId, clientTurnId: body.clientTurnId, input, output: "", citations: [], status: accepted.status || "running" };
-      const turn = saved.status === "running" ? { ...saved, output: "" } : saved;
+      const saved = accepted.mode === "handoff" ? null : accepted.turn || { id: accepted.runId, clientTurnId: body.clientTurnId, input, output: "", citations: [], status: accepted.status || "running" };
+      const turn = saved?.status === "running" ? { ...saved, output: "" } : saved;
       if (draftKey !== accepted.conversationId) { persist(`draft:${accepted.conversationId}`, read(`draft:${draftKey}`)); persist(`draft:${draftKey}`, ""); }
       setMessageState(read(`draft:${accepted.conversationId}`));
       if (!body.retryOfTurnId) { setMentionsState([]); persist(`mentions:${draftKey}`, "[]"); }
-      setWorkspace((next) => ({ ...next, selectedConversation: { ...next.selectedConversation, id: accepted.conversationId, title: next.selectedConversation?.title || input, pinsVersion: next.selectedConversation?.pinsVersion || 0 } }));
+      setWorkspace((next) => ({ ...next,
+        selectedConversation: { ...next.selectedConversation, id: accepted.conversationId, title: next.selectedConversation?.title || input, pinsVersion: next.selectedConversation?.pinsVersion || 0 },
+        ...(accepted.mode === "handoff" ? { activeHandoff:accepted.handoff?.status === "active" ? accepted.handoff : null,
+          handoffs:[...(next.handoffs || []).filter(item=>item.id!==accepted.handoff.id),accepted.handoff],
+          handoffMessages:[...(next.handoffMessages || []).filter(item=>item.id!==accepted.message.id),accepted.message] } : {}) }));
       syncUrl(trip, accepted.conversationId, true);
-      setTurns((items) => {
+      if (turn) setTurns((items) => {
         const index = items.findIndex((item) => item.id === body.retryOfTurnId || item.id === turn.id);
         if (index < 0) return [...items, turn];
         return items.map((item, i) => i === index ? turn : item);
       });
-      if (turn.status === "running") { setProgress("assistantExtra.progress.waiting"); observe(turn, token); }
+      if (turn?.status === "running") { setProgress("assistantExtra.progress.waiting"); observe(turn, token); }
       else setProgress("");
       window.dispatchEvent(new Event("assistant-completed"));
     } catch (failure) {

@@ -17,6 +17,7 @@ export default async function AssistantManagementPage({params,searchParams}) {
   const uuid = value => { try { validateSchema(workspaceQuerySchema.properties.conversationId,value); } catch { notFound(); } };
   try {
     if (path.length===1 && path[0]==="settings") view.kind="settings";
+    else if (path[0]==="handoffs" && path.length===2) { uuid(path[1]); view.kind="handoff"; view.handoff=await service.handoff(path[1]); }
     else if (path[0]==="users" && (path.length===2 || path.length===3 && path[2]==="conversations")) {
       try {view.email=decodeURIComponent(path[1]);} catch {notFound();} view.person=initial.admins.find(p=>p.email===view.email);
       if (!view.person && view.email!==viewer.email) notFound();
