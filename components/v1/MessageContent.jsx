@@ -1,6 +1,6 @@
 import Markdown from "react-markdown";
 import { useLocale } from "../LocaleProvider";
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import remarkGfm from "remark-gfm";
 import styles from "./assistant.module.css";
 
@@ -26,16 +26,21 @@ function citationPlugin(citations) {
     walk(tree);
   };
 }
-export default function MessageContent({ text, citations = [], onCitation }) {
+function MessageContent({ turnId, text, citations = [], onCitation, streaming = false }) {
   const { t } = useLocale();
   const action = useRef(onCitation);
   useEffect(() => { action.current = onCitation; }, [onCitation]);
   const plugins = useMemo(() => [remarkGfm, citationPlugin(citations)], [citations]);
   const components = useMemo(() => ({
       a: ({ href, children }) => href?.startsWith("#assistant-evidence-")
-        ? <button className={styles.citation} type="button" onClick={() => action.current(href.slice(20))}>{children}</button>
+        ? <button className={styles.citation} type="button" onClick={() => action.current(turnId, href.slice(20))}>{children}</button>
         : <a href={href} target="_blank" rel="noreferrer">{children}</a>,
       table: ({ children }) => <div className={styles.tableScroll} tabIndex={0} role="region" aria-label={t("assistantExtra.answerTable")}><table>{children}</table></div>,
-    }), [t]);
+    }), [t, turnId]);
+  if (streaming) return <div className={`${styles.markdown} ${styles.streamingText}`}>
+    {(text || "").split(/\n{2,}/).map((block, index) => <p key={index}>{block}</p>)}
+  </div>;
   return <div className={styles.markdown}><Markdown skipHtml remarkPlugins={plugins} components={components}>{text || ""}</Markdown></div>;
 }
+
+export default memo(MessageContent);

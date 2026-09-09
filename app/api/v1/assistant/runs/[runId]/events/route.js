@@ -45,7 +45,7 @@ export async function GET(request, context) {
         }
         if (page.length === 100) continue;
         if (state.status !== "running") return;
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
     return ndjsonResponse(events(), () => { detached = true; });

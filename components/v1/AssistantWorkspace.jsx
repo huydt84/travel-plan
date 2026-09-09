@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState, ViewTransition } from "react";
+import { useCallback, useEffect, useRef, useState, ViewTransition } from "react";
 import { useRouter } from "next/navigation";
 import Dialog, { DialogTitle } from "../ui/Dialog";
 import { useAssistantNavigation } from "./AssistantProvider";
@@ -88,6 +88,11 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     return () => clearTimeout(timer);
   }, [chat.turns, setTurns]);
   const inspect = (turn, nextPanel, citation) => { setSelectedId(turn.id); focusCitation.current = citation || null; setPanel(nextPanel); };
+  const inspectCitation = useCallback((turnId, citation) => {
+    setSelectedId(turnId);
+    focusCitation.current = citation;
+    setPanel("evidence");
+  }, []);
   const confirm = async () => {
     if (restricted || !changeSet?.confirmationToken || applying) return;
     setApplying(true); chat.setError("");
@@ -213,7 +218,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
         {chat.turns.map((turn, index) => <article key={turn.exchangeId || turn.id} className={styles.turn} aria-label={t("assistantExtra.exchange", { input: turn.input })}>
           <div className={styles.userMessage}><span>{t("assistantExtra.you")}</span><p>{turn.input}</p><ReferenceList label={t("assistantExtra.messageContext")} items={(turn.mentions || []).map((ref) => turn.resolvedContext?.find((item) => item.ref.kind === ref.kind && item.ref.id === ref.id) || { ref })} onPin={chat.pin} disabled={restricted || chat.pinBusy} /></div>
           <div className={styles.assistantMessage} data-exchange={turn.exchangeId || turn.id} tabIndex={-1}><span>{t("assistantExtra.assistant")}</span>
-            {turn.output && <MessageContent text={turn.output} citations={turn.citations} onCitation={(citation) => inspect(turn, "evidence", citation)} />}
+            {turn.output && <MessageContent turnId={turn.id} text={turn.output} citations={turn.citations} streaming={turn.status === "running"} onCitation={inspectCitation} />}
             {turn.status === "running" && chat.disconnected?.turnId !== turn.id && <p className={styles.running} role="status">{localizeAssistantMessage(t, chat.progress) || t("assistantExtra.answering")}</p>}
             {turn.status === "failed" && <div className={styles.interrupted}>
               <p role="status">{turn.errorCode === "TURN_CANCELLED" ? t("assistantExtra.answerStopped") : turn.errorCode === "TURN_DEADLINE_EXCEEDED" ? t("assistantExtra.answerTimedOut") : turn.output ? t("assistantExtra.answerInterrupted") : t("assistantExtra.answerStartFailed")}</p>
