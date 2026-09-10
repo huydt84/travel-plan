@@ -96,6 +96,15 @@ for (const [width, height] of [[320,760],[1440,900],[1920,1080]]) {
     await page.screenshot({ path: `.impeccable/review/assistant-context/${width}-picker.png` });
     await result.click();
     const attachments = page.getByRole("list", { name: "Ngữ cảnh sắp gửi" });
+    const attachmentLayout = await page.evaluate(() => {
+      const input = document.getElementById("assistant-message").getBoundingClientRect();
+      const list = document.querySelector('[aria-label="Ngữ cảnh sắp gửi"]').getBoundingClientRect();
+      const send = document.querySelector('button[aria-label="Gửi yêu cầu"]').getBoundingClientRect();
+      return { inputBottom: input.bottom, listTop: list.top, listBottom: list.bottom, listHeight: list.height, sendBottom: send.bottom };
+    });
+    expect(attachmentLayout.listTop).toBeGreaterThanOrEqual(attachmentLayout.inputBottom);
+    expect(attachmentLayout.listBottom).toBeLessThanOrEqual(attachmentLayout.sendBottom);
+    expect(attachmentLayout.listHeight).toBeLessThanOrEqual(44);
     await attachments.getByRole("button", { name: /^Ghim/ }).click();
     const pins = page.getByRole("list", { name: "Ngữ cảnh đã ghim" }); await expect(pins).toBeVisible();
     await expect(pins.getByRole("button", { name: /^Bỏ ghim/ })).toBeEnabled();

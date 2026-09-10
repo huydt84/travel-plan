@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import AssistantIcon from "./AssistantIcon";
 import styles from "./assistant.module.css";
 import { useLocale } from "../LocaleProvider";
-export default function Composer({ message, setMessage, onSubmit, onStop, running, disabled, onMention }) {
+export default function Composer({ message, setMessage, onSubmit, onStop, running, disabled, onMention, context }) {
   const { t } = useLocale();
   const ref = useRef(null);
   useLayoutEffect(() => {
@@ -22,8 +22,11 @@ export default function Composer({ message, setMessage, onSubmit, onStop, runnin
           if (event.key === "@" && !event.nativeEvent.isComposing) { event.preventDefault(); onMention?.(); return; }
           if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { event.preventDefault(); if (!running && !disabled && message.trim()) onSubmit(); }
         }} />
-      {running ? <button type="button" className={styles.secondaryButton} onClick={onStop} aria-label={t("assistant.stop")} title={t("assistant.stop")}><AssistantIcon name="stop" /></button>
-        : <button className={styles.primaryButton} disabled={disabled || !message.trim()} type="submit" aria-label={t("assistant.send")} title={t("assistant.send")}><AssistantIcon name="send" /></button>}
+      <div className={styles.composerFooter}>
+        <div className={styles.composerContext}>{context}</div>
+        {running ? <button type="button" className={styles.secondaryButton} onClick={onStop} aria-label={t("assistant.stop")} title={t("assistant.stop")}><AssistantIcon name="stop" /></button>
+          : <button className={styles.primaryButton} disabled={disabled || !message.trim()} type="submit" aria-label={t("assistant.send")} title={t("assistant.send")}><AssistantIcon name="send" /></button>}
+      </div>
     </div>
     <small><span className={styles.keyboardHint}>{t("assistant.keyboardHint")} </span>{t("assistant.applyReminder")}</small>
   </form>;

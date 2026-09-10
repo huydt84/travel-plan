@@ -88,8 +88,27 @@ test("deduplicated parallel research still returns one result per provider call"
 
 test("unknown tools, tool budget and fabricated citations fail closed", async () => {
   await assert.rejects(run(scriptedClient([{ steps: [call("send_email", {})] }])), { code: "TOOL_NOT_ALLOWED" });
-  await assert.rejects(run(scriptedClient([{ steps: Array.from({ length: 9 }, (_, i) => call("read_context", { ref: { kind: "trip", id: "1" } }, String(i))) }])), { code: "TOOL_BUDGET_EXCEEDED" });
+  const withinBudget = scriptedClient([
+    { steps: Array.from({ length: 16 }, (_, i) => call("read_context", { ref: { kind: "trip", id: "1" } }, String(i))) },
+    { output_text: "Done" },
+  ]);
+  assert.equal((await run(withinBudget)).text, "Done");
+  assert.match(withinBudget.requests[0].system_instruction, /at most 16 total tool executions/);
+  await assert.rejects(run(scriptedClient([{ steps: Array.from({ length: 17 }, (_, i) => call("read_context", { ref: { kind: "trip", id: "1" } }, String(i))) }])), { code: "TOOL_BUDGET_EXCEEDED" });
   await assert.rejects(run(scriptedClient([{ output_text: "Invented [E9]" }])), { code: "INVALID_EVIDENCE" });
+});
+
+test("the system instruction tracks the configured tool budget on every model round", async () => {
+  const client = scriptedClient([
+    { steps: [call("read_context", { ref: { kind: "trip", id: "1" } })] },
+    (request) => {
+      assert.match(request.system_instruction, /at most 12 total tool executions/);
+      assert.match(request.system_instruction, /11 tool executions remaining/);
+      return { output_text: "Done" };
+    },
+  ]);
+  await run(client, { maxToolExecutions: 12 });
+  assert.match(client.requests[0].system_instruction, /12 tool executions remaining/);
 });
 
 test("abort settles even when the provider ignores the signal", async () => {

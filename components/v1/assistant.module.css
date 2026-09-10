@@ -81,7 +81,16 @@
 .composer textarea { resize: none; display: block; width: 100%; min-width: 0; min-height: 48px; max-height: 180px; border: 0; border-radius: 4px; padding: 4px; font-size: 16px; line-height: 1.5; background: transparent; color: var(--navy); }
 .composer textarea:focus-visible { outline: 2px solid var(--green-dark); outline-offset: 2px; }
 .composer textarea::placeholder { color: var(--muted); }
-.composerField button { width: 44px; height: 44px; align-self: flex-end; display: flex; align-items: center; justify-content: center; padding: 0; }
+.composerFooter { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; min-width: 0; }
+.composerContext { flex: 1; min-width: 0; overflow: hidden; }
+.composerContext:empty { display: none; }
+.composerContext .contextRefs { flex-wrap: nowrap; gap: 4px; max-height: none; margin: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.composerContext .contextRefs li { flex: 0 0 auto; max-width: min(100%, 430px); min-height: 36px; padding: 0 4px 0 8px; gap: 4px; }
+.composerContext .contextName { flex: 1; max-width: 260px; overflow: hidden; font-size: 13px; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
+.composerContext .contextName > a, .composerContext .contextName > span { display: block; overflow: hidden; text-overflow: ellipsis; }
+.composerContext .contextName small { display: none; }
+.composerContext .contextRefs button { min-width: 44px; min-height: 36px; padding: 2px 6px; font-size: 12px; }
+.composerFooter > button { width: 44px; height: 44px; flex: 0 0 44px; display: flex; align-items: center; justify-content: center; padding: 0; }
 .composer small { display: block; margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--muted); }
 .primaryButton, .secondaryButton { min-height: 44px; padding: 10px 14px; border-radius: 4px; font-weight: 600; flex-shrink: 0; }
 .primaryButton { border: 1px solid var(--green-dark); background: var(--green-dark); color: var(--paper-bright); }
