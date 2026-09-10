@@ -8,7 +8,7 @@ import { useLocale } from "../LocaleProvider";
 export function ReferenceList({ items = [], onPin, onRemove, removeLabel, disabled = false, label }) {
   const { t } = useLocale();
   const effectiveRemoveLabel = removeLabel ?? t("assistantExtra.remove");
-  const labels = { trip: t("context.trip"), activity: t("context.activity"), source: t("context.source"), contribution: t("context.contribution"), place: t("context.place"), google_place: "Google Maps" };
+  const labels = { trip: t("context.trip"), activity: t("context.activity"), source: t("context.source"), contribution: t("context.contribution"), place: t("context.place"), collection: t("context.collection"), google_place: "Google Maps" };
   if (!items.length) return null;
   return <ul className={styles.contextRefs} aria-label={label}>{items.map((item) => {
     const ref = item.ref || item;
@@ -54,7 +54,7 @@ export function ContextPicker({ onClose, onSelect }) {
     } catch (failure) { if (token === generation.current) setError(failure.message); }
     finally { if (token === generation.current) setLoading(false); }
   };
-  const labels = { trip: t("context.trip"), activity: t("context.activity"), source: t("context.source"), contribution: t("context.contribution"), place: t("context.place"), google_place: "Google Maps" };
+  const labels = { trip: t("context.trip"), activity: t("context.activity"), source: t("context.source"), contribution: t("context.contribution"), place: t("context.place"), collection: t("context.collection"), google_place: "Google Maps" };
   return <Dialog onClose={onClose} initialFocusRef={searchRef} overlayClassName={styles.overlay}><section className={styles.contextPicker}>
     <header><DialogTitle>{t("assistant.addContext")}</DialogTitle><button type="button" onClick={onClose}>{t("common.close")}</button></header>
     <label>{t("context.searchLabel")}<input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("context.searchPlaceholder")} /></label>

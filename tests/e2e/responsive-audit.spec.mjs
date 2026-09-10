@@ -32,6 +32,26 @@ const surfaces = [
     ready: (page) => page.getByRole("heading", { level: 1, name: "Quản lý lịch" }),
   },
   {
+    name: "admin collections",
+    path: "/admin/collections",
+    ready: (page) => page.getByRole("heading", { level: 1, name: "Bộ sưu tập địa điểm" }),
+  },
+  {
+    name: "admin collection preview",
+    path: "/admin/collections",
+    setup: async (page) => {
+      await page.route("**/api/admin/place-collections/sync-previews", (route) => route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({
+        id: "11111111-1111-4111-8111-111111111111", collectionId: null, title: "Tokyo field notes", description: "Preview fixture",
+        publicUrl: "https://www.google.com/maps/placelists/list/test", parserVersion: "fixture-v1", digest: "a".repeat(64), expiresAt: "2030-01-01T00:00:00.000Z",
+        summary: { added: 1, updated: 0, restored: 0, removed: 0, unchanged: 0 }, nextCursor: null,
+        items: [{ position: 0, name: "Kiyosumi Garden", address: "Tokyo", note: "Quiet morning stop", mapsUrl: "https://www.google.com/maps", externalIds: [{ kind: "feature_tuple", value: "8:8" }], change: "added" }],
+      }) }));
+      await page.getByLabel("Liên kết danh sách Google Maps").fill("https://maps.app.goo.gl/example");
+      await page.getByRole("button", { name: "Kiểm tra danh sách" }).click();
+    },
+    ready: (page) => page.getByText("Chưa có thay đổi nào được lưu.", { exact: false }),
+  },
+  {
     name: "admin trip requests",
     path: "/admin/requests",
     ready: (page) => page.getByRole("heading", { level: 1, name: "Yêu cầu chuyến đi" }),

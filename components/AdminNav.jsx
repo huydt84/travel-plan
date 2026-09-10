@@ -13,12 +13,18 @@ export default function AdminNav({
   const assistant = useAssistantNavigation();
   const { t } = useLocale();
   return (
-    <nav className={adminShellStyles["admin-nav"]} data-owner={assistant?.isOwner || undefined} style={{ "--admin-columns": assistant?.enabled && assistant.isOwner ? 5 : 4 }} aria-label={t("nav.adminArea")}>
+    <nav className={adminShellStyles["admin-nav"]} data-owner={assistant?.isOwner || undefined} style={{ "--admin-columns": assistant?.enabled && assistant.isOwner ? 6 : 5 }} aria-label={t("nav.adminArea")}>
       <Link
         href={ADMIN_ROUTES.trips}
         aria-current={active === "trips" ? "page" : undefined}
       >
         {t("nav.adminTrips")}
+      </Link>
+      <Link
+        href={ADMIN_ROUTES.collections}
+        aria-current={active === "collections" ? "page" : undefined}
+      >
+        {t("nav.adminCollections")}
       </Link>
       <Link
         href={ADMIN_ROUTES.requests}
