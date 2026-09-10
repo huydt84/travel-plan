@@ -27,21 +27,27 @@ async function fixture() {
 test("no-trip acceptance, context capture, pin conflict, replay and retry are independent of trips", async () => {
   const f = await fixture();
   try {
-    const first = await f.accept({ initialPins: [f.refs[0]], mentions: [f.refs[1]], background: true });
+    const selectedTools = ["search_context", "read_context"];
+    const first = await f.accept({ initialPins: [f.refs[0]], mentions: [f.refs[1]], allowedTools: selectedTools, background: true });
     expect(first.conversation.tripSlug).toBeNull();
     expect(first.turn.pinnedContext).toEqual([f.refs[0]]); expect(first.turn.mentions).toEqual([f.refs[1]]);
+    expect(first.turn.allowedTools).toEqual(selectedTools);
     await f.store.updatePins(first.conversation.id, f.ownerEmail, [], 0);
     await expect(f.store.updatePins(first.conversation.id, f.ownerEmail, [f.refs[1]], 0)).rejects.toMatchObject({ code: "CONTEXT_CONFLICT" });
-    const replay = await f.accept({ clientTurnId: first.turn.clientTurnId, initialPins: [f.refs[0]], mentions: [f.refs[1]], background: true });
+    const replay = await f.accept({ clientTurnId: first.turn.clientTurnId, initialPins: [f.refs[0]], mentions: [f.refs[1]], allowedTools: selectedTools, background: true });
     expect(replay.turn.id).toBe(first.turn.id); expect(replay.turn.pinnedContext).toEqual([f.refs[0]]);
+    await expect(f.accept({ clientTurnId: first.turn.clientTurnId, initialPins: [f.refs[0]], mentions: [f.refs[1]], allowedTools: [] })).rejects.toMatchObject({ code: "IDEMPOTENCY_MISMATCH" });
     await expect(f.accept({ clientTurnId: first.turn.clientTurnId, initialPins: [], mentions: [f.refs[1]] })).rejects.toMatchObject({ code: "IDEMPOTENCY_MISMATCH" });
     await f.store.failTurn(first.turn.id, "TURN_CANCELLED");
-    const retry = await f.accept({ conversationId: first.conversation.id, retryOfTurnId: first.turn.id, mentions: [f.refs[1]], background: true });
+    const retry = await f.accept({ conversationId: first.conversation.id, retryOfTurnId: first.turn.id, mentions: [f.refs[1]], allowedTools: selectedTools, background: true });
     expect(retry.turn.pinnedContext).toEqual([f.refs[0]]);
+    expect(retry.turn.allowedTools).toEqual(selectedTools);
     await f.sql`DELETE FROM trips WHERE id=${f.trips[0].id}`;
     expect((await f.store.getConversation(first.conversation.id, f.ownerEmail)).id).toBe(first.conversation.id);
     expect((await createContextService({ sql: f.sql }).read({ email: f.ownerEmail, isAdmin: true }, f.refs[0])).available).toBe(false);
-    expect((await createBackgroundStore(f.store).job(retry.turn.id)).conversation_id).toBe(first.conversation.id);
+    const job = await createBackgroundStore(f.store).job(retry.turn.id);
+    expect(job.conversation_id).toBe(first.conversation.id);
+    expect(job.allowed_tools).toEqual(selectedTools);
     expect(await createBackgroundStore(f.store).summaries(f.ownerEmail)).toHaveLength(2);
   } finally { await f.close(); }
 });
@@ -99,12 +105,14 @@ for (const [width, height] of [[320,760],[1440,900],[1920,1080]]) {
     const attachmentLayout = await page.evaluate(() => {
       const input = document.getElementById("assistant-message").getBoundingClientRect();
       const list = document.querySelector('[aria-label="Ngữ cảnh sắp gửi"]').getBoundingClientRect();
+      const tools = [...document.querySelectorAll("button")].find((button) => button.textContent.startsWith("Công cụ")).getBoundingClientRect();
       const send = document.querySelector('button[aria-label="Gửi yêu cầu"]').getBoundingClientRect();
-      return { inputBottom: input.bottom, listTop: list.top, listBottom: list.bottom, listHeight: list.height, sendBottom: send.bottom };
+      return { inputBottom: input.bottom, listTop: list.top, listBottom: list.bottom, listHeight: list.height, toolsRight: tools.right, listLeft: list.left, sendBottom: send.bottom };
     });
     expect(attachmentLayout.listTop).toBeGreaterThanOrEqual(attachmentLayout.inputBottom);
     expect(attachmentLayout.listBottom).toBeLessThanOrEqual(attachmentLayout.sendBottom);
     expect(attachmentLayout.listHeight).toBeLessThanOrEqual(44);
+    expect(attachmentLayout.toolsRight).toBeLessThanOrEqual(attachmentLayout.listLeft);
     await attachments.getByRole("button", { name: /^Ghim/ }).click();
     const pins = page.getByRole("list", { name: "Ngữ cảnh đã ghim" }); await expect(pins).toBeVisible();
     await expect(pins.getByRole("button", { name: /^Bỏ ghim/ })).toBeEnabled();
@@ -134,3 +142,28 @@ for (const [width, height] of [[320,760],[1440,900],[1920,1080]]) {
     await sql.end();
   });
 }
+
+test("tool chooser supports model-only messages, keyboard focus and conversation persistence",async({page})=>{
+  await page.setViewportSize({width:320,height:760});
+  await gotoHealthy(page,"/assistant");
+  await expect(page.getByLabel("Yêu cầu cho trợ lý")).toBeEnabled();
+  const trigger=page.getByRole("button",{name:"Công cụ 8/8",exact:true});
+  await expect(trigger).toBeVisible();
+  await trigger.focus();await page.keyboard.press("Enter");await expect(trigger).toHaveAttribute("aria-expanded","true");
+  const chooser=page.getByRole("region",{name:"Công cụ cho tin nhắn này"});
+  await expect(chooser.getByRole("checkbox")).toHaveCount(8);
+  for(const checkbox of await chooser.getByRole("checkbox").all())await checkbox.uncheck();
+  await expect(page.getByRole("button",{name:"Công cụ 0/8",exact:true})).toBeVisible();
+  await expect(chooser).toContainText("chỉ trả lời từ tin nhắn");
+  await page.keyboard.press("Escape");await expect(page.getByRole("button",{name:"Công cụ 0/8",exact:true})).toBeFocused();
+  let submitted;
+  await page.route("**/api/v1/assistant/turns",async route=>{submitted=route.request().postDataJSON();await route.continue();});
+  const input=page.getByLabel("Yêu cầu cho trợ lý");await input.fill("Chỉ trả lời từ lời nhắn này");await input.press("Enter");
+  await expect(page.getByRole("article")).toHaveCount(1);
+  await expect(page.getByRole("button",{name:"Dừng",exact:true})).toHaveCount(0,{timeout:20000});
+  expect(submitted.allowedTools).toEqual([]);
+  const conversation=new URL(page.url()).searchParams.get("conversation");expect(conversation).toBeTruthy();
+  await page.reload();await expect(page.getByRole("button",{name:"Công cụ 0/8",exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(320);
+  const sql=createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);await sql`DELETE FROM assistant_conversations WHERE id=${conversation}::UUID`;await sql.end();
+});

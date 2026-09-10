@@ -87,4 +87,13 @@ test("turn transport schema refuses browser-supplied identity and malformed idem
   assert.doesNotThrow(() => validateSchema(turnBodySchema, {
     clientTurnId: "d8f32e14-9229-4f08-bf35-153880228757", message: "Hello",
   }));
+  assert.doesNotThrow(() => validateSchema(turnBodySchema, {
+    clientTurnId: "d8f32e14-9229-4f08-bf35-153880228757", message: "Hello", allowedTools: [],
+  }));
+  assert.throws(() => validateSchema(turnBodySchema, {
+    clientTurnId: "d8f32e14-9229-4f08-bf35-153880228757", message: "Hello", allowedTools: ["search_web", "search_web"],
+  }), /không hợp lệ/);
+  assert.throws(() => validateSchema(turnBodySchema, {
+    clientTurnId: "d8f32e14-9229-4f08-bf35-153880228757", message: "Hello", allowedTools: ["unknown"],
+  }), /không hợp lệ/);
 });

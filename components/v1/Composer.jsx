@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef } from "react";
 import AssistantIcon from "./AssistantIcon";
 import styles from "./assistant.module.css";
 import { useLocale } from "../LocaleProvider";
-export default function Composer({ message, setMessage, onSubmit, onStop, running, disabled, onMention, context }) {
+import ToolChooser from "./ToolChooser";
+export default function Composer({ message, setMessage, onSubmit, onStop, running, disabled, onMention, context, availableTools, allowedTools, onAllowedToolsChange }) {
   const { t } = useLocale();
   const ref = useRef(null);
   useLayoutEffect(() => {
@@ -23,7 +24,10 @@ export default function Composer({ message, setMessage, onSubmit, onStop, runnin
           if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) { event.preventDefault(); if (!running && !disabled && message.trim()) onSubmit(); }
         }} />
       <div className={styles.composerFooter}>
-        <div className={styles.composerContext}>{context}</div>
+        <div className={styles.composerControls}>
+          <ToolChooser key={disabled || running ? "disabled" : "enabled"} availableTools={availableTools} allowedTools={allowedTools} onChange={onAllowedToolsChange} disabled={disabled || running} />
+          <div className={styles.composerContext}>{context}</div>
+        </div>
         {running ? <button type="button" className={styles.secondaryButton} onClick={onStop} aria-label={t("assistant.stop")} title={t("assistant.stop")}><AssistantIcon name="stop" /></button>
           : <button className={styles.primaryButton} disabled={disabled || !message.trim()} type="submit" aria-label={t("assistant.send")} title={t("assistant.send")}><AssistantIcon name="send" /></button>}
       </div>

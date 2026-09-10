@@ -263,7 +263,7 @@ for (const [width,height] of [[320,760],[1440,900],[1920,1080]]) {
       expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
       await mkdir(".impeccable/review/owner-errors",{recursive:true});
       await page.screenshot({path:`.impeccable/review/owner-errors/${width}.png`,fullPage:false});
-      await detail.locator("dl").scrollIntoViewIfNeeded();
+      await detail.locator("dl").first().scrollIntoViewIfNeeded();
       await page.screenshot({path:`.impeccable/review/owner-errors/${width}-details.png`,fullPage:false});
     } finally {if(ownerTurn) await f.sql`DELETE FROM assistant_conversations WHERE id=${ownerTurn.conversation.id}`;await f.close();}
   });
@@ -290,7 +290,9 @@ test("owner log includes recovered tool errors and paginates legacy failures wit
     const tool=await f.store.createToolRun({turnId:first.turn.id,toolName:"search_web"});
     await f.store.finishToolRun(tool,{status:"failed",errorCode:"RESEARCH_UNAVAILABLE",resultMetadata:{diagnostics:{phase:"search_web",upstreamStatus:503}}});
     await f.store.publishTurn({turnId:first.turn.id,output:"The source is unavailable",citations:[]});
-    expect((await f.service.failures()).items.find(item=>item.id===first.turn.id).tools[0].diagnostics.upstreamStatus).toBe(503);
+    expect((await f.service.failures()).items.find(item=>item.id===first.turn.id).tools).toBeUndefined();
+    const detail=await f.service.failure(first.turn.id);
+    expect(detail.trace[0].result.diagnostics.upstreamStatus).toBe(503);
     await f.sql`INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,status,error_code,created_at,completed_at)
       SELECT gen_random_uuid(),${first.conversation.id},gen_random_uuid(),'Legacy failure','failed','LEGACY','2020-01-01'::TIMESTAMPTZ+i*INTERVAL '1 second','2030-01-01'::TIMESTAMPTZ+i*INTERVAL '1 second' FROM generate_series(1,32) AS i`;
     const a=await f.service.failures();const b=await f.service.failures(a.cursor);
@@ -298,6 +300,37 @@ test("owner log includes recovered tool errors and paginates legacy failures wit
     expect(new Set([...a.items,...b.items].map(item=>item.id)).size).toBe(a.items.length+b.items.length);
     expect(b.items.filter(item=>item.code==="LEGACY")).toHaveLength(2);
   }finally{if(first)await f.sql`DELETE FROM assistant_conversations WHERE id=${first.conversation.id}`;await f.close();}
+});
+
+test("owner request and failure details expose sanitized ordered traces and token totals",async({page,request})=>{
+  const f=await fixture();let accepted;
+  try {
+    accepted=await f.accept({allowedTools:["search_context","read_context"],title:"Trace detail"});
+    const model=await f.store.createToolRun({turnId:accepted.turn.id,toolName:"model_interaction",
+      requestMetadata:{model:"gemini-test",round:1,offeredTools:["search_context","read_context"],remainingToolBudget:16,authorization:"Bearer hidden",reasoning:"hidden"}});
+    const calls=Array.from({length:17},(_,index)=>({callId:`call-${index}`,name:"read_context",arguments:{ref:{kind:"trip",id:"1"}}}));
+    await f.store.finishToolRun(model,{status:"completed",durationMs:25,resultMetadata:{
+      response:{text:"I need more context",calls,rawProvider:{private:true}},
+      usage:{inputTokens:12,outputTokens:4,totalTokens:16,cachedTokens:2,thoughtTokens:1,toolUseTokens:3},
+    }});
+    await f.store.failTurn(accepted.turn.id,"TOOL_BUDGET_EXCEEDED");
+    const review=await f.service.request(accepted.conversation.id,accepted.turn.id);
+    const turn=review.turns[0];
+    expect(turn.allowedTools).toEqual(["search_context","read_context"]);
+    expect(turn.trace.map(step=>step.ordinal)).toEqual([turn.trace[0].ordinal]);
+    expect(turn.trace[0].result.functionCalls).toHaveLength(17);
+    expect(turn.traceSummary).toMatchObject({modelInteractions:1,executedTools:0,tokens:{inputTokens:12,outputTokens:4,totalTokens:16,cachedTokens:2,thoughtTokens:1,toolUseTokens:3}});
+    expect(JSON.stringify(turn.trace)).not.toMatch(/Bearer hidden|reasoning|rawProvider/);
+    const failure=await f.service.failure(accepted.turn.id);
+    expect(failure.traceSummary.tokens.totalTokens).toBe(16);
+    const personal=await request.get(`/api/v1/assistant/workspace?conversation=${accepted.conversation.id}`);
+    expect(await personal.text()).not.toMatch(/traceSummary|functionCalls|remainingToolBudget/);
+    await gotoHealthy(page,`/admin/assistant/conversations/${accepted.conversation.id}/turns/${accepted.turn.id}`);
+    await expect(page.getByRole("region",{name:"Dấu vết thực thi"})).toContainText("16 token");
+    await expect(page.getByText("Lô lệnh gọi bị từ chối",{exact:true})).toBeVisible();
+    await gotoHealthy(page,`/admin/assistant/failures/${accepted.turn.id}`);
+    await expect(page.getByText(/không được khởi chạy vì vượt quá ngân sách/)).toBeVisible();
+  } finally {if(accepted)await f.sql`DELETE FROM assistant_conversations WHERE id=${accepted.conversation.id}`;await f.close();}
 });
 
 for(const [width,height] of [[320,760],[1440,900],[1920,1080]]) test(`addressable history, request and error navigation at ${width}`,async({page,context,request},testInfo)=>{

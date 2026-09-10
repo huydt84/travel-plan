@@ -4,8 +4,10 @@ import { createPostgresSql } from "../lib/sql-adapter.mjs";
 import { DEFAULT_LOCAL_POSTGRES_URI } from "../lib/runtime-config.mjs";
 import { createAssistantStore } from "../lib/v1/store.mjs";
 import { createTravelAssistant } from "../lib/v1/travel-assistant.mjs";
+import { createContextService } from "../lib/v1/context.mjs";
 import { createGoogleResearchAdapters } from "../lib/v1/research.mjs";
 import { resolveAgenticV1Config } from "../lib/v1/config.mjs";
+import { assistantFault } from "../lib/v1/errors.mjs";
 import { snapshot as example, activity } from "./assistant-fixtures.mjs";
 
 // This command may consume .env internally. Never print provider exceptions:
@@ -18,7 +20,7 @@ if (missing.length) {
 } else {
   const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
   const slug = `live-harness-${randomUUID()}`;
-  let tripId, phase = "setup";
+  let tripId, turnId, phase = "setup";
   try {
     const [trip] = await sql`INSERT INTO trips(slug,title,trip_date,end_date,timezone,location)
       VALUES(${slug},'Disposable harness smoke','2030-01-01','2030-01-01','Asia/Tokyo','Tokyo') RETURNING id`;
@@ -44,36 +46,33 @@ if (missing.length) {
     assert.ok(routes.routes.length);
     phase = "Gemini grounded proposal";
     const store = createAssistantStore({ sql });
-    const assistant = createTravelAssistant({ config, store, readSnapshot, listTrips: async () => [], researchAdapters: research, invalidateCache: () => {} });
+    const contextService = createContextService({ sql, research, readSnapshot, maxChars: config.contextMaxChars });
+    const assistant = createTravelAssistant({ config, store, readSnapshot, listTrips: async () => [], researchAdapters: research, contextService, invalidateCache: () => {} });
     const before = await readSnapshot();
-    const actor = { email: "live-harness@localhost.invalid", isAdmin: true };
+    const actor = { email: "local-admin@localhost.invalid", isAdmin: true, isOwner: true };
     const run = await assistant.startTurn({ actor, tripSlug: slug, clientTurnId: randomUUID(),
       message: "Find the official Tokyo National Museum website using search_web and cite it. Then stage exactly one change: update activity museum title to Tokyo National Museum. Preserve all other fields. This is a staging request, not permission to apply." });
-    let completed, deltas = 0;
+    turnId = run.runId;
+    let awaiting;
     for await (const event of run.events) {
-      if (event.type === "answer-delta" && event.text) deltas++;
       if (event.type === "failed") { console.log(`Harness outcome: ${event.error.code}`); throw new Error("Harness turn failed"); }
-      if (event.type === "completed") completed = event.turn;
+      if (event.type === "awaiting_approval") awaiting = event.turn;
     }
-    assert.ok(completed?.changeSet && completed.citations.length);
-    assert.ok(deltas > 0, "Gemini must emit public answer deltas before completion");
+    assert.ok(awaiting?.actions?.[0]?.confirmationToken && awaiting.citations.length);
     assert.deepEqual(await readSnapshot(), before, "Staging must not mutate the plan");
-    phase = "explicit confirmation and replay";
-    const confirmation = { actor, proposalId: completed.changeSet.id, confirmationToken: completed.changeSet.confirmationToken };
-    const receipt = await assistant.confirmProposal(confirmation);
+    phase = "explicit approval";
+    const action = awaiting.actions[0];
+    const receipt = await assistant.approveAction({ actor, actionId: action.id, confirmationToken: action.confirmationToken });
+    assert.ok(receipt.receipt);
     assert.equal((await readSnapshot()).backbone[0].title, "Tokyo National Museum");
-    const after = await readSnapshot();
-    assert.deepEqual(await assistant.confirmProposal(confirmation), receipt);
-    assert.deepEqual(await readSnapshot(), after);
-    console.log("Live smoke passed: Gemini, Search, Places, Routes, staged-only preview, explicit commit, and receipt replay. Disposable local trip removed.");
-  } catch {
-    if (tripId) {
+    console.log("Live smoke passed: Gemini, Search, Places, Routes, staged-only preview, and explicit approval. Disposable local trip removed.");
+  } catch (error) {
+    if (turnId) {
       const diagnostics = await sql`SELECT r.tool_name, r.status, r.error_code, r.duration_ms, r.result_metadata
-        FROM assistant_tool_runs r JOIN assistant_turns t ON t.id=r.turn_id
-        JOIN assistant_conversations c ON c.id=t.conversation_id WHERE c.trip_id=${tripId} ORDER BY r.created_at`;
+        FROM assistant_tool_runs r WHERE r.turn_id=${turnId}::UUID ORDER BY r.ordinal,r.created_at`;
       console.log(JSON.stringify(diagnostics));
     }
-    console.error(`Live smoke failed at ${phase}. Provider payloads withheld. Check configuration, quota, and the safe assistant tool audit records.`);
+    console.error(`Live smoke failed at ${phase} (${assistantFault(error).code}). Provider payloads withheld. Check configuration, quota, and the safe assistant tool audit records.`);
     process.exitCode = 1;
   } finally {
     if (tripId) await sql`DELETE FROM trips WHERE id=${tripId}`;

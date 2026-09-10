@@ -111,6 +111,53 @@ test("the system instruction tracks the configured tool budget on every model ro
   assert.match(client.requests[0].system_instruction, /12 tool executions remaining/);
 });
 
+test("per-message tools filter provider definitions, instructions and execution", async () => {
+  const selected = scriptedClient([{ output_text: "Trip only" }]);
+  await createGeminiModelAdapter({ client: selected, model: "test" }).run({
+    message: "Help", actor: { email: "test@example.com", isAdmin: true },
+    contextService: { targetSnapshot: async () => snapshot }, allowedTools: ["search_context"],
+  });
+  assert.deepEqual(selected.requests[0].tools.map((tool) => tool.name), ["search_context"]);
+  assert.match(selected.requests[0].system_instruction, /search_context/);
+  assert.doesNotMatch(selected.requests[0].system_instruction, /apply_changes|ask_question|search_web/);
+
+  const modelOnly = scriptedClient([{ output_text: "No tools" }]);
+  await createGeminiModelAdapter({ client: modelOnly, model: "test" }).run({
+    message: "Help", actor: { email: "test@example.com", isAdmin: true },
+    contextService: { targetSnapshot: async () => snapshot }, allowedTools: [],
+  });
+  assert.equal(modelOnly.requests[0].tools, undefined);
+  assert.doesNotMatch(modelOnly.requests[0].system_instruction, /apply_changes|ask_question|search_context/);
+
+  await assert.rejects(createGeminiModelAdapter({
+    client: scriptedClient([{ steps: [call("search_web", { query: "museum" })] }]), model: "test",
+  }).run({ message: "Help", actor: { email: "test@example.com", isAdmin: true },
+    contextService: { targetSnapshot: async () => snapshot }, allowedTools: ["search_context"] }), { code: "TOOL_NOT_ALLOWED" });
+});
+
+test("over-budget calls remain in the final public model trace", async () => {
+  const rows = new Map(), order = [];
+  await assert.rejects(createGeminiModelAdapter({
+    client: scriptedClient([{ output_text: "I need more data", steps: Array.from({ length: 17 }, (_, i) =>
+      call("read_context", { ref: { kind: "trip", id: "1" } }, String(i))) }]), model: "test",
+  }).run({
+    message: "Help", actor: { email: "test@example.com", isAdmin: true },
+    contextService: { targetSnapshot: async () => snapshot },
+    onToolStart: ({ name, metadata }) => { const id = String(order.length + 1); order.push(id); rows.set(id, { name, request: metadata }); return id; },
+    onToolFinish: (id, result) => rows.set(id, { ...rows.get(id), result }),
+  }), { code: "TOOL_BUDGET_EXCEEDED" });
+  const model = rows.get(order[0]);
+  assert.equal(model.name, "model_interaction");
+  assert.equal(model.result.metadata.response.calls.length, 17);
+  assert.equal(model.result.metadata.response.calls[0].arguments.ref.id, "1");
+  assert.equal(model.result.metadata.response.calls[0].status, "not_started_budget_exceeded");
+  assert.equal(model.result.metadata.response.calls[0].durationMs, null);
+  assert.deepEqual(model.result.metadata.usage, {
+    inputTokens: null, outputTokens: null, totalTokens: null,
+    cachedTokens: null, thoughtTokens: null, toolUseTokens: null,
+  });
+});
+
 test("abort settles even when the provider ignores the signal", async () => {
   const controller = new AbortController();
   const client = scriptedClient([() => new Promise(() => {})]);

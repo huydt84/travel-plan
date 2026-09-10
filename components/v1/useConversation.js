@@ -15,6 +15,7 @@ export function useConversation({ initialWorkspace, viewer }) {
   const [turns, setTurns] = useState(initialWorkspace?.turns || []);
   const [message, setMessageState] = useState("");
   const [mentions, setMentionsState] = useState([]);
+  const [allowedTools, setAllowedToolsState] = useState(initialWorkspace?.availableTools || []);
   const [pinBusy, setPinBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -55,6 +56,13 @@ export function useConversation({ initialWorkspace, viewer }) {
   const draftKey = workspace?.selectedConversation?.id || "new";
   const setMessage = (value) => { setMessageState(value); persist(`draft:${draftKey}`, value); };
   const setMentions = (items) => { setMentionsState(items); persist(`mentions:${draftKey}`, JSON.stringify(items)); };
+  const setAllowedTools = (items) => {
+    const catalog = workspace?.availableTools || [];
+    const selected = Array.isArray(items) ? items : catalog;
+    const next = catalog.filter((name) => selected.includes(name));
+    setAllowedToolsState(next);
+    persist(`tools:${draftKey}`, JSON.stringify(next));
+  };
   const addMention = (item) => {
     if (mentions.some((entry) => entry.ref.kind === item.ref.kind && entry.ref.id === item.ref.id)) return;
     if (mentions.length >= 20) { setError("assistantExtra.error.mentions"); return; }
@@ -188,6 +196,11 @@ export function useConversation({ initialWorkspace, viewer }) {
       if (!next.selectedConversation) { try { next.pins = JSON.parse(read("pins:new") || "[]"); } catch { next.pins = []; } }
       setMessageState(read(`draft:${nextKey}`));
       try { setMentionsState(JSON.parse(read(`mentions:${nextKey}`) || "[]")); } catch { setMentionsState([]); }
+      try {
+        const stored = read(`tools:${nextKey}`);
+        const selected = stored ? JSON.parse(stored) : next.availableTools;
+        setAllowedToolsState(next.availableTools.filter((name) => selected.includes(name)));
+      } catch { setAllowedToolsState(next.availableTools); }
       if (navigation) syncUrl(next.selectedTripSlug, next.selectedConversation?.id, replace);
       const running = next.turns.find((turn) => turn.status === "running");
       if (running) { setTurns(next.turns.map((turn) => turn.id === running.id ? { ...turn, output: "" } : turn)); observe(running, token); }
@@ -209,12 +222,17 @@ export function useConversation({ initialWorkspace, viewer }) {
   }, [load, read]);
 
   const selectConversation = (conversation) => void load({ conversation: conversation.id });
-  const newConversation = () => void load({ conversation: "new" });
+  const newConversation = () => {
+    const all = workspace?.availableTools || [];
+    setAllowedToolsState(all);
+    persist("tools:new", JSON.stringify(all));
+    void load({ conversation: "new" });
+  };
   const send = async (input = message.trim(), retryRequest = null) => {
     if (!input || sending.current || submitting || pinBusy || loading || turns.some((turn) => ["running", "awaiting_approval", "awaiting_input"].includes(turn.status))) return;
     const token = generation.current;
     const trip = null;
-    const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input, locale, mentions: mentions.map((item) => item.ref),
+    const body = retryRequest || { clientTurnId: crypto.randomUUID(), conversationId: workspace.selectedConversation?.id || null, message: input, locale, mentions: mentions.map((item) => item.ref), allowedTools,
       ...(!workspace.selectedConversation ? { initialPins: (workspace.pins || []).map((item) => item.ref) } : {}) };
     try { sessionStorage.setItem(prefix + `pending:${draftKey}`, JSON.stringify(body)); }
     catch { setError("assistantExtra.error.storage"); return; }
@@ -240,7 +258,10 @@ export function useConversation({ initialWorkspace, viewer }) {
       if (generation.current !== token) return;
       const saved = accepted.mode === "handoff" ? null : accepted.turn || { id: accepted.runId, clientTurnId: body.clientTurnId, input, output: "", citations: [], status: accepted.status || "running" };
       const turn = saved?.status === "running" ? { ...saved, output: "" } : saved;
-      if (draftKey !== accepted.conversationId) { persist(`draft:${accepted.conversationId}`, read(`draft:${draftKey}`)); persist(`draft:${draftKey}`, ""); }
+      if (draftKey !== accepted.conversationId) {
+        persist(`draft:${accepted.conversationId}`, read(`draft:${draftKey}`)); persist(`draft:${draftKey}`, "");
+        persist(`tools:${accepted.conversationId}`, JSON.stringify(body.allowedTools));
+      }
       setMessageState(read(`draft:${accepted.conversationId}`));
       if (!body.retryOfTurnId) { setMentionsState([]); persist(`mentions:${draftKey}`, "[]"); }
       setWorkspace((next) => ({ ...next,
@@ -267,7 +288,7 @@ export function useConversation({ initialWorkspace, viewer }) {
     try { pending = JSON.parse(read(`pending:${draftKey}`) || "null"); } catch { pending = null; }
     if (pending && pending.retryOfTurnId !== turn.id) { setError("assistantExtra.error.previousReconnect"); return; }
     return send(turn.input, pending || { clientTurnId: crypto.randomUUID(),
-      conversationId: workspace.selectedConversation.id, message: turn.input, mentions: turn.mentions || [], retryOfTurnId: turn.id });
+      conversationId: workspace.selectedConversation.id, message: turn.input, mentions: turn.mentions || [], allowedTools: turn.allowedTools || workspace.availableTools, retryOfTurnId: turn.id });
   };
   const reconnect = () => {
     const turn = turns.find((item) => item.id === disconnected?.turnId);
@@ -319,6 +340,6 @@ export function useConversation({ initialWorkspace, viewer }) {
     } catch (failure) { if (token === generation.current) setError(failure.message); }
   };
   return { workspace, turns, setTurns, message, setMessage, loading, error: localizeAssistantMessage(t, error), setError, progress: localizeAssistantMessage(t, progress), submitting, historyLoading, historyError: localizeAssistantMessage(t, historyError),
-    mentions, addMention, setMentions, pin, unpin, pinBusy, load, selectConversation, newConversation, submit, send, stop, history, older,
+    mentions, addMention, setMentions, allowedTools, setAllowedTools, pin, unpin, pinBusy, load, selectConversation, newConversation, submit, send, stop, history, older,
     refreshConversation, retry, retrying, submissionFailure: submissionFailure ? { ...submissionFailure, message: localizeAssistantMessage(t, submissionFailure.message) } : null, retrySubmission, disconnected, reconnect };
 }

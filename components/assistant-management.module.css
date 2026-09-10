@@ -132,6 +132,37 @@
 .failureDetails pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; }
 .failureDetails dd { min-width:0; user-select:text; }
 .failureStep { padding:12px 0; border-top:1px solid var(--rule); }
+.trace { min-width:0; margin-top:24px; padding-top:20px; border-top:2px solid var(--rule); }
+.trace > h3 { margin:0 0 12px; font-size:17px; }
+.traceSummary { display:flex; flex-wrap:wrap; gap:6px 18px; padding:10px 12px; border:1px solid var(--rule); border-radius:4px; background:#f4f7f6; color:var(--ink); font-size:13px; font-weight:600; }
+.traceTools { margin-top:8px; color:var(--quiet); font-size:12px; }
+.traceTools summary { min-height:44px; align-content:center; color:var(--accent); cursor:pointer; }
+.traceTools p { margin:0 0 8px; overflow-wrap:anywhere; }
+.traceBudget { margin:12px 0; padding:10px 12px; border-left:3px solid #aa6e00; background:#fff7df; color:#705116; font-size:13px; }
+.tokenGrid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); margin:12px 0 4px; border-block:1px solid var(--rule); }
+.tokenGrid > div { min-width:0; padding:8px; }
+.tokenGrid dt { color:var(--quiet); font-size:11px; }
+.tokenGrid dd { margin:2px 0 0; color:var(--ink); font-size:14px; font-weight:600; }
+.traceSteps { min-width:0; }
+.traceStep { min-width:0; border-bottom:1px solid var(--rule); }
+.traceStep > summary { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:48px; padding:10px 4px; color:var(--accent); cursor:pointer; }
+.traceStep > summary span { min-width:0; overflow-wrap:anywhere; font-weight:600; }
+.traceStep > summary small { flex:0 0 auto; color:var(--quiet); }
+.traceStepBody { min-width:0; padding:0 4px 16px 24px; }
+.traceStepBody h4 { margin:14px 0 4px; color:var(--quiet); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
+.traceStepBody p { margin:4px 0; overflow-wrap:anywhere; }
+.traceStepBody pre { max-width:100%; max-height:360px; overflow:auto; margin:4px 0; padding:10px; border:1px solid var(--rule); background:#f7f8f7; color:var(--ink); font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
+.tokenGrid > div { min-width:0; padding:8px; border-right:1px solid var(--rule); }
+.tokenGrid > div:last-child { border-right:0; }
+.tokenGrid dt { color:var(--quiet); font-size:10px; }
+.tokenGrid dd { margin:2px 0 0; color:var(--ink); font-size:14px; font-weight:600; }
+.traceStep { min-width:0; border-bottom:1px solid var(--rule); }
+.traceStep > summary { display:flex; justify-content:space-between; gap:12px; min-height:48px; padding:10px 4px; cursor:pointer; color:var(--ink); font-size:13px; font-weight:600; }
+.traceStep > summary small { color:var(--quiet); font-weight:400; white-space:nowrap; }
+.traceStepBody { min-width:0; padding:0 4px 16px 20px; }
+.traceStepBody h4 { margin:14px 0 4px; color:var(--quiet); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
+.traceStepBody p { margin:4px 0; overflow-wrap:anywhere; }
+.traceStepBody pre { max-width:100%; margin:4px 0; padding:10px; overflow:auto; border:1px solid var(--rule); border-radius:4px; background:#f7f8f7; color:var(--ink); font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
 .switchButton { display:inline-flex; align-items:center; gap:9px; min-height:44px; min-width:100px; padding:0; border:0; background:transparent; color:var(--ink); font-size:13px !important; }
 .switchTrack { display:block; width:40px; height:24px; padding:3px; flex-shrink:0; border-radius:20px; background:#65727b; transition:background-color 160ms ease-out; }
 .switchTrack > span { display:block; width:18px; height:18px; border-radius:50%; background:white; transform:translateX(0); transition:transform 160ms ease-out; }
@@ -140,6 +171,12 @@
 .switchButton:hover:not(:disabled) .switchTrack { box-shadow:0 0 0 4px #08694f14; }
 .console .switchError { color:#a12929; }
 @media(prefers-reduced-motion:reduce) { .switchTrack,.switchTrack > span { transition:none; } }
+
+@media(max-width:640px) {
+  .tokenGrid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .tokenGrid > div:nth-child(3) { border-right:0; }
+  .traceStep > summary { align-items:flex-start; flex-direction:column; gap:2px; }
+}
 
 .tabs a { display:inline-flex; align-items:center; min-height:48px; padding:14px 0; color:var(--quiet); border-bottom:2px solid transparent; text-decoration:none; font-weight:500; }
 .tabs a[aria-current="page"] { color:var(--accent); border-bottom-color:var(--accent); }
