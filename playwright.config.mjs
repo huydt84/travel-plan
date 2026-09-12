@@ -41,7 +41,7 @@ export default defineConfig({
     },
     {
       name: "next",
-      command: "next dev --hostname 127.0.0.1 --port 3100",
+      command: "node scripts/dev-server.mjs --hostname 127.0.0.1 --port 3100",
       url: baseURL,
       reuseExistingServer: false,
       gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },

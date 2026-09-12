@@ -36,6 +36,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Test the local app at `http://127.0.0.1:3000`. Keep the development server running while using the in-app Browser, and rely on Fast Refresh or reload the page after changes.
 - Manage the isolated Rancher database with `pnpm run db:up:local`, `pnpm run db:migrate:local`, and `pnpm run db:down:local`.
 
+## Resource and memory hygiene
+
+- Start development through `pnpm run dev` or `pnpm run dev:admin`; do not bypass the repository wrapper with raw `next dev`. The wrapper disables Next telemetry and removes only orphaned telemetry/esbuild processes scoped to this checkout before and after the server runs.
+- Keep the wrapper's 3 GiB development old-space limit and the memory-oriented Next.js settings unless a measured workload proves they are insufficient. Override the heap through an explicit `NODE_OPTIONS=--max-old-space-size=...` only for that run, record the reason and before/after measurements, and do not raise the repository default to mask a leak.
+- Before starting a server, inspect port 3000 and reuse the confirmed travel-plan process when possible. Do not launch overlapping dev servers for independent checks.
+- At the end of work, stop every development or Playwright process started by Codex, run `pnpm run dev:cleanup`, and verify that this checkout has no `detached-flush` process, no orphaned esbuild service, and no listener on test-only ports. Never use broad process-name kills; resolve the project path, parent process, and listening port first.
+- Reuse one browser session for browser verification and close surplus pages, contexts, and test runners after the batched pass. Keep Playwright at the configured single worker unless a measured test requirement justifies a temporary increase.
+- Start Rancher and the local database only for work that needs them. When Codex started the database and no further local database work remains, use `pnpm run db:down:local`; before stopping Rancher itself, verify that no unrelated containers are running.
+- For builds, full E2E runs, or performance investigations, record project-scoped process counts and resident memory before and after. Treat monotonic growth or repeated Node/esbuild pairs as a failed run that must be diagnosed and cleaned up, not as expected framework overhead.
+
 ## Engineering decision quality
 
 - Prefer established ecosystem practices and maintained tooling when they solve the actual problem. Evaluate decisions by correctness, maintainability, portability, diagnostics, CI support, and onboarding across the full lifecycle.

@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "dev:admin": "LOCAL_ADMIN_BYPASS=true next dev --hostname 127.0.0.1",
+    "dev": "node scripts/dev-server.mjs",
+    "dev:admin": "LOCAL_ADMIN_BYPASS=true node scripts/dev-server.mjs --hostname 127.0.0.1",
+    "dev:cleanup": "node scripts/dev-process-cleanup.mjs",
     "build": "next build",
     "start": "next start",
     "test": "pnpm run lint && pnpm run test:unit && pnpm run test:e2e",

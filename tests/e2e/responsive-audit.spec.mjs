@@ -16,6 +16,12 @@ const surfaces = [
     ready: (page) => page.getByRole("combobox", { name: "Chọn chuyến đi" }),
   },
   {
+    name: "public schedule editor",
+    path: "/",
+    setup: async (page) => page.getByRole("button", { name: /Thêm vào ngày này|Thêm hoạt động/ }).first().click(),
+    ready: (page) => page.locator("#schedule-editor-new"),
+  },
+  {
     name: "public invitation",
     path: "/",
     setup: async (page) => page.getByRole("button", { name: "Rủ bạn đi cùng", exact: true }).click(),

@@ -723,6 +723,69 @@
   font: 700 clamp(35px, 5vw, 56px) / 0.95 var(--display);
   text-transform: uppercase;
 }
+.schedule-heading-actions,
+.timeline-card-controls,
+.timeline-owner-actions,
+.empty-schedule-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.schedule-heading-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.timeline-card-controls {
+  justify-content: flex-end;
+}
+.timeline-owner-actions :global(.admin-ghost),
+.timeline-owner-actions :global(.admin-danger) {
+  padding: 7px 9px;
+  font-size: 9px;
+}
+.public-schedule-editor,
+.schedule-notice {
+  max-width: 1120px;
+  margin-inline: auto;
+}
+.public-schedule-editor {
+  padding-top: 18px;
+}
+.public-schedule-editor :global(.schedule-create-editor) {
+  margin-bottom: 0;
+}
+.schedule-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 11px 14px;
+  border: 1px solid var(--green-dark);
+  color: var(--green-dark);
+  background: var(--green-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+.schedule-notice button {
+  display: inline-grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  color: inherit;
+  background: transparent;
+}
+.schedule-notice button:hover {
+  color: var(--paper-bright);
+  background: var(--green-dark);
+}
+.empty-schedule-actions {
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
 .section-heading:global(.compact) {
   padding-top: 0;
 }
@@ -1554,6 +1617,34 @@
   }
   .section-heading h2 {
     font-size: 38px;
+  }
+  .section-heading {
+    align-items: flex-start;
+  }
+  .schedule-heading-actions {
+    display: grid;
+    width: min(100%, 176px);
+  }
+  .schedule-heading-actions > button,
+  .timeline-owner-actions > button,
+  .empty-schedule-actions > button,
+  .empty-schedule-actions > a,
+  .schedule-notice button {
+    min-height: 44px;
+  }
+  .timeline-card-head {
+    align-items: flex-start;
+  }
+  .timeline-card-controls,
+  .timeline-owner-actions {
+    flex-wrap: wrap;
+  }
+  .timeline-owner-actions {
+    justify-content: flex-end;
+  }
+  .public-schedule-editor,
+  .schedule-notice {
+    margin-inline: 0;
   }
   .timeline-item {
     grid-template-columns: 50px 27px minmax(0, 1fr);

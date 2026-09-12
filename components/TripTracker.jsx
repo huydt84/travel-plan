@@ -3,8 +3,13 @@ import SavedPlaces from "./tracker/SavedPlaces";
 import trackerStyles from "../src/styles/tracker.module.css";
 import navigationStyles from "../src/styles/navigation.module.css";
 import contributionsStyles from "../src/styles/contributions.module.css";
+import scheduleEditorStyles from "../src/styles/schedule-editor.module.css";
 
 import { AssistantLauncher } from "./v1/AssistantProvider";
+import { ScheduleForm } from "./admin/EditorForms";
+import { useScheduleDraft } from "./admin/useScheduleDraft";
+import Button from "./ui/Button";
+import ConfirmDialog from "./ConfirmDialog";
 import Footer from "./ui/Footer";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
@@ -39,8 +44,23 @@ import ViewerMenu from "./ViewerMenu";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useLocale } from "./LocaleProvider";
 import { translateActivityType } from "../lib/i18n.mjs";
+import { adminErrorMessage } from "../lib/i18n-admin.mjs";
+import { requestJson as api } from "../lib/request-json.mjs";
+import { normalizeScheduleRefs } from "../lib/schedule-editor-state.mjs";
 
 const NOTIFICATION_NAVIGATION_EVENT = "travel-plan:notification-navigation";
+const EMPTY_SCHEDULE = {
+  startDate: "",
+  start: "",
+  endDate: "",
+  end: "",
+  displayEnd: "",
+  type: "Visit",
+  icon: "📍",
+  title: "",
+  detail: "",
+  refs: [],
+};
 
 const formatDuration = (milliseconds, t) => {
   const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
@@ -86,6 +106,21 @@ export default function TripTracker({
   const [invitationOpen, setInvitationOpen] = useState(initialInvitationOpen);
   const [gmailReturn, setGmailReturn] = useState(initialGmailReturn);
   const [selectedDay, setSelectedDay] = useState(initialData.trip.startDate);
+  const [scheduleBusy, setScheduleBusy] = useState(false);
+  const [scheduleNotice, setScheduleNotice] = useState("");
+  const [activityToDelete, setActivityToDelete] = useState(null);
+  const [scheduleDeleteError, setScheduleDeleteError] = useState("");
+  const {
+    editor: scheduleEditor,
+    setEditor: setScheduleEditor,
+    error: scheduleError,
+    setError: setScheduleError,
+    activate: activateScheduleEditor,
+    close: closeScheduleEditor,
+    guard: guardScheduleDraft,
+    restoreFocus: restoreScheduleFocus,
+    discardDialog,
+  } = useScheduleDraft(scheduleBusy);
   const routeListRef = useRef(null);
   const activeStopRef = useRef(null);
   const stationStageRef = useRef(null);
@@ -113,6 +148,115 @@ export default function TripTracker({
         .catch(() => {}),
     [initialData.trip.slug],
   );
+
+  const loadLatestItinerary = useCallback(async () => {
+    const nextData = await api(
+      `/api/itinerary?slug=${encodeURIComponent(initialData.trip.slug)}`,
+    );
+    setData(nextData);
+    return nextData;
+  }, [initialData.trip.slug]);
+
+  const saveSchedule = async (values, activityId) => {
+    setScheduleBusy(true);
+    setScheduleError("");
+    setScheduleNotice("");
+    try {
+      const payload = {
+        ...values,
+        displayEnd: values.displayEnd || null,
+        refs: normalizeScheduleRefs(values.refs),
+      };
+      delete payload.id;
+      const base = `/api/trips/${encodeURIComponent(data.trip.slug)}/schedule`;
+      await api(activityId ? `${base}/${activityId}` : base, {
+        method: activityId ? "PATCH" : "POST",
+        body: JSON.stringify(payload),
+      });
+      await loadLatestItinerary();
+      setScheduleEditor(null);
+      const message = activityId
+        ? t("adminExtra.message006")
+        : t("adminExtra.message007");
+      setScheduleNotice(message);
+      setAnnouncement(message);
+      restoreScheduleFocus();
+    } catch (requestError) {
+      setScheduleError(adminErrorMessage(requestError, t, locale));
+    } finally {
+      setScheduleBusy(false);
+    }
+  };
+
+  const createScheduleSource = async (values) => {
+    const source = await api(
+      `/api/trips/${encodeURIComponent(data.trip.slug)}/sources`,
+      { method: "POST", body: JSON.stringify(values) },
+    );
+    setData((current) => ({
+      ...current,
+      sources: [...current.sources, source],
+    }));
+    return source;
+  };
+
+  const openNewScheduleEditor = (trigger) =>
+    activateScheduleEditor(
+      {
+        ...EMPTY_SCHEDULE,
+        startDate: selectedDay,
+        endDate: selectedDay,
+      },
+      trigger,
+    );
+
+  const selectTripDay = (date, trigger) =>
+    guardScheduleDraft(
+      () => {
+        setScheduleEditor(null);
+        setScheduleError("");
+        setSelectedDay(date);
+        trigger?.focus?.();
+      },
+      t("adminExtra.message003", {
+        value0:
+          scheduleEditor?.values.title || t("adminExtra.message004"),
+      }),
+    );
+
+  const requestScheduleDelete = (item) =>
+    guardScheduleDraft(
+      () => {
+        setScheduleDeleteError("");
+        setActivityToDelete(item);
+      },
+      t("adminExtra.message003", {
+        value0:
+          scheduleEditor?.values.title || t("adminExtra.message004"),
+      }),
+    );
+
+  const deleteScheduleItem = async () => {
+    if (!activityToDelete) return;
+    setScheduleBusy(true);
+    setScheduleDeleteError("");
+    try {
+      await api(
+        `/api/trips/${encodeURIComponent(data.trip.slug)}/schedule/${activityToDelete.id}`,
+        { method: "DELETE" },
+      );
+      await loadLatestItinerary();
+      setScheduleEditor(null);
+      setActivityToDelete(null);
+      const message = t("adminExtra.message238");
+      setScheduleNotice(message);
+      setAnnouncement(message);
+    } catch (requestError) {
+      setScheduleDeleteError(adminErrorMessage(requestError, t, locale));
+    } finally {
+      setScheduleBusy(false);
+    }
+  };
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -374,9 +518,19 @@ export default function TripTracker({
               <select
                 value={data.trip.slug}
                 onChange={(event) => {
-                  const url = new URL(window.location.href);
-                  url.searchParams.set("trip", event.target.value);
-                  router.push(`/${url.search}`);
+                  const nextSlug = event.target.value;
+                  guardScheduleDraft(
+                    () => {
+                      const url = new URL(window.location.href);
+                      url.searchParams.set("trip", nextSlug);
+                      router.push(`/${url.search}`);
+                    },
+                    t("adminExtra.message003", {
+                      value0:
+                        scheduleEditor?.values.title ||
+                        t("adminExtra.message004"),
+                    }),
+                  );
                 }}
               >
                 {trips.map((trip) => (
@@ -519,6 +673,26 @@ export default function TripTracker({
       </Footer>
 
       {contributionDialogs}
+      {discardDialog}
+      {activityToDelete && (
+        <ConfirmDialog
+          title={t("adminExtra.message021")}
+          description={t("adminExtra.message237", {
+            value0: activityToDelete.title,
+          })}
+          preview={activityToDelete.title}
+          confirmLabel={t("adminExtra.message033")}
+          pendingLabel={t("adminExtra.message070")}
+          pending={scheduleBusy}
+          error={scheduleDeleteError}
+          onCancel={() => {
+            if (scheduleBusy) return;
+            setActivityToDelete(null);
+            setScheduleDeleteError("");
+          }}
+          onConfirm={deleteScheduleItem}
+        />
+      )}
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
       </p>
@@ -528,13 +702,60 @@ export default function TripTracker({
     return (
       <main className="shell">
         {tripHeader}
+        {scheduleNotice && (
+          <p className={trackerStyles["schedule-notice"]} role="status">
+            {scheduleNotice}
+            <button
+              type="button"
+              aria-label={t("adminExtra.message027")}
+              onClick={() => setScheduleNotice("")}
+            >
+              <ActionIcon name="close" />
+            </button>
+          </p>
+        )}
         <section className="now-card error-card">
           <h1>{t("tracker.noActivities")}</h1>
           <p>{t("tracker.noActivitiesDescription")}</p>
-          <Link className={trackerStyles["jump-button"]} href="/">
-            {t("tracker.chooseTrip")}
-          </Link>
+          <div className={trackerStyles["empty-schedule-actions"]}>
+            <Link className={trackerStyles["jump-button"]} href="/">
+              {t("tracker.chooseTrip")}
+            </Link>
+            {viewer?.isAdmin && (
+              <Button
+                variant="primary"
+                type="button"
+                aria-expanded={scheduleEditor?.key === "new"}
+                aria-controls="schedule-editor-new"
+                onClick={(event) =>
+                  openNewScheduleEditor(event.currentTarget)
+                }
+              >
+                {t("adminExtra.message042")}
+              </Button>
+            )}
+          </div>
         </section>
+        {viewer?.isAdmin && scheduleEditor?.key === "new" && (
+          <div className={trackerStyles["public-schedule-editor"]}>
+            <ScheduleForm
+              key="new"
+              editor={scheduleEditor}
+              busy={scheduleBusy}
+              error={scheduleError}
+              sources={data.sources}
+              placement="create"
+              onChange={(values) =>
+                setScheduleEditor((current) =>
+                  current ? { ...current, values } : current,
+                )
+              }
+              onCreateSource={createScheduleSource}
+              onSave={saveSchedule}
+              onCancel={closeScheduleEditor}
+            />
+          </div>
+        )}
         {tripSupplement}
       </main>
     );
@@ -707,7 +928,7 @@ export default function TripTracker({
               type="button"
               data-trip-day={date}
               aria-current={selectedDay === date ? "date" : undefined}
-              onClick={() => setSelectedDay(date)}
+              onClick={(event) => selectTripDay(date, event.currentTarget)}
             >
               <span>{t("tracker.day", { number: index + 1 })}</span>
               <strong>
@@ -1063,14 +1284,61 @@ export default function TripTracker({
 
       <div className={trackerStyles["section-heading"]}>
         <h2>{t("tracker.fullSchedule")}</h2>
-        <button
-          className={trackerStyles["jump-button"]}
-          type="button"
-          onClick={jumpToCurrent}
-        >
-          {isAfter ? t("tracker.backToEnd") : t("tracker.backToCurrent")} <ActionIcon name="down" />
-        </button>
+        <div className={trackerStyles["schedule-heading-actions"]}>
+          {viewer?.isAdmin && (
+            <Button
+              variant="primary"
+              type="button"
+              aria-expanded={scheduleEditor?.key === "new"}
+              aria-controls="schedule-editor-new"
+              onClick={(event) => openNewScheduleEditor(event.currentTarget)}
+            >
+              {t("adminExtra.message046")}
+            </Button>
+          )}
+          <button
+            className={trackerStyles["jump-button"]}
+            type="button"
+            onClick={jumpToCurrent}
+          >
+            {isAfter ? t("tracker.backToEnd") : t("tracker.backToCurrent")} <ActionIcon name="down" />
+          </button>
+        </div>
       </div>
+
+      {scheduleNotice && (
+        <p className={trackerStyles["schedule-notice"]} role="status">
+          {scheduleNotice}
+          <button
+            type="button"
+            aria-label={t("adminExtra.message027")}
+            onClick={() => setScheduleNotice("")}
+          >
+            <ActionIcon name="close" />
+          </button>
+        </p>
+      )}
+
+      {viewer?.isAdmin && scheduleEditor?.key === "new" && (
+        <div className={trackerStyles["public-schedule-editor"]}>
+          <ScheduleForm
+            key="new"
+            editor={scheduleEditor}
+            busy={scheduleBusy}
+            error={scheduleError}
+            sources={data.sources}
+            placement="create"
+            onChange={(values) =>
+              setScheduleEditor((current) =>
+                current ? { ...current, values } : current,
+              )
+            }
+            onCreateSource={createScheduleSource}
+            onSave={saveSchedule}
+            onCancel={closeScheduleEditor}
+          />
+        </div>
+      )}
 
       {selectedItinerary.length > 0 && (
         <section
@@ -1121,9 +1389,42 @@ export default function TripTracker({
                         {translateActivityType(locale, item.type)}
                         {item.branchLabel ? ` · ${item.branchLabel}` : ""}
                       </span>
-                      <span className={trackerStyles["done-label"]}>
-                        {t("trackerExtra.passed")}
-                      </span>
+                      <div className={trackerStyles["timeline-card-controls"]}>
+                        <span className={trackerStyles["done-label"]}>
+                          {t("trackerExtra.passed")}
+                        </span>
+                        {viewer?.isAdmin && (
+                          <div className={trackerStyles["timeline-owner-actions"]}>
+                            <Button
+                              variant="ghost"
+                              type="button"
+                              disabled={scheduleBusy}
+                              aria-expanded={
+                                scheduleEditor?.key === String(item.id)
+                              }
+                              aria-controls={`schedule-editor-${item.id}`}
+                              onClick={(event) =>
+                                activateScheduleEditor(
+                                  item,
+                                  event.currentTarget,
+                                )
+                              }
+                            >
+                              {scheduleEditor?.key === String(item.id)
+                                ? t("adminExtra.message072")
+                                : t("adminExtra.message037")}
+                            </Button>
+                            <Button
+                              variant="danger"
+                              type="button"
+                              disabled={scheduleBusy}
+                              onClick={() => requestScheduleDelete(item)}
+                            >
+                              {t("adminExtra.message033")}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <h3>{item.title}</h3>
                     {item.detail && (
@@ -1153,6 +1454,25 @@ export default function TripTracker({
                         : t("tracker.loginToComment")}
                     </button>
                   </div>
+                  {viewer?.isAdmin &&
+                    scheduleEditor?.key === String(item.id) && (
+                      <ScheduleForm
+                        key={scheduleEditor.key}
+                        editor={scheduleEditor}
+                        busy={scheduleBusy}
+                        error={scheduleError}
+                        sources={data.sources}
+                        placement="inline"
+                        onChange={(values) =>
+                          setScheduleEditor((current) =>
+                            current ? { ...current, values } : current,
+                          )
+                        }
+                        onCreateSource={createScheduleSource}
+                        onSave={saveSchedule}
+                        onCancel={closeScheduleEditor}
+                      />
+                    )}
                 </article>
                 {branchGroup && (
                   <BranchJunction
