@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   claimInvitationDeliveries,
-  listInvitationDeliveries,
   recordInvitationDeliveries,
 } from "../lib/invitation-history-store.mjs";
 
@@ -42,7 +41,6 @@ test("stores each recipient outcome atomically and returns client-safe history r
   }, timestamp);
 
   assert.equal(transactionQueries.length, 2);
-  assert.match(transactionQueries[0].text, /ON CONFLICT \(request_id, recipient_email\) DO UPDATE/);
   assert.deepEqual(rows, [
     {
       id: "10",
@@ -73,31 +71,6 @@ test("stores each recipient outcome atomically and returns client-safe history r
   ]);
 });
 
-test("lists the latest 200 invitation deliveries", async () => {
-  let query = "";
-  const sql = async (strings) => {
-    query = strings.join("");
-    return [{
-      id: "2",
-      request_id: requestId,
-      inviter_email: "owner@example.com",
-      recipient_email: "friend@example.com",
-      trip_slug: "kasai-evening",
-      trip_title: "Kasai",
-      subject: "Đi cùng mình nhé?",
-      status: "sent",
-      error_code: null,
-      attempted_at: timestamp,
-      sent_at: timestamp,
-    }];
-  };
-  const rows = await listInvitationDeliveries(sql);
-  assert.match(query, /ORDER BY attempted_at DESC, id DESC/);
-  assert.match(query, /status IN \('sent', 'failed'\)/);
-  assert.match(query, /LIMIT 200/);
-  assert.equal(rows[0].id, "2");
-});
-
 test("claims only retryable recipients before Gmail delivery", async () => {
   const transactionQueries = [];
   const sql = async () => [];
@@ -116,8 +89,7 @@ test("claims only retryable recipients before Gmail delivery", async () => {
   }, timestamp);
 
   assert.deepEqual(claimed, ["retry@example.com"]);
-  assert.match(transactionQueries[0].text, /status = 'sending'/);
-  assert.match(transactionQueries[0].text, /invitation_deliveries\.status = 'failed'/);
-  assert.match(transactionQueries[0].text, /invitation_deliveries\.status = 'sending'/);
-  assert.match(transactionQueries[0].text, /RETURNING recipient_email/);
+  assert.equal(transactionQueries.length, 2);
+  assert.equal(transactionQueries[0].values[2], "retry@example.com");
+  assert.equal(transactionQueries[1].values[2], "already-sent@example.com");
 });

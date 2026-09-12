@@ -41,7 +41,7 @@ test("normalizes verified Google identities", () => {
   assert.throws(() => normalizeLoginIdentity({}), /verified email is required/);
 });
 
-test("upserts only the latest login while preserving the first login", async () => {
+test("normalizes login values and serializes the stored user", async () => {
   const loginTime = new Date("2026-08-11T09:30:00.000Z");
   const { calls, sql } = sqlMock([{
     name: "Hoang Ngoc",
@@ -65,8 +65,6 @@ test("upserts only the latest login while preserving the first login", async () 
     last_active_at: loginTime.toISOString(),
   });
 
-  assert.match(calls[0].text, /ON CONFLICT \(email\) DO UPDATE SET/);
-  assert.doesNotMatch(calls[0].text, /first_login\s*=/);
   assert.deepEqual(calls[0].values, [
     "Hoang Ngoc",
     "Hoang Ngoc",
@@ -77,7 +75,7 @@ test("upserts only the latest login while preserving the first login", async () 
   ]);
 });
 
-test("upserts activity without changing login timestamps and throttles writes for five minutes", async () => {
+test("normalizes activity values and serializes a stored activity update", async () => {
   const activityTime = new Date("2026-08-11T10:00:00.000Z");
   const { calls, sql } = sqlMock([{
     name: "Hoang Ngoc",
@@ -93,9 +91,6 @@ test("upserts activity without changing login timestamps and throttles writes fo
   }, activityTime);
 
   assert.equal(result.last_active_at, activityTime.toISOString());
-  assert.match(calls[0].text, /last_active_at = EXCLUDED\.last_active_at/);
-  assert.match(calls[0].text, /INTERVAL '1 millisecond'/);
-  assert.doesNotMatch(calls[0].text, /DO UPDATE SET[\s\S]*last_login\s*=/);
   assert.deepEqual(calls[0].values, [
     "Hoang Ngoc",
     "Hoang Ngoc",
@@ -107,7 +102,7 @@ test("upserts activity without changing login timestamps and throttles writes fo
   ]);
 });
 
-test("returns null when activity falls inside the database throttle window", async () => {
+test("returns null when an activity write produces no stored row", async () => {
   const { sql } = sqlMock([]);
   assert.equal(await upsertUserActivity(sql, {
     name: "Hoang Ngoc",
@@ -137,9 +132,9 @@ test("serializes and sorts activity timestamps for the admin client", async () =
   }]);
 });
 
-test("preserves a custom display name while Google refreshes the source name", async () => {
+test("prefers a stored display name when serializing a refreshed login", async () => {
   const loginTime = new Date("2026-08-17T09:30:00.000Z");
-  const { calls, sql } = sqlMock([{
+  const { sql } = sqlMock([{
     name: "New Google Name",
     display_name: "My trip name",
     email: "friend@example.com",
@@ -152,8 +147,6 @@ test("preserves a custom display name while Google refreshes the source name", a
   const result = await upsertUserLogin(sql, { name: "New Google Name", email: "friend@example.com" }, loginTime);
   assert.equal(result.name, "My trip name");
   assert.equal(result.displayName, "My trip name");
-  assert.match(calls[0].text, /name = EXCLUDED\.name/);
-  assert.doesNotMatch(calls[0].text, /display_name\s*=\s*EXCLUDED\.display_name/);
 });
 
 test("validates display-name updates", () => {
@@ -162,7 +155,7 @@ test("validates display-name updates", () => {
   assert.throws(() => parseDisplayName({ displayName: "A", extra: true }), ValidationError);
 });
 
-test("updates the display name everywhere a contribution identity is denormalized", async () => {
+test("normalizes a display-name update and serializes the stored result", async () => {
   const { calls, sql } = sqlMock([{
     name: "Google Name",
     display_name: "Chosen Name",
@@ -179,9 +172,7 @@ test("updates the display name everywhere a contribution identity is denormalize
   });
   assert.equal(result.displayName, "Chosen Name");
   assert.equal(calls.length, 4);
-  assert.match(calls[1].text, /UPDATE suggestions SET author_name/);
-  assert.match(calls[2].text, /UPDATE notifications notification/);
-  assert.match(calls[3].text, /UPDATE admin_notification_outbox outbox/);
+  assert.deepEqual(calls[0].values, ["Chosen Name", "friend@example.com"]);
 });
 
 test("resolves, updates, and protects stored roles", async () => {
@@ -204,7 +195,7 @@ test("resolves, updates, and protects stored roles", async () => {
     ownerEmail: "owner@example.com",
   });
   assert.equal(updated.role, "admin");
-  assert.match(roleUpdate.calls[0].text, /UPDATE users/);
+  assert.deepEqual(roleUpdate.calls[0].values, ["admin", "friend@example.com"]);
 
   await assert.rejects(() => updateStoredUserRole(roleUpdate.sql, {
     email: "OWNER@example.com",

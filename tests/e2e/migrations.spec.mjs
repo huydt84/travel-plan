@@ -78,6 +78,40 @@ test("old single-day schedules acquire dates, stable keys, and contributor ident
   });
 });
 
+test("each migration can be deployed separately while existing core data remains intact", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "travel-incremental-migrations-"));
+  const sourceDir = new URL("../../migrations/", import.meta.url);
+  const files = (await readdir(sourceDir)).filter((name) => /^\d+.*\.mjs$/.test(name)).sort();
+  try {
+    await cp(new URL("../../migrations/support.mjs", import.meta.url), join(dir, "support.mjs"));
+    await isolatedSchema(async (db, migrate) => {
+      let seeded = false;
+      for (const file of files) {
+        await cp(new URL(`../../migrations/${file}`, import.meta.url), join(dir, file));
+        expect(await migrate({ dir }), file).toHaveLength(1);
+        if (!seeded) {
+          await db.query(`
+            INSERT INTO trips (slug,title,trip_date,end_date,timezone,location)
+            VALUES ('incremental','Existing trip','2032-01-01','2032-01-01','Asia/Tokyo','Tokyo');
+            INSERT INTO activities
+              (trip_id,item_key,sort_order,start_date,start_time,end_date,end_time,type,icon,title,detail)
+            VALUES (1,'existing-activity',0,'2032-01-01','09:00','2032-01-01','10:00','Visit','x','Existing activity','');
+            INSERT INTO suggestions (trip_id,activity_id,author_email,author_name,body)
+            VALUES (1,1,'existing@example.com','Existing user','Keep this');
+          `);
+          seeded = true;
+        }
+      }
+      expect((await db.query("SELECT title FROM trips WHERE slug='incremental'")).rows).toEqual([{ title: "Existing trip" }]);
+      expect((await db.query("SELECT item_key,title FROM activities WHERE trip_id=1")).rows).toEqual([{ item_key: "existing-activity", title: "Existing activity" }]);
+      expect((await db.query("SELECT email,name FROM users WHERE email='existing@example.com'")).rows).toEqual([{ email: "existing@example.com", name: "Existing user" }]);
+      expect((await db.query("SELECT body FROM suggestions WHERE author_email='existing@example.com'")).rows).toEqual([{ body: "Keep this" }]);
+    });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("a failed migration rolls back its DDL and ledger entry and can be retried", async () => {
   const dir = await mkdtemp(join(tmpdir(), "travel-migrations-"));
   try {

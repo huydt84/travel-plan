@@ -69,8 +69,10 @@ it must not import evolving application validation or repositories.
 
 - Use `pnpm run db:migrate:local` for the isolated Docker database.
 - Use `pnpm run db:migrate` intentionally for the configured production database.
-- Add a new `<timestamp>_<description>.mjs` file for future changes. Never edit an
-  applied migration or manually remove its ledger entry.
+- Create future migrations with `pnpm run db:migration:new <description>`. The
+  generator always chooses an id above the highest existing migration, including
+  historical future-dated ids. Never edit an applied migration or manually remove
+  its ledger entry.
 - Export `async function up(pgm)` and use the migration builder or `pgm.db.query`
   with parameters. Keep changes transactional. Existing baselines intentionally
   have no destructive down migration; correct them with forward migrations.
@@ -95,6 +97,7 @@ PostgreSQL and include:
 | Risk | Coverage |
 | --- | --- |
 | Fresh install / upgrade / failed migration | `migrations.spec.mjs` checks real schema constraints, ledger, backfills, no-op reruns and transactional retry |
+| SQL-backed store contracts | `store-contracts.spec.mjs` checks invitation leases/history, login throttling/display-name propagation, and outbox retry persistence against PostgreSQL |
 | Activity plus citations | `schedule-persistence.spec.mjs` forces FK failures and checks partial-edit semantics |
 | Whole-plan import / seeds | `import-persistence.spec.mjs` checks keys, selected branches, notes, create-only conflicts and rollback |
 | AI confirmation | `assistant-persistence.spec.mjs` checks rollback, stale revision guards, citation clearing and receipt replay |
@@ -103,6 +106,10 @@ PostgreSQL and include:
 | Drafts and focus | Branch editor and invitation browser tests |
 | Layout and completed trips | `maintenance-ui.spec.mjs` checks geometry, timers, feedback and anonymous heartbeat |
 | Shared CSS | `responsive-audit.spec.mjs` captures every public/admin surface at 320×760, 1440×900 and 1920×1080 |
+
+For focused feedback, use `pnpm run test:quick`, `pnpm run test:db`,
+`pnpm run test:browser:smoke`, or `pnpm run test:visual`. The ordinary `pnpm test`
+and `pnpm run test:full` commands remain the complete release gate.
 
 Tests no longer inspect application source files to infer runtime behavior.
 Inspect the complete screenshot batch, fix findings together, then run the

@@ -54,8 +54,6 @@ export default defineConfig({
         APP_URL: baseURL,
         NEXT_DIST_DIR: ".next-playwright",
         NEXT_TELEMETRY_DISABLED: "1",
-        FORCE_COLOR: "",
-        NO_COLOR: "",
         RESEND_API_ENDPOINT: "http://127.0.0.1:3101/emails",
         RESEND_API_KEY: "e2e-test-key",
       },
