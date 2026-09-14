@@ -106,17 +106,26 @@ for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) {
   test(`latest message edit and response regeneration fit at ${width}`, async ({ page }, testInfo) => {
     const f = await fixture(page.request);
     try {
+      await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
       const original = await f.accept();
       await f.store.publishTurn({ turnId: original.turn.id, output: "Câu trả lời ban đầu", citations: [] });
       await page.setViewportSize({ width, height });
       await gotoHealthy(page, `/assistant?trip=${f.slug}&conversation=${original.conversation.id}`);
       const edit = page.getByRole("button", { name: "Sửa tin nhắn" });
       const regenerate = page.getByRole("button", { name: "Tạo lại câu trả lời" });
-      await expect(edit).toBeVisible(); await expect(regenerate).toBeVisible();
-      for (const control of [edit, regenerate]) {
+      const copyMessage = page.getByRole("button", { name: "Sao chép tin nhắn" });
+      const copyResponse = page.getByRole("button", { name: "Sao chép câu trả lời" });
+      await expect(edit).toBeVisible(); await expect(regenerate).toBeVisible(); await expect(copyMessage).toBeVisible(); await expect(copyResponse).toBeVisible();
+      for (const control of [copyMessage, edit, copyResponse, regenerate]) {
         const box = await control.boundingBox();
         expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44);
       }
+      await copyMessage.click();
+      await expect(page.getByRole("button", { name: "Đã sao chép tin nhắn" })).toBeVisible();
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Tóm tắt chuyến đi");
+      await copyResponse.click();
+      await expect(page.getByRole("button", { name: "Đã sao chép câu trả lời" })).toBeVisible();
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("Câu trả lời ban đầu");
       await edit.click();
       const editor = page.getByRole("textbox", { name: "Nội dung tin nhắn đã sửa" });
       await expect(editor).toHaveValue("Tóm tắt chuyến đi");

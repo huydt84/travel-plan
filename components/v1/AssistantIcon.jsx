@@ -10,6 +10,8 @@ const paths = {
   stop: "M6 6h12v12H6Z",
   edit: "M4 20h4l11-11-4-4L4 16v4Zm9-13 4 4",
   regenerate: "M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7",
+  copy: "M9 9h10v10H9zM5 15V5h10",
+  check: "m5 12 4 4L19 6",
 };
 
 export default function AssistantIcon({ name }) {

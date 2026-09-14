@@ -32,13 +32,16 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
   const [historyWide, setHistoryWide] = useState(false);
   const [editingTurnId, setEditingTurnId] = useState(null);
   const [editDraft, setEditDraft] = useState("");
+  const [copiedMessage, setCopiedMessage] = useState(null);
   const historyTrigger = useRef(null);
+  const copyReset = useRef(null);
   useEffect(() => {
     if (!frame) return;
     const observer = new ResizeObserver(([entry]) => setHistoryWide(entry.contentRect.width >= 900));
     observer.observe(frame);
     return () => observer.disconnect();
   }, [frame]);
+  useEffect(() => () => clearTimeout(copyReset.current), []);
   const [newResponse, setNewResponse] = useState(false);
   const listRef = useRef(null), nearEnd = useRef(true), olderAnchor = useRef(null), focusCitation = useRef(null), citationFocus = useRef(null);
   const retryFocus = useRef(null), announcedQuestion = useRef(null);
@@ -161,6 +164,19 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
       throw failure;
     }
   };
+  const copyMessage = async (key, value) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      clearTimeout(copyReset.current);
+      setCopiedMessage(key);
+      copyReset.current = setTimeout(() => setCopiedMessage((current) => current === key ? null : current), 1800);
+    } catch { chat.setError("assistantExtra.error.copyMessage"); }
+  };
+  const copyButton = (key, value, kind) => {
+    const copied = copiedMessage === key;
+    const label = t(copied ? `assistantExtra.copied.${kind}` : `assistantExtra.copy.${kind}`);
+    return <button type="button" onClick={() => void copyMessage(key, value)} aria-label={label} title={label} aria-live="polite"><AssistantIcon name={copied ? "check" : "copy"} /></button>;
+  };
   const trackerTrip = tripSlug || initialWorkspace?.selectedTripSlug || null;
   const navigationQuery = new URLSearchParams();
   if (trackerTrip) navigationQuery.set("trip", trackerTrip);
@@ -192,9 +208,11 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     if (entry.kind === "handoff-message") {
       const item=entry.value,owner=item.author.role === "owner";
       return <article key={entry.id} className={styles.turn} aria-label={owner ? t("assistantExtra.handoff.ownerMessage") : t("assistantExtra.handoff.userMessage")}>
-        <div className={owner ? `${styles.assistantMessage} ${styles.ownerMessage}` : styles.userMessage}><span>{owner ? t("assistantExtra.handoff.owner") : t("assistantExtra.you")}</span><p>{item.body}</p>
-          {!owner && <ReferenceList label={t("assistantExtra.messageContext")} items={(item.contextRefs || []).map(ref=>({ref}))} onPin={chat.pin} disabled={restricted || chat.pinBusy} />}
-        </div>
+        {owner ? <div className={`${styles.assistantMessage} ${styles.ownerMessage}`}><span>{t("assistantExtra.handoff.owner")}</span><p>{item.body}</p>
+          <div className={styles.messageIconActions}>{copyButton(`handoff:${item.id}`, item.body, "response")}</div>
+        </div> : <div className={styles.userTurn}><div className={styles.userMessage}><span>{t("assistantExtra.you")}</span><p>{item.body}</p>
+          <ReferenceList label={t("assistantExtra.messageContext")} items={(item.contextRefs || []).map(ref=>({ref}))} onPin={chat.pin} disabled={restricted || chat.pinBusy} />
+        </div><div className={styles.messageIconActions}>{copyButton(`handoff:${item.id}`, item.body, "message")}</div></div>}
       </article>;
     }
     const turn=entry.value;
@@ -208,7 +226,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
           <textarea autoFocus aria-label={t("assistantExtra.editMessageLabel")} value={editDraft} maxLength={4000} onChange={(event) => setEditDraft(event.target.value)} />
           <div><button type="button" onClick={() => setEditingTurnId(null)}>{t("assistantExtra.cancel")}</button><button type="submit" disabled={!editDraft.trim() || chat.submitting}>{chat.retrying === turn.id ? t("assistantExtra.regenerating") : t("assistantExtra.saveAndRegenerate")}</button></div>
         </form> : <><p>{turn.input}</p><ReferenceList label={t("assistantExtra.messageContext")} items={(turn.mentions || []).map((ref) => turn.resolvedContext?.find((item) => item.ref.kind === ref.kind && item.ref.id === ref.id) || { ref })} onPin={chat.pin} disabled={restricted || chat.pinBusy} /></>}
-      </div>{canEdit && !editing && <div className={styles.messageIconActions}><button type="button" onClick={() => { setEditDraft(turn.input); setEditingTurnId(turn.id); }} aria-label={t("assistantExtra.editMessage")} title={t("assistantExtra.editMessage")}><AssistantIcon name="edit" /></button></div>}</div>
+      </div>{!editing && <div className={styles.messageIconActions}>{copyButton(`input:${turn.id}`, turn.input, "message")}{canEdit && <button type="button" onClick={() => { setEditDraft(turn.input); setEditingTurnId(turn.id); }} aria-label={t("assistantExtra.editMessage")} title={t("assistantExtra.editMessage")}><AssistantIcon name="edit" /></button>}</div>}</div>
       <div className={styles.assistantMessage} data-exchange={turn.exchangeId || turn.id} tabIndex={-1}><span>{t("assistantExtra.assistant")}</span>
         {turn.output && <MessageContent turnId={turn.id} text={turn.output} citations={turn.citations} streaming={turn.status === "running"} onCitation={inspectCitation} />}
         {turn.status === "running" && chat.disconnected?.turnId !== turn.id && <p className={styles.running} role="status">{localizeAssistantMessage(t, chat.progress) || t("assistantExtra.answering")}</p>}
@@ -219,7 +237,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
         {turn.actions?.map((item) => <BatchReview key={item.id} action={item} busy={applying} readOnly={restricted} onApprove={() => decideBatch(item,"approve")} onReject={() => decideBatch(item,"reject")} onRevise={(action,edits) => edits ? reviseBatch(action,edits) : (() => { chat.setMessage(`Tạo lại đề xuất: ${turn.input}`);document.getElementById("assistant-message")?.focus(); })()} />)}
         <ReferenceList items={turn.usedContext} label={t("assistantExtra.usedContext")} onPin={chat.pin} disabled={restricted || chat.pinBusy} />
         <div className={styles.messageActions}>{!!turn.citations?.length && <button onClick={() => inspect(turn,"evidence")}>{t("assistantExtra.sourceCount",{count:turn.citations.length})}</button>}{turn.status === "completed" && turn.changeSet && <button data-status={turn.changeSet.status} className={styles.reviewButton} onClick={() => inspect(turn,"changes")}>{turn.changeSet.status === "applied" ? t("assistantExtra.viewApplied") : ["expired","conflicted"].includes(turn.changeSet.status) ? t("assistantExtra.viewStale") : t("assistantExtra.viewProposed",{count:turn.changeSet.preview.changes.length})}</button>}</div>
-        {canRegenerate && <div className={styles.messageIconActions}><button type="button" onClick={() => void chat.replace(turn)} aria-label={t("assistantExtra.regenerateResponse")} title={t("assistantExtra.regenerateResponse")}><AssistantIcon name="regenerate" /></button></div>}
+        {!!turn.output && turn.status !== "running" && <div className={styles.messageIconActions}>{copyButton(`output:${turn.id}`, turn.output, "response")}{canRegenerate && <button type="button" onClick={() => void chat.replace(turn)} aria-label={t("assistantExtra.regenerateResponse")} title={t("assistantExtra.regenerateResponse")}><AssistantIcon name="regenerate" /></button>}</div>}
       </div>
     </article>;
   };
