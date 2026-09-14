@@ -74,6 +74,64 @@ test("retry is atomic, actor scoped, latest-only and paginated as one exchange",
   } finally { await f.close(); }
 });
 
+test("replacing the latest turn overwrites its persisted input and generated artifacts", async ({ request }) => {
+  const f = await fixture(request);
+  try {
+    const original = await f.accept();
+    await f.store.publishTurn({ turnId: original.turn.id, output: "Old answer", citations: [{ id: "old" }] });
+    const clientTurnId = randomUUID();
+    const first = await f.store.replaceLatestTurn({ turnId: original.turn.id, ownerEmail: "local-admin@localhost.invalid",
+      clientTurnId, input: "Edited latest message", leaseMs: 60000, maxTurnsPerHour: 100 });
+    const replay = await f.store.replaceLatestTurn({ turnId: original.turn.id, ownerEmail: "local-admin@localhost.invalid",
+      clientTurnId, input: "Edited latest message", leaseMs: 60000, maxTurnsPerHour: 100 });
+    expect(replay.replayed).toBe(true);
+    expect(first.turn).toMatchObject({ id: original.turn.id, input: "Edited latest message", output: null, citations: [], status: "running" });
+    expect(await f.sql`SELECT id,input_text,output_text FROM assistant_turns WHERE conversation_id=${original.conversation.id}`).toEqual([
+      { id: original.turn.id, input_text: "Edited latest message", output_text: null },
+    ]);
+    expect(await f.sql`SELECT seq FROM assistant_events WHERE turn_id=${original.turn.id}`).toEqual([{ seq: 1 }]);
+    expect(await f.sql`SELECT turn_id FROM assistant_jobs WHERE turn_id=${original.turn.id}`).toHaveLength(1);
+    await f.store.publishTurn({ turnId: original.turn.id, output: "New answer", citations: [] });
+    expect(await f.store.listModelHistory(original.conversation.id, "local-admin@localhost.invalid")).toEqual([
+      expect.objectContaining({ id: original.turn.id, input: "Edited latest message", output: "New answer" }),
+    ]);
+    const later = await f.accept({ conversationId: original.conversation.id, input: "Later message" });
+    await f.store.publishTurn({ turnId: later.turn.id, output: "Later answer", citations: [] });
+    await expect(f.store.replaceLatestTurn({ turnId: original.turn.id, ownerEmail: "local-admin@localhost.invalid",
+      clientTurnId: randomUUID(), input: "Too late", leaseMs: 60000, maxTurnsPerHour: 100 })).rejects.toMatchObject({ code: "REPLACE_UNAVAILABLE" });
+  } finally { await f.close(); }
+});
+
+for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) {
+  test(`latest message edit and response regeneration fit at ${width}`, async ({ page }, testInfo) => {
+    const f = await fixture(page.request);
+    try {
+      const original = await f.accept();
+      await f.store.publishTurn({ turnId: original.turn.id, output: "Câu trả lời ban đầu", citations: [] });
+      await page.setViewportSize({ width, height });
+      await gotoHealthy(page, `/assistant?trip=${f.slug}&conversation=${original.conversation.id}`);
+      const edit = page.getByRole("button", { name: "Sửa tin nhắn" });
+      const regenerate = page.getByRole("button", { name: "Tạo lại câu trả lời" });
+      await expect(edit).toBeVisible(); await expect(regenerate).toBeVisible();
+      for (const control of [edit, regenerate]) {
+        const box = await control.boundingBox();
+        expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44);
+      }
+      await edit.click();
+      const editor = page.getByRole("textbox", { name: "Nội dung tin nhắn đã sửa" });
+      await expect(editor).toHaveValue("Tóm tắt chuyến đi");
+      await editor.fill("Tin nhắn mới nhất đã sửa");
+      await page.getByRole("button", { name: "Lưu và tạo lại" }).click();
+      await expect(page.getByText("Tin nhắn mới nhất đã sửa", { exact: true })).toBeVisible();
+      await expect(page.getByText("Đây là chế độ mô phỏng cục bộ.", { exact: false })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Tạo lại câu trả lời" })).toBeVisible();
+      expect(await f.sql`SELECT input_text FROM assistant_turns WHERE conversation_id=${original.conversation.id}`).toEqual([{ input_text: "Tin nhắn mới nhất đã sửa" }]);
+      await page.screenshot({ path: testInfo.outputPath("latest-message-actions.png"), fullPage: true });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    } finally { await f.close(); }
+  });
+}
+
 test("unconfirmed submission keeps its identity and does not overwrite a newer draft", async ({ page }) => {
   const f = await fixture(page.request);
   try {

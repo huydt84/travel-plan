@@ -35,6 +35,7 @@
 .tripControl select { min-height: 44px; width: 100%; min-width: 0; padding: 6px 24px 6px 10px; color: var(--navy); background: var(--paper-bright); border: 1px solid var(--v1-line); border-radius: 4px; font-size: 14px; }
 .turnList { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; padding: 32px max(24px, calc((100% - 760px)/2)); overflow-anchor: none; }
 .turn { margin: 0 0 28px; overflow-wrap: anywhere; }
+.userTurn { display: flex; flex-direction: column; align-items: flex-end; }
 .userMessage { margin-left: auto; max-width: 88%; padding: 14px 18px; background: var(--green-soft); border-radius: 4px; }
 .userMessage > span, .assistantMessage > span { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; color: var(--green-dark); }
 .userMessage p { margin: 0; white-space: pre-wrap; }
@@ -64,6 +65,19 @@
 .messageActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .messageActions .reviewButton { background: var(--yellow-soft); border-color: var(--v1-line); }
 .messageActions .reviewButton[data-status="applied"] { background: var(--green-soft); }
+.messageIconActions { display: flex; min-height: 44px; margin-top: 4px; }
+.messageIconActions button { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--navy-soft); }
+.messageIconActions button:hover:not(:disabled) { color: var(--green-dark); background: color-mix(in srgb, var(--green-soft) 72%, transparent); }
+.messageIconActions button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.messageIconActions button:active:not(:disabled) { transform: translateY(1px); }
+.messageEditor { display: grid; gap: 8px; }
+.messageEditor textarea { display: block; width: 100%; min-height: 96px; resize: vertical; padding: 10px 12px; border: 1px solid var(--green-dark); border-radius: 4px; background: var(--paper-bright); color: var(--navy); font: inherit; line-height: 1.55; }
+.messageEditor textarea:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.messageEditor > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.messageEditor button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--green-dark); border-radius: 4px; background: var(--paper-bright); color: var(--green-dark); font: 600 13px/1.3 var(--font-body), sans-serif; }
+.messageEditor button[type="submit"] { background: var(--green-dark); color: var(--paper-bright); }
+.messageEditor button:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.messageEditor button:disabled { opacity: .55; }
 .running { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 10px; }
 .running::before { content: ""; width: 8px; height: 8px; background: var(--green-dark); border-radius: 50%; animation: pulse 1.4s ease-in-out infinite alternate; }
 @keyframes pulse { to { opacity: .35; } }

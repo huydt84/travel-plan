@@ -290,6 +290,38 @@ export function useConversation({ initialWorkspace, viewer }) {
     return send(turn.input, pending || { clientTurnId: crypto.randomUUID(),
       conversationId: workspace.selectedConversation.id, message: turn.input, mentions: turn.mentions || [], allowedTools: turn.allowedTools || workspace.availableTools, retryOfTurnId: turn.id });
   };
+  const replace = async (turn, input = turn.input) => {
+    const nextInput = input.trim();
+    if (!nextInput || sending.current || submitting || pinBusy || loading || turns.some((item) => ["running", "awaiting_approval", "awaiting_input"].includes(item.status))) return false;
+    const token = generation.current;
+    const body = { clientTurnId: crypto.randomUUID(), message: nextInput };
+    const pendingKey = `replace:${turn.id}`;
+    try { sessionStorage.setItem(prefix + pendingKey, JSON.stringify(body)); }
+    catch { setError("assistantExtra.error.storage"); return false; }
+    sending.current = true; setSubmitting(true); setRetrying(turn.id); setError(""); setSubmissionFailure(null);
+    try {
+      let accepted;
+      try {
+        accepted = await apiJson(`/api/v1/assistant/turns/${turn.id}/regenerate`, { method: "POST", body: JSON.stringify(body) });
+        if (!accepted.runId || !accepted.turn) throw new Error("assistantExtra.error.acceptance");
+      } catch (failure) {
+        if (failure.status && failure.status < 500) throw failure;
+        const recovered = await apiJson(`/api/v1/assistant/workspace?request=${body.clientTurnId}`);
+        if (!recovered.request?.found || recovered.request.turn.id !== turn.id) throw failure;
+        accepted = { runId: turn.id, turn: recovered.request.turn };
+      }
+      persist(pendingKey, "");
+      if (generation.current !== token) return false;
+      const replacement = accepted.turn.status === "running" ? { ...accepted.turn, output: "" } : accepted.turn;
+      setTurns((items) => items.map((item) => item.id === turn.id ? replacement : item));
+      if (replacement.status === "running") { setProgress("assistantExtra.progress.waiting"); observe(replacement, token); }
+      else setProgress("");
+      return true;
+    } catch (failure) {
+      if (generation.current === token) setError(failure.message);
+      return false;
+    } finally { sending.current = false; setSubmitting(false); setRetrying(null); }
+  };
   const reconnect = () => {
     const turn = turns.find((item) => item.id === disconnected?.turnId);
     if (!turn) return;
@@ -341,5 +373,5 @@ export function useConversation({ initialWorkspace, viewer }) {
   };
   return { workspace, turns, setTurns, message, setMessage, loading, error: localizeAssistantMessage(t, error), setError, progress: localizeAssistantMessage(t, progress), submitting, historyLoading, historyError: localizeAssistantMessage(t, historyError),
     mentions, addMention, setMentions, allowedTools, setAllowedTools, pin, unpin, pinBusy, load, selectConversation, newConversation, submit, send, stop, history, older,
-    refreshConversation, retry, retrying, submissionFailure: submissionFailure ? { ...submissionFailure, message: localizeAssistantMessage(t, submissionFailure.message) } : null, retrySubmission, disconnected, reconnect };
+    refreshConversation, retry, replace, retrying, submissionFailure: submissionFailure ? { ...submissionFailure, message: localizeAssistantMessage(t, submissionFailure.message) } : null, retrySubmission, disconnected, reconnect };
 }

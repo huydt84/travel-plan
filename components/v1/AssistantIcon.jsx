@@ -8,6 +8,8 @@ const paths = {
   prompt: "M5 12h14m-5-5 5 5-5 5",
   send: "M12 19V5m-6 6 6-6 6 6",
   stop: "M6 6h12v12H6Z",
+  edit: "M4 20h4l11-11-4-4L4 16v4Zm9-13 4 4",
+  regenerate: "M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7",
 };
 
 export default function AssistantIcon({ name }) {

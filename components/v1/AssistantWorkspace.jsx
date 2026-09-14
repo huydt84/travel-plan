@@ -30,6 +30,8 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
   const [frame, setFrame] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyWide, setHistoryWide] = useState(false);
+  const [editingTurnId, setEditingTurnId] = useState(null);
+  const [editDraft, setEditDraft] = useState("");
   const historyTrigger = useRef(null);
   useEffect(() => {
     if (!frame) return;
@@ -196,8 +198,17 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
       </article>;
     }
     const turn=entry.value;
+    const hasAppliedChanges = turn.changeSet?.status === "applied" || turn.actions?.some((action) => action.status === "applied");
+    const canEdit = index === timeline.length - 1 && ["completed", "failed"].includes(turn.status) && !hasAppliedChanges && !requestBlocked && !running && !chat.submitting && !chat.loading;
+    const canRegenerate = canEdit && turn.status === "completed";
+    const editing = editingTurnId === turn.id;
     return <article key={entry.id} className={styles.turn} aria-label={t("assistantExtra.exchange", { input: turn.input })}>
-      <div className={styles.userMessage}><span>{t("assistantExtra.you")}</span><p>{turn.input}</p><ReferenceList label={t("assistantExtra.messageContext")} items={(turn.mentions || []).map((ref) => turn.resolvedContext?.find((item) => item.ref.kind === ref.kind && item.ref.id === ref.id) || { ref })} onPin={chat.pin} disabled={restricted || chat.pinBusy} /></div>
+      <div className={styles.userTurn}><div className={styles.userMessage}><span>{t("assistantExtra.you")}</span>
+        {editing ? <form className={styles.messageEditor} onSubmit={async (event) => { event.preventDefault(); if (await chat.replace(turn, editDraft)) setEditingTurnId(null); }}>
+          <textarea autoFocus aria-label={t("assistantExtra.editMessageLabel")} value={editDraft} maxLength={4000} onChange={(event) => setEditDraft(event.target.value)} />
+          <div><button type="button" onClick={() => setEditingTurnId(null)}>{t("assistantExtra.cancel")}</button><button type="submit" disabled={!editDraft.trim() || chat.submitting}>{chat.retrying === turn.id ? t("assistantExtra.regenerating") : t("assistantExtra.saveAndRegenerate")}</button></div>
+        </form> : <><p>{turn.input}</p><ReferenceList label={t("assistantExtra.messageContext")} items={(turn.mentions || []).map((ref) => turn.resolvedContext?.find((item) => item.ref.kind === ref.kind && item.ref.id === ref.id) || { ref })} onPin={chat.pin} disabled={restricted || chat.pinBusy} /></>}
+      </div>{canEdit && !editing && <div className={styles.messageIconActions}><button type="button" onClick={() => { setEditDraft(turn.input); setEditingTurnId(turn.id); }} aria-label={t("assistantExtra.editMessage")} title={t("assistantExtra.editMessage")}><AssistantIcon name="edit" /></button></div>}</div>
       <div className={styles.assistantMessage} data-exchange={turn.exchangeId || turn.id} tabIndex={-1}><span>{t("assistantExtra.assistant")}</span>
         {turn.output && <MessageContent turnId={turn.id} text={turn.output} citations={turn.citations} streaming={turn.status === "running"} onCitation={inspectCitation} />}
         {turn.status === "running" && chat.disconnected?.turnId !== turn.id && <p className={styles.running} role="status">{localizeAssistantMessage(t, chat.progress) || t("assistantExtra.answering")}</p>}
@@ -208,6 +219,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
         {turn.actions?.map((item) => <BatchReview key={item.id} action={item} busy={applying} readOnly={restricted} onApprove={() => decideBatch(item,"approve")} onReject={() => decideBatch(item,"reject")} onRevise={(action,edits) => edits ? reviseBatch(action,edits) : (() => { chat.setMessage(`Tạo lại đề xuất: ${turn.input}`);document.getElementById("assistant-message")?.focus(); })()} />)}
         <ReferenceList items={turn.usedContext} label={t("assistantExtra.usedContext")} onPin={chat.pin} disabled={restricted || chat.pinBusy} />
         <div className={styles.messageActions}>{!!turn.citations?.length && <button onClick={() => inspect(turn,"evidence")}>{t("assistantExtra.sourceCount",{count:turn.citations.length})}</button>}{turn.status === "completed" && turn.changeSet && <button data-status={turn.changeSet.status} className={styles.reviewButton} onClick={() => inspect(turn,"changes")}>{turn.changeSet.status === "applied" ? t("assistantExtra.viewApplied") : ["expired","conflicted"].includes(turn.changeSet.status) ? t("assistantExtra.viewStale") : t("assistantExtra.viewProposed",{count:turn.changeSet.preview.changes.length})}</button>}</div>
+        {canRegenerate && <div className={styles.messageIconActions}><button type="button" onClick={() => void chat.replace(turn)} aria-label={t("assistantExtra.regenerateResponse")} title={t("assistantExtra.regenerateResponse")}><AssistantIcon name="regenerate" /></button></div>}
       </div>
     </article>;
   };
