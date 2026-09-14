@@ -242,6 +242,29 @@ test("proposal source additions require previously researched evidence", async (
   assert.equal((await run(client)).operations, null);
 });
 
+test("proposal reuses an exact verified URL from recent conversation history", async () => {
+  const url = "https://example.com/already-verified";
+  const client = scriptedClient([
+    { steps: [call("apply_changes", { operations: [
+      { kind: "source.create", trip: { id: "1" }, draftId: "known", value: { title: "Already verified", url } },
+    ] })] },
+    { output_text: "The previously verified source was rejected." },
+  ]);
+  const result = await createGeminiModelAdapter({ client, model: "test" }).run({
+    message: "Chỉ format lại và lưu link đã tra.",
+    actor: { email: "test@example.com", isAdmin: true },
+    contextService: { targetSnapshot: async () => snapshot },
+    history: [{
+      input: "Hãy tra nguồn này.",
+      output: "Đã kiểm tra [E1]",
+      citations: [{ id: "E1", kind: "web", title: "Already verified", url, checkedAt: "2030-01-01T00:00:00Z" }],
+    }],
+  });
+  assert.ok(result.pendingAction);
+  assert.deepEqual(result.citations.map((citation) => citation.url), [url]);
+  assert.equal(client.requests.length, 1);
+});
+
 
 test("incomplete provider output never becomes a completed answer", async () => {
   await assert.rejects(run(scriptedClient([{ status: "incomplete", output_text: "Partial answer" }])), { code: "MODEL_INCOMPLETE" });

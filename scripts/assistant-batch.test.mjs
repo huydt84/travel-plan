@@ -52,3 +52,20 @@ test("unsupported operations, duplicate targets, source provenance, overlaps and
   assert.throws(() => compileBatch({ operations: [create("activity", "overlap", a, { id: "1" })] }, [snapshot]));
   assert.throws(() => compileBatch({ operations: Array.from({ length: 25 }, (_, i) => create("trip", `t${i}`, { ...trip, slug: `trip-${i}` })) }, []));
 });
+
+test("source provenance matches the exact trimmed URL and records only used evidence", () => {
+  const source = (url) => ({ operations: [create("source", "source", { title: "Verified", url }, { id: "1" })] });
+  const verifiedUrl = "https://example.com/guide?lang=vi";
+  const compiled = compileBatch(source(`  ${verifiedUrl}  `), [snapshot], [
+    { id: "E1", url: "https://example.com/unused" },
+    { id: "E2", url: verifiedUrl },
+  ]);
+  assert.equal(compiled.operations[0].value.url, verifiedUrl);
+  assert.deepEqual(compiled.evidenceRefs, ["E2"]);
+  for (const url of [
+    "https://example.com/guide",
+    "https://example.com/guide?lang=en",
+    "https://example.com/guide?lang=vi#details",
+  ]) assert.throws(() => compileBatch(source(url), [snapshot], [{ id: "E2", url: verifiedUrl }]), /tra cứu URL nguồn/);
+  assert.throws(() => compileBatch(source("javascript:alert(1)"), [snapshot], [{ id: "E2", url: verifiedUrl }]), /http hoặc https/);
+});
