@@ -12,7 +12,7 @@ import { ADMIN_ROUTES } from "../lib/admin-routes.mjs";
 import { normalizeScheduleRefs } from "../lib/schedule-editor-state.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
 import { useScheduleDraft } from "./admin/useScheduleDraft";
-import { TripForm, ScheduleForm, SourceForm } from "./admin/EditorForms";
+import { PlaceForm, TripForm, ScheduleForm, SourceForm } from "./admin/EditorForms";
 import AdminNav from "./AdminNav";
 import ConfirmDialog from "./ConfirmDialog";
 import LanguageSwitcher from "./LanguageSwitcher";
@@ -64,6 +64,14 @@ const sourceUsageCount = (plan, sourceNumber) =>
       group.branches.flatMap((branch) => branch.itinerary),
     ),
   ].filter((item) => item.refs?.includes(sourceNumber)).length;
+
+const placeUsageCount = (plan, placeId) =>
+  [
+    ...(plan?.backbone || plan?.itinerary || []),
+    ...(plan?.branchGroups || []).flatMap((group) =>
+      group.branches.flatMap((branch) => branch.itinerary),
+    ),
+  ].filter((item) => item.placeId === placeId).length;
 
 export default function AdminApp({
   viewer,
@@ -164,6 +172,7 @@ function Dashboard({
   const [plan, setPlan] = useState(initialPlan);
   const [tripEditor, setTripEditor] = useState(null);
   const [sourceEditor, setSourceEditor] = useState(null);
+  const [placeEditor, setPlaceEditor] = useState(null);
   const [suggestions, setSuggestions] = useState(initialSuggestions);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -221,6 +230,7 @@ function Dashboard({
         setTripEditor(null);
         setScheduleEditor(null);
         setSourceEditor(null);
+        setPlaceEditor(null);
         setSelectedSlug(slug);
         setError("");
         setNotice("");
@@ -488,6 +498,35 @@ function Dashboard({
           value1: source.title,
         }),
       );
+    });
+  };
+
+  const savePlace = async (values, placeId = null) => {
+    const base = `/api/trips/${encodeURIComponent(selectedSlug)}/places`;
+    const place = await api(placeId ? `${base}/${placeId}` : base, {
+      method: placeId ? "PATCH" : "POST",
+      body: JSON.stringify(values),
+    });
+    setPlan((current) => current ? {
+      ...current,
+      places: placeId
+        ? current.places.map((item) => item.id === place.id ? place : item)
+        : [...current.places, place],
+    } : current);
+    setPlaceEditor(null);
+    setNotice(placeId ? t("adminPlaces.updated") : t("adminPlaces.created"));
+    return place;
+  };
+
+  const removePlaceForPlan = (place) => {
+    const usageCount = placeUsageCount(plan, place.id);
+    const usage = usageCount ? t("adminPlaces.unlinkWarning", { count: usageCount }) : "";
+    if (!window.confirm(t("adminPlaces.deleteConfirm", { name: place.name, usage }))) return;
+    run(async () => {
+      await api(`/api/trips/${encodeURIComponent(selectedSlug)}/places/${place.id}`, { method: "DELETE" });
+      setPlaceEditor(null);
+      await refreshPlan(selectedSlug);
+      setNotice(t("adminPlaces.deleted"));
     });
   };
 
@@ -825,6 +864,51 @@ function Dashboard({
                       {t("adminExtra.message038")}
                     </p>
                   )}
+                </div>
+              </section>
+
+              <section
+                className={scheduleEditorStyles["admin-places"]}
+                aria-labelledby="admin-places-title"
+                aria-label={t("adminPlaces.title")}
+              >
+                <div className={`${adminShellStyles["admin-section-head"]} ${scheduleEditorStyles["place-heading"]}`}>
+                  <div>
+                    <h2 id="admin-places-title">{t("adminPlaces.title")} · {plan.places.length}</h2>
+                    <p>{t("adminPlaces.description")}</p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    type="button"
+                    aria-expanded={placeEditor?.place == null && Boolean(placeEditor)}
+                    onClick={() => setPlaceEditor((current) => current && current.place == null ? null : { place: null })}
+                  >
+                    {placeEditor?.place == null && placeEditor ? t("adminPlaces.cancel") : t("adminPlaces.add")}
+                  </Button>
+                </div>
+                {placeEditor?.place == null && placeEditor && <PlaceForm onSave={(values) => savePlace(values)} onCancel={() => setPlaceEditor(null)} />}
+                <div className={scheduleEditorStyles["admin-place-list"]}>
+                  {plan.places.map((place) => <div key={place.id}>
+                    {placeEditor?.place?.id === place.id
+                      ? <PlaceForm place={place} onSave={(values) => savePlace(values, place.id)} onCancel={() => setPlaceEditor(null)} />
+                      : <article className={scheduleEditorStyles["admin-place-item"]}>
+                        <div className={scheduleEditorStyles["admin-place-copy"]}>
+                          <h3>{place.name}</h3>
+                          <p>{place.address}</p>
+                          {place.notes && <p>{place.notes}</p>}
+                          {place.latitude != null && <small>{t("adminPlaces.coordinates", { latitude: place.latitude, longitude: place.longitude })}</small>}
+                          <div className={scheduleEditorStyles["admin-place-links"]}>
+                            {place.website && <a href={place.website} target="_blank" rel="noreferrer">{t("adminPlaces.website")}</a>}
+                            {place.googlePlaceId && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${encodeURIComponent(place.googlePlaceId)}`} target="_blank" rel="noreferrer">Google Maps</a>}
+                          </div>
+                        </div>
+                        <div className={scheduleEditorStyles["admin-row-actions"]}>
+                          <Button variant="ghost" type="button" disabled={busy} onClick={() => setPlaceEditor({ place })}>{t("adminPlaces.edit")}</Button>
+                          <Button variant="danger" type="button" disabled={busy} onClick={() => removePlaceForPlan(place)}>{t("adminPlaces.delete")}</Button>
+                        </div>
+                      </article>}
+                  </div>)}
+                  {!plan.places.length && <p className={scheduleEditorStyles["admin-empty"]}>{t("adminPlaces.empty")}</p>}
                 </div>
               </section>
 

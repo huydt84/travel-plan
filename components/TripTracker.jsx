@@ -635,6 +635,8 @@ export default function TripTracker({
         />
       </section>
 
+      <SavedPlaces places={data.places} activities={data.itinerary} />
+
       <section
         className={contributionsStyles["sources"]}
         aria-labelledby="sources-title"
@@ -665,8 +667,6 @@ export default function TripTracker({
           ))}
         </div>
       </section>
-
-      <SavedPlaces places={data.places} activities={data.itinerary} />
       <Footer>
         <span>{tripTitle}</span>
         <span>{t("trackerExtra.footer")}</span>

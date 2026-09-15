@@ -177,6 +177,87 @@
   margin: 0;
   border-top: 0;
 }
+.admin-places {
+  margin-top: 34px;
+}
+.place-heading {
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+.place-heading p {
+  max-width: 68ch;
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.place-form {
+  margin: 0;
+  border-top: 0;
+}
+.admin-place-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.admin-place-list > div:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+.admin-place-list > div {
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+}
+.admin-place-list > .admin-empty {
+  grid-column: 1 / -1;
+}
+.admin-place-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  min-height: 100%;
+  padding: 16px 12px;
+}
+.admin-place-item:hover {
+  background: var(--yellow-soft);
+}
+.admin-place-copy {
+  min-width: 0;
+}
+.admin-place-copy h3 {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+  font: 600 22px/1.05 var(--display);
+}
+.admin-place-copy p {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+  color: var(--navy-soft);
+  font-size: 10px;
+  line-height: 1.55;
+}
+.admin-place-copy small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.admin-place-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+.admin-place-links a {
+  color: var(--navy);
+  font-size: 9px;
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+.admin-place-item .admin-row-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .schedule-heading {
   composes: schedule-heading from global;
   margin: 34px 0 0;
@@ -1335,6 +1416,19 @@
   }
   .admin-source-actions {
     flex-wrap: wrap;
+  }
+  .admin-place-list {
+    grid-template-columns: 1fr;
+  }
+  .admin-place-list > div:nth-child(odd) {
+    border-right: 0;
+  }
+  .admin-place-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .admin-place-item .admin-row-actions {
+    grid-column: auto;
+    justify-content: flex-start;
   }
   .form-grid {
     grid-template-columns: minmax(0, 1fr);

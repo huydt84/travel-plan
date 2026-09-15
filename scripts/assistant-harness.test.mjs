@@ -181,6 +181,47 @@ test("source annotations follow SDK steps and reject executable URLs", () => {
   assert.equal(citations.length, 1);
 });
 
+test("web research unwraps a Vertex grounding redirect without requesting the destination", async () => {
+  const redirect = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/provider-token";
+  const destination = "https://www.hakonenavi.jp/international/en/transportation/hakone-ropeway";
+  const requested = [];
+  const research = createGoogleResearchAdapters({
+    searchClient: { interactions: { create: async () => ({
+      output_text: "Hakone Ropeway",
+      steps: [{ type: "model_output", content: [{ type: "text", annotations: [
+        { type: "url_citation", url: redirect, title: "Hakone Navi" },
+      ] }] }],
+    }) } },
+    fetchImpl: async (url, options) => {
+      requested.push({ url: String(url), options });
+      return new Response(null, { status: 302, headers: { location: destination } });
+    },
+  });
+  const result = await research.searchWeb({ query: "Hakone Ropeway official" });
+  assert.equal(result.citations[0].url, destination);
+  assert.deepEqual(requested.map((item) => item.url), [redirect]);
+  assert.equal(requested[0].options.redirect, "manual");
+});
+
+test("web research keeps an unresolved or unsafe grounding redirect citation-only", async () => {
+  const redirect = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/provider-token";
+  for (const response of [
+    new Response(null, { status: 302, headers: { location: "javascript:alert(1)" } }),
+    new Response(null, { status: 200 }),
+  ]) {
+    const research = createGoogleResearchAdapters({
+      searchClient: { interactions: { create: async () => ({
+        output_text: "Hakone",
+        steps: [{ type: "model_output", content: [{ type: "text", annotations: [
+          { type: "url_citation", url: redirect, title: "Hakone" },
+        ] }] }],
+      }) } },
+      fetchImpl: async () => response,
+    });
+    assert.equal((await research.searchWeb({ query: "Hakone" })).citations[0].url, redirect);
+  }
+});
+
 test("routes use explicit waypoints, trip timezone and Maps link modes", async () => {
   let body;
   const research = createGoogleResearchAdapters({ mapsApiKey: "test", now: () => Date.parse("2030-01-01T00:00:00Z"),
@@ -242,6 +283,35 @@ test("proposal source additions require previously researched evidence", async (
   assert.equal((await run(client)).operations, null);
 });
 
+test("source provenance errors return exact verified URLs so the model can repair without another search", async () => {
+  const verified = "https://www.hakonenavi.jp/international/en/";
+  const derived = "https://www.hakonenavi.jp/international/en/invented-path";
+  const client = scriptedClient([
+    { steps: [call("apply_changes", { operations: [
+      { kind: "source.create", trip: { id: "1" }, draftId: "hakone", value: { title: "Hakone", url: derived } },
+    ] })] },
+    (request) => {
+      assert.deepEqual(request.input[0].result.error.details, {
+        unverifiedUrls: [derived],
+        verifiedSources: [{ id: "E1", title: "Hakone Navi", url: verified }],
+      });
+      return { steps: [call("apply_changes", { operations: [
+        { kind: "source.create", trip: { id: "1" }, draftId: "hakone", value: { title: "Hakone", url: verified } },
+      ] })] };
+    },
+  ]);
+  const result = await createGeminiModelAdapter({ client, model: "test" }).run({
+    message: "Lưu nguồn đã tra.",
+    actor: { email: "test@example.com", isAdmin: true },
+    contextService: { targetSnapshot: async () => snapshot },
+    history: [{ input: "Tra Hakone.", output: "Hakone [E1]", citations: [
+      { id: "E1", kind: "web", title: "Hakone Navi", url: verified },
+    ] }],
+  });
+  assert.equal(result.pendingAction.compiled.operations[0].value.url, verified);
+  assert.equal(client.requests.length, 2);
+});
+
 test("proposal reuses an exact verified URL from recent conversation history", async () => {
   const url = "https://example.com/already-verified";
   const client = scriptedClient([
@@ -262,6 +332,42 @@ test("proposal reuses an exact verified URL from recent conversation history", a
   });
   assert.ok(result.pendingAction);
   assert.deepEqual(result.citations.map((citation) => citation.url), [url]);
+  assert.equal(client.requests.length, 1);
+});
+
+test("proposal lazily unwraps a historical grounding citation and exposes its exact URL to the model", async () => {
+  const redirect = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/provider-token";
+  const destination = "https://www.hakonenavi.jp/international/en/";
+  let resolveCalls = 0;
+  const client = scriptedClient([
+    (request) => {
+      assert.match(request.input, new RegExp(destination.replaceAll("/", "\\/")));
+      assert.doesNotMatch(request.input, /grounding-api-redirect/);
+      return { steps: [call("apply_changes", { operations: [
+        { kind: "source.create", trip: { id: "1" }, draftId: "hakone", value: { title: "Hakone Navi", url: destination } },
+      ] })] };
+    },
+  ]);
+  const result = await createGeminiModelAdapter({
+    client,
+    model: "test",
+    research: { async resolveWebCitations(citations) {
+      resolveCalls++;
+      return citations.map((citation) => ({ ...citation, url: destination }));
+    } },
+  }).run({
+    message: "Chỉ format lại và lưu nguồn đã tra cứu.",
+    actor: { email: "test@example.com", isAdmin: true },
+    contextService: { targetSnapshot: async () => snapshot },
+    history: [{
+      input: "Tra nguồn Hakone.",
+      output: "Đã kiểm tra [E10]",
+      citations: [{ id: "E10", kind: "web", title: "Hakone Navi", url: redirect, checkedAt: "2030-01-01T00:00:00Z" }],
+    }],
+  });
+  assert.equal(resolveCalls, 1);
+  assert.equal(result.pendingAction.compiled.operations[0].value.url, destination);
+  assert.deepEqual(result.citations.map((citation) => citation.url), [destination]);
   assert.equal(client.requests.length, 1);
 });
 

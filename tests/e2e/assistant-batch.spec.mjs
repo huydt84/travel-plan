@@ -89,6 +89,30 @@ test("stale targets, expired approvals, and immutable arguments cannot be applie
   }finally{await f.close();}
 });
 
+test("approval rejects a legacy pending action that contains a provider grounding redirect", async () => {
+  const f = await fixture();
+  try {
+    const redirect = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/provider-token";
+    const legacyArgs = { operations: [
+      { kind: "trip.create", draftId: "trip", value: { ...f.args.operations[0].value, slug: `${f.slug}-legacy-redirect` } },
+      { kind: "source.create", draftId: "source", trip: { draftId: "trip" }, value: { title: "Legacy redirect", url: redirect } },
+    ] };
+    const accepted = await f.store.acceptRequest({ ownerEmail: f.email, clientTurnId: randomUUID(), input: "Legacy redirect", title: "Legacy redirect", leaseMs: 60000, maxTurnsPerHour: 100, background: true });
+    const compiled = {
+      operations: [
+        { kind: "trip.create", ref: { draftId: "trip" }, trip: { draftId: "trip" }, value: { ...legacyArgs.operations[0].value } },
+        { kind: "source.create", ref: { draftId: "source" }, trip: { draftId: "trip" }, value: { title: "Legacy redirect", host: "vertexaisearch.cloud.google.com", url: redirect, number: 1 } },
+      ],
+      revisions: {}, evidenceRefs: ["E1"],
+      preview: { summary: "Tạo 1 chuyến đi, Thêm 1 nguồn", groups: [], changes: [], warnings: [] },
+    };
+    const action = await f.batches.stage({ turnId: accepted.turn.id, call: { id: "legacy", arguments: legacyArgs }, compiled,
+      citations: [{ id: "E1", kind: "web", title: "Legacy redirect", url: redirect }], usedContext: [], lifetimeMs: 1800000, email: f.email });
+    await expect(f.batches.approve(action.id, f.email, action.confirmationToken)).rejects.toMatchObject({ code: "ACTION_SOURCE_INVALID" });
+    expect(await f.sql`SELECT id FROM trips WHERE slug=${legacyArgs.operations[0].value.slug}`).toHaveLength(0);
+  } finally { await f.close(); }
+});
+
 test("pending batch can be revised into a fresh immutable approval", async () => {
   const f = await fixture();
   try {

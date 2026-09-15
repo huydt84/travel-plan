@@ -361,7 +361,7 @@ Editable approval revisions extend this same section, not a new trip editor. Chá
 
 ### Saved Places
 
-Saved places continue the trackerâ€™s navy source region. Each place has a thin top rule, an 18px name, 14px detail at 1.6 line-height, and wrapping links to its website, map, and linked activities. The grid fits as many columns as available width allows with a 280px preferred minimum; narrow containers remain a single contained column. Each place is an addressable, focusable receipt destination.
+Saved places are a trip directory, not citation evidence. They appear before the final navy source index in a separate bright-paper station board so the two concepts cannot merge visually. Each place is one ruled directory row with an ordinal, a 24px name, address, notes and coordinates, linked schedule activities, and direct website or map actions. Wide rows separate identity, trip context, and actions into stable columns; narrow containers collapse them into one reading column beside the ordinal. Each place remains an addressable, focusable receipt destination.
 
 ### Motion and Live State
 

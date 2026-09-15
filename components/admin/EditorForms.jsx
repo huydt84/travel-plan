@@ -10,6 +10,7 @@ import { normalizeScheduleRefs } from "../../lib/schedule-editor-state.mjs";
 import { ActionIcon } from "../Icons";
 
 const emptySource = { title: "", url: "" };
+const emptyPlace = { name: "", address: "", latitude: "", longitude: "", website: "", googlePlaceId: "", notes: "" };
 const openTimePicker = (event) => {
   try {
     event.currentTarget.showPicker?.();
@@ -602,4 +603,49 @@ export function SourceForm({
       </Button>
     </form>
   );
+}
+
+export function PlaceForm({ place = null, onSave, onCancel }) {
+  const { t, locale } = useLocale();
+  const [values, setValues] = useState(place ? {
+    name: place.name,
+    address: place.address,
+    latitude: place.latitude ?? "",
+    longitude: place.longitude ?? "",
+    website: place.website || "",
+    googlePlaceId: place.googlePlaceId || "",
+    notes: place.notes || "",
+  } : emptyPlace);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const field = (name) => ({
+    value: values[name],
+    onChange: (event) => setValues({ ...values, [name]: event.target.value }),
+  });
+  const label = place ? t("adminPlaces.editForm", { name: place.name }) : t("adminPlaces.add");
+  const submit = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try { await onSave(values); }
+    catch (requestError) { setError(adminErrorMessage(requestError, t, locale)); }
+    finally { setBusy(false); }
+  };
+  return <form aria-label={label} className={`${scheduleEditorStyles["admin-editor"]} ${scheduleEditorStyles["admin-form"]} ${scheduleEditorStyles["place-form"]}`} onSubmit={submit}>
+    <div className={adminShellStyles["admin-section-head"]}>
+      <h2>{label}</h2>
+      <Button type="button" variant="ghost" onClick={onCancel}>{t("adminPlaces.cancel")}</Button>
+    </div>
+    <div className={scheduleEditorStyles["form-grid"]}>
+      <label>{t("adminPlaces.name")} <input {...field("name")} maxLength={240} required /></label>
+      <label>{t("adminPlaces.address")} <input {...field("address")} maxLength={1000} required /></label>
+      <label>{t("adminPlaces.latitude")} <input {...field("latitude")} type="number" inputMode="decimal" min="-90" max="90" step="any" /></label>
+      <label>{t("adminPlaces.longitude")} <input {...field("longitude")} type="number" inputMode="decimal" min="-180" max="180" step="any" /></label>
+      <label className="wide">{t("adminPlaces.website")} <input {...field("website")} type="url" inputMode="url" maxLength={2000} /></label>
+      <label className="wide">{t("adminPlaces.googlePlaceId")} <input {...field("googlePlaceId")} maxLength={500} /></label>
+      <label className="wide">{t("adminPlaces.notes")} <textarea {...field("notes")} rows={3} maxLength={2000} /></label>
+    </div>
+    {error && <p className="form-error" role="alert">{error}</p>}
+    <Button variant="primary" disabled={busy}>{busy ? t("adminPlaces.saving") : place ? t("adminPlaces.save") : t("adminPlaces.add")}</Button>
+  </form>;
 }

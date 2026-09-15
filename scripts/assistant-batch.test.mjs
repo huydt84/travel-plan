@@ -69,3 +69,9 @@ test("source provenance matches the exact trimmed URL and records only used evid
   ]) assert.throws(() => compileBatch(source(url), [snapshot], [{ id: "E2", url: verifiedUrl }]), /tra cứu URL nguồn/);
   assert.throws(() => compileBatch(source("javascript:alert(1)"), [snapshot], [{ id: "E2", url: verifiedUrl }]), /http hoặc https/);
 });
+
+test("provider grounding redirects can cite answers but can never become saved sources", () => {
+  const redirect = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/provider-token";
+  const args = { operations: [create("source", "source", { title: "Provider redirect", url: redirect }, { id: "1" })] };
+  assert.throws(() => compileBatch(args, [snapshot], [{ id: "E1", kind: "web", url: redirect }]), /URL trung gian/);
+});
