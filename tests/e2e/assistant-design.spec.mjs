@@ -67,5 +67,61 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
     await gotoHealthy(page, "/assistant");
     await expect(page.getByRole("button", { name: "Đăng xuất", exact: true })).toBeVisible();
     await capture("access");
+
+    for (const locale of [
+      { value: "vi", title: "Trợ lý hành trình", action: "Đăng xuất" },
+      { value: "en", title: "Trip assistant", action: "Sign out" },
+      { value: "ja", title: "旅のアシスタント", action: "ログアウト" },
+    ]) {
+      await page.getByTestId("language-switcher").selectOption(locale.value);
+      await expect(page.getByRole("heading", { level: 1, name: locale.title })).toBeVisible();
+      await expect(page.getByRole("button", { name: locale.action, exact: true })).toBeVisible();
+
+      const accessLayout = await page.locator("main").evaluate((main) => {
+        const utilities = main.querySelector("section > header");
+        const back = utilities.querySelector("a").getBoundingClientRect();
+        const language = utilities.querySelector("select").getBoundingClientRect();
+        const heading = main.querySelector("h1");
+        const paragraph = main.querySelector("section > div > p");
+        const action = main.querySelector("section > div > button");
+        const headingBox = heading.getBoundingClientRect();
+        const paragraphBox = paragraph.getBoundingClientRect();
+        const actionBox = action.getBoundingClientRect();
+        const headingLineHeight = Number.parseFloat(getComputedStyle(heading).lineHeight);
+        const tabbables = [...main.querySelectorAll("a[href], select, button:not([disabled])")]
+          .filter((element) => {
+            const box = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+            return box.width > 0 && box.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+          })
+          .map((element) => element.tagName.toLowerCase());
+        return {
+          controlsOverlap: back.right > language.left || language.right > innerWidth,
+          headingLines: Math.round(headingBox.height / headingLineHeight),
+          contentInViewport: headingBox.top >= 0 && paragraphBox.bottom <= innerHeight && actionBox.bottom <= innerHeight,
+          actionWraps: action.scrollWidth > action.clientWidth,
+          actionSize: { width: actionBox.width, height: actionBox.height },
+          languageSize: { width: language.width, height: language.height },
+          tabbables,
+        };
+      });
+
+      expect(accessLayout.controlsOverlap, `${locale.value} access utilities must not overlap`).toBe(false);
+      expect(accessLayout.headingLines, `${locale.value} access heading must stay within two lines`).toBeLessThanOrEqual(2);
+      expect(accessLayout.contentInViewport, `${locale.value} access content must fit the initial viewport`).toBe(true);
+      expect(accessLayout.actionWraps, `${locale.value} access action must stay on one line`).toBe(false);
+      expect(accessLayout.tabbables.slice(0, 3), `${locale.value} access tab order`).toEqual(["a", "select", "button"]);
+      await page.locator("main section header a").focus();
+      await expect(page.locator("main section header a")).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(page.getByTestId("language-switcher")).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(page.locator("main section > div > button")).toBeFocused();
+      if (viewport.width === 320) {
+        expect(accessLayout.actionSize.height).toBeGreaterThanOrEqual(44);
+        expect(accessLayout.languageSize.width).toBeGreaterThanOrEqual(44);
+        expect(accessLayout.languageSize.height).toBeGreaterThanOrEqual(44);
+      }
+    }
   });
 }
