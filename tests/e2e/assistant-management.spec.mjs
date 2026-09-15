@@ -311,6 +311,7 @@ test("owner request and failure details expose sanitized ordered traces and toke
     const calls=Array.from({length:17},(_,index)=>({callId:`call-${index}`,name:"read_context",arguments:{ref:{kind:"trip",id:"1"}}}));
     await f.store.finishToolRun(model,{status:"completed",durationMs:25,resultMetadata:{
       response:{text:"I need more context",calls,rawProvider:{private:true}},
+      thoughtSummaries:[{title:"Đánh giá dữ liệu chuyến đi",text:"**Đánh giá dữ liệu chuyến đi**\n\nCần đọc thêm lịch trình trước khi trả lời."}],
       usage:{inputTokens:12,outputTokens:4,totalTokens:16,cachedTokens:2,thoughtTokens:1,toolUseTokens:3},
     }});
     await f.store.failTurn(accepted.turn.id,"TOOL_BUDGET_EXCEEDED");
@@ -319,6 +320,7 @@ test("owner request and failure details expose sanitized ordered traces and toke
     expect(turn.allowedTools).toEqual(["search_context","read_context"]);
     expect(turn.trace.map(step=>step.ordinal)).toEqual([turn.trace[0].ordinal]);
     expect(turn.trace[0].result.functionCalls).toHaveLength(17);
+    expect(turn.trace[0].result.thoughtSummaries).toHaveLength(1);
     expect(turn.traceSummary).toMatchObject({modelInteractions:1,executedTools:0,tokens:{inputTokens:12,outputTokens:4,totalTokens:16,cachedTokens:2,thoughtTokens:1,toolUseTokens:3}});
     expect(JSON.stringify(turn.trace)).not.toMatch(/Bearer hidden|reasoning|rawProvider/);
     const failure=await f.service.failure(accepted.turn.id);
@@ -327,6 +329,9 @@ test("owner request and failure details expose sanitized ordered traces and toke
     expect(await personal.text()).not.toMatch(/traceSummary|functionCalls|remainingToolBudget/);
     await gotoHealthy(page,`/admin/assistant/conversations/${accepted.conversation.id}/turns/${accepted.turn.id}`);
     await expect(page.getByRole("region",{name:"Dấu vết thực thi"})).toContainText("16 token");
+    await expect(page.getByText("Tóm tắt suy nghĩ từ model",{exact:true})).toBeVisible();
+    await page.getByText("Đánh giá dữ liệu chuyến đi",{exact:true}).click();
+    await expect(page.getByText("Cần đọc thêm lịch trình trước khi trả lời.",{exact:false})).toBeVisible();
     await expect(page.getByText("Lô lệnh gọi bị từ chối",{exact:true})).toBeVisible();
     await gotoHealthy(page,`/admin/assistant/failures/${accepted.turn.id}`);
     await expect(page.getByText(/không được khởi chạy vì vượt quá ngân sách/)).toBeVisible();

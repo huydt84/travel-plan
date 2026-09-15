@@ -14,7 +14,9 @@ export async function readEvents(response, onEvent) {
         (runId && runId !== event.runId) || (!runId && event.type !== "accepted") ||
         (runId && event.type === "accepted") ||
         (event.type === "accepted" && !event.conversationId) ||
-        (event.type === "progress" && typeof event.label !== "string") ||
+        (event.type === "progress" && (typeof event.label !== "string" || (event.values !== undefined &&
+          (!event.values || typeof event.values !== "object" || Array.isArray(event.values) || Object.keys(event.values).length > 4 ||
+            Object.values(event.values).some((value) => typeof value !== "string" || value.length > 160))))) ||
         (event.type === "completed" && (event.turn?.id !== event.runId || event.turn?.status !== "completed")) ||
         (event.type === "failed" && (!event.error?.code || event.turn?.id !== event.runId || event.turn?.status !== "failed")) ||
         !["accepted", "progress", "answer-delta", "evidence", "completed", "failed", "awaiting_approval", "awaiting_input", "cancelled", "checkpoint"].includes(event.type)) {

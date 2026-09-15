@@ -110,7 +110,7 @@ export function useConversation({ initialWorkspace, viewer }) {
     // Rebuild partial output from the persisted event log on each attachment.
     void observeRun(turn.id, (event) => {
       if (generation.current !== token) return;
-      if (event.type === "progress") setProgress(event.label);
+      if (event.type === "progress") setProgress({ label: event.label, values: event.values });
       if (event.type === "answer-delta") setTurns((items) => items.map((item) => item.id === turn.id ? { ...item, output: event.reset ? event.text : (item.output || "") + event.text } : item));
       if (event.type === "evidence") setTurns((items) => items.map((item) => item.id === turn.id ? { ...item, citations: event.citations } : item));
       if (event.turn) {

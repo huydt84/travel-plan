@@ -163,6 +163,10 @@
 .traceStepBody h4 { margin:14px 0 4px; color:var(--quiet); font-size:11px; letter-spacing:.04em; text-transform:uppercase; }
 .traceStepBody p { margin:4px 0; overflow-wrap:anywhere; }
 .traceStepBody pre { max-width:100%; margin:4px 0; padding:10px; overflow:auto; border:1px solid var(--rule); border-radius:4px; background:#f7f8f7; color:var(--ink); font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; overflow-wrap:anywhere; user-select:text; }
+.traceThoughts { display:grid; gap:6px; }
+.traceThought { border-block:1px solid var(--rule); }
+.traceThought > summary { min-height:44px; padding:10px 2px; align-content:center; color:var(--ink); cursor:pointer; font-size:13px; font-weight:600; }
+.traceThought > pre { max-height:480px; }
 .switchButton { display:inline-flex; align-items:center; gap:9px; min-height:44px; min-width:100px; padding:0; border:0; background:transparent; color:var(--ink); font-size:13px !important; }
 .switchTrack { display:block; width:40px; height:24px; padding:3px; flex-shrink:0; border-radius:20px; background:#65727b; transition:background-color 160ms ease-out; }
 .switchTrack > span { display:block; width:18px; height:18px; border-radius:50%; background:white; transform:translateX(0); transition:transform 160ms ease-out; }

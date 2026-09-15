@@ -26,6 +26,7 @@ export default function AssistantExecutionTrace({ allowedTools = [], trace = [],
       const request = step.request || {};
       const result = step.result || {};
       const calls = result.functionCalls || [];
+      const thoughts = result.thoughtSummaries || [];
       const rejected = errorCode === "TOOL_BUDGET_EXCEEDED" && step.id === finalModel?.id && calls.length;
       return <details key={step.id} className={styles.traceStep} open={Boolean(rejected)}>
         <summary><span>{step.ordinal}. {step.kind === "model" ? t("assistantTrace.model") : t("assistantTrace.tool")}: {step.name}</span><small>{step.status} · {step.durationMs ?? "–"} ms</small></summary>
@@ -36,6 +37,12 @@ export default function AssistantExecutionTrace({ allowedTools = [], trace = [],
             <h4>{t("assistantTrace.offered")}</h4><p>{(request.offeredTools || []).join(", ") || t("assistantTrace.noneAllowed")}</p>
             <h4>{t("assistantTrace.remaining")}</h4><p>{request.remainingToolBudget ?? "–"}</p>
             {result.truncated && <Json value={result} />}
+            {!!thoughts.length && <><h4>{t("assistantTrace.thoughtSummaries")}</h4><div className={styles.traceThoughts}>
+              {thoughts.map((thought, index) => <details key={index} className={styles.traceThought}>
+                <summary>{thought.title || t("assistantTrace.thoughtStage", { count: index + 1 })}</summary>
+                <pre tabIndex={0}>{thought.text}</pre>
+              </details>)}
+            </div></>}
             {!!result.publicText && <><h4>{t("assistantTrace.publicText")}</h4><pre tabIndex={0}>{result.publicText}</pre></>}
             {!!calls.length && <><h4>{rejected ? t("assistantTrace.rejectedCalls") : t("assistantTrace.requestedCalls")}</h4><Json value={calls} /></>}
           </> : <>
