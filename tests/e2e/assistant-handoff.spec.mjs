@@ -5,6 +5,7 @@ import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
 import { createAssistantStore } from "../../lib/v1/store.mjs";
 import { createAssistantManagement } from "../../lib/v1/assistant-management.mjs";
 import { processAssistantHandoffOutboxRecords } from "../../lib/assistant-handoff-outbox-store.mjs";
+import { listNotificationRecords } from "../../lib/notification-store.mjs";
 import { expect, test, gotoHealthy } from "./fixtures.mjs";
 
 const ownerEmail="local-admin@localhost.invalid";
@@ -43,6 +44,8 @@ test("handoff admission is atomic, replay-safe, quota-free, and repeatable",asyn
     expect(await f.sql`SELECT j.* FROM assistant_jobs j JOIN assistant_turns t ON t.id=j.turn_id WHERE t.conversation_id=${first.conversation.id}`).toHaveLength(0);
     expect(await f.sql`SELECT * FROM assistant_handoffs WHERE conversation_id=${first.conversation.id}`).toHaveLength(1);
     expect(await f.sql`SELECT * FROM assistant_handoff_email_outbox WHERE handoff_id=${first.handoff.id}`).toHaveLength(1);
+    const ownerNotifications=await listNotificationRecords(f.sql,{recipientEmail:ownerEmail,limit:50});
+    expect(ownerNotifications.notifications.filter(item=>item.type==="assistant_handoff_created"&&item.handoff?.id===first.handoff.id)).toHaveLength(1);
     let deliveries=0;
     await processAssistantHandoffOutboxRecords(f.sql,{handoffId:first.handoff.id},{sendImpl:async()=>{deliveries++;return "resend-handoff";},logger:{error(){}}});
     await processAssistantHandoffOutboxRecords(f.sql,{handoffId:first.handoff.id},{sendImpl:async()=>{deliveries++;return "duplicate";},logger:{error(){}}});
@@ -56,6 +59,8 @@ test("handoff admission is atomic, replay-safe, quota-free, and repeatable",asyn
     expect(follow.mode).toBe("handoff");expect(follow.handoff.id).toBe(first.handoff.id);
     expect(await f.sql`SELECT * FROM assistant_handoff_messages WHERE handoff_id=${first.handoff.id}`).toHaveLength(2);
     expect(await f.sql`SELECT * FROM assistant_handoff_email_outbox WHERE handoff_id=${first.handoff.id}`).toHaveLength(1);
+    expect((await listNotificationRecords(f.sql,{recipientEmail:ownerEmail,limit:50})).notifications
+      .filter(item=>item.type==="assistant_handoff_created"&&item.handoff?.id===first.handoff.id)).toHaveLength(1);
     await f.management.markHandoffSeen(ownerEmail,first.handoff.id);
     expect((await f.management.handoffs())[0].unreadCount).toBe(0);
     expect(await f.sql`SELECT * FROM assistant_management_audit WHERE target_email=${f.email} AND action='handoff_seen'`).toHaveLength(1);
@@ -73,6 +78,8 @@ test("handoff admission is atomic, replay-safe, quota-free, and repeatable",asyn
     const second=await f.accept({conversationId:first.conversation.id,input:"VỢ YÊU, xem tiếp",triggerMatch:true});
     expect(second.mode).toBe("handoff");expect(second.handoff.id).not.toBe(first.handoff.id);
     expect(await f.sql`SELECT * FROM assistant_handoff_email_outbox o JOIN assistant_handoffs h ON h.id=o.handoff_id WHERE h.conversation_id=${first.conversation.id}`).toHaveLength(2);
+    expect((await listNotificationRecords(f.sql,{recipientEmail:ownerEmail,limit:50})).notifications
+      .filter(item=>item.type==="assistant_handoff_created"&&[first.handoff.id,second.handoff.id].includes(item.handoff?.id))).toHaveLength(2);
     const history=await f.store.listModelHistory(first.conversation.id,f.email,{limit:30});
     expect(history.some(item=>item.kind==="handoff"&&item.owner==="Anh đang xem nhé")).toBe(true);
     expect(history.some(item=>item.kind==="handoff"&&item.user==="VỢ YÊU, xem tiếp")).toBe(false);
@@ -123,9 +130,17 @@ for(const [width,height] of [[320,760],[1440,900],[1920,1080]]) test(`owner hand
     await f.accept({conversationId:first.conversation.id,input:"Em gửi thêm chi tiết",triggerMatch:false});
     await f.management.replyHandoff(ownerEmail,"Chủ lịch trình",first.handoff.id,{clientMessageId:randomUUID(),message:"Anh đã nhận được"});
     await page.setViewportSize({width,height});
+    await mkdir(".impeccable/review/handoff",{recursive:true});
+    await gotoHealthy(page,"/");
+    await page.getByRole("button",{name:/Mở thông báo/}).click();
+    const handoffNotification=page.locator(".notification-list button").filter({hasText:"Người thử bàn giao đã bàn giao cuộc trò chuyện cho bạn"});
+    await expect(handoffNotification).toContainText("Chồng iu, giúp em nhé");
+    await expect(handoffNotification).toContainText("Trợ lý hành trình · Cần hỗ trợ");
+    await page.screenshot({path:`.impeccable/review/handoff/${width}-notification.png`,fullPage:false});
+    await handoffNotification.click();
+    await expect(page).toHaveURL(new RegExp(`/admin/assistant/handoffs/${first.handoff.id}`));
     await gotoHealthy(page,"/admin/assistant");
     await expect(page.getByRole("heading",{name:"Bàn giao đang hoạt động"})).toBeVisible();
-    await mkdir(".impeccable/review/handoff",{recursive:true});
     await page.screenshot({path:`.impeccable/review/handoff/${width}-inbox.png`,fullPage:false});
     await page.getByRole("region",{name:"Bàn giao đang hoạt động"}).getByRole("link",{name:/Người thử bàn giao/}).click();
     await expect(page).toHaveURL(new RegExp(`/admin/assistant/handoffs/${first.handoff.id}`));

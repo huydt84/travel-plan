@@ -32,6 +32,12 @@ const relativeTime = (value, locale) => {
 };
 
 const notificationCopy = (notification, t) => {
+  if (notification.type === "assistant_handoff_created") {
+    return {
+      title: t("notifications.handoffCreated", { actor: notification.actor.name }),
+      detail: notification.handoff.message,
+    };
+  }
   if (notification.type === "trip_request_fulfilled") {
     return {
       title: t("notifications.tripReady"),
@@ -318,10 +324,15 @@ export default function NotificationCenter() {
                 <ul className={styles["notification-list"]}>
                   {notifications.map((notification) => {
                     const copy = notificationCopy(notification, t);
-                    const target = notification.request
+                    const target = notification.handoff
+                      ? notification.handoff.title
+                      : notification.request
                       ? notification.request.places.join(" · ")
                       : notification.contribution.activityTitle ||
                         t("notifications.wholeTrip");
+                    const area = notification.handoff
+                      ? t("notifications.handoffArea")
+                      : notification.trip.title;
                     return (
                       <li
                         className={
@@ -353,7 +364,7 @@ export default function NotificationCenter() {
                               {copy.detail}
                             </span>
                             <small>
-                              {notification.trip.title} · {target}
+                              {area} · {target}
                             </small>
                           </span>
                           <ActionIcon name="right" />
