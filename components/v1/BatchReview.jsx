@@ -23,7 +23,7 @@ export default function BatchReview({ action, busy = false, readOnly = false, on
   const [editError, setEditError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [saving, setSaving] = useState(false);
-  const status = action.status === "pending" && Date.parse(action.expiresAt) <= now ? "expired" : action.status;
+  const status = action.status === "pending" && action.expiresAt && Date.parse(action.expiresAt) <= now ? "expired" : action.status;
   const pending = status === "pending";
   const canEdit = pending && !readOnly && Boolean(action.confirmationToken);
   const editableEntries = useMemo(() => (action.preview?.changes || []).flatMap((change) => (change.editableFields || []).map((field) => ({
@@ -31,7 +31,7 @@ export default function BatchReview({ action, busy = false, readOnly = false, on
   }))), [action.preview]);
 
   useEffect(() => {
-    if (action.status !== "pending") return;
+    if (action.status !== "pending" || !action.expiresAt) return;
     const timer = setTimeout(() => setNow(Date.now()), Math.max(0, Date.parse(action.expiresAt) - Date.now()) + 1);
     return () => clearTimeout(timer);
   }, [action.status, action.expiresAt]);
@@ -115,7 +115,7 @@ export default function BatchReview({ action, busy = false, readOnly = false, on
     </details>}
     {action.receipt && <div className={styles.batchReceipt}><h3>{t("assistantExtra.batch.resources")}</h3><ul>{action.receipt.resources.map((resource) => <li key={`${resource.kind}:${resource.id}`}><a href={resource.href}>{resource.title}</a><span>{kinds[resource.kind]}</span></li>)}</ul></div>}
     {readOnly ? <p>{t("assistantExtra.batch.readOnly")}</p> : pending && !(editing && canEdit) ? <div className={styles.batchApproval}>
-      <p>{t("assistantExtra.batch.expires", { date: new Date(action.expiresAt).toLocaleString(intlLocale, { hour12: false }) })}</p>
+      <p>{action.expiresAt ? t("assistantExtra.batch.expires", { date: new Date(action.expiresAt).toLocaleString(intlLocale, { hour12: false }) }) : t("assistantExtra.batch.noExpiry")}</p>
       <div>{editableEntries.length > 0 && <button ref={editButtonRef} className={styles.secondaryButton} type="button" disabled={busy || !canEdit} onClick={beginEdit}>{t("assistantExtra.batch.edit")}</button>}<button className={styles.applyButton} disabled={busy || !action.confirmationToken} onClick={onApprove}>{busy ? t("assistantExtra.processing") : t("assistantExtra.batch.approve")}</button><button className={styles.secondaryButton} disabled={busy} onClick={onReject}>{t("assistantExtra.batch.reject")}</button></div>
     </div> : !pending && action.status !== "applied" && onRevise ? <button className={styles.secondaryButton} onClick={() => onRevise(action)}>{t("assistantExtra.batch.regenerate")}</button> : null}
   </section>;

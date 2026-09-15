@@ -78,7 +78,7 @@ test("reload reconciles a running lease and explicit retry creates one new turn"
 });
 
 for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
-  test(`expired proposal and recovery controls fit ${viewport.width}`, async ({ page }, testInfo) => {
+  test(`approval remains available without a timeout at ${viewport.width}`, async ({ page }, testInfo) => {
     await page.clock.install();
     await page.setViewportSize(viewport);
     const f = await setup(page);
@@ -87,25 +87,23 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
       await expect(page.getByRole("heading", { name: "Cần phê duyệt" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Phê duyệt thay đổi" })).toBeVisible();
       const [proposal] = await f.sql`SELECT a.* FROM assistant_actions a JOIN assistant_turns t ON t.id=a.turn_id JOIN assistant_conversations c ON c.id=t.conversation_id WHERE c.owner_email=${ownerEmail} ORDER BY a.created_at DESC LIMIT 1`;
-      // Advance the browser clock beyond the displayed immutable expiry.
+      // Advancing time must not make an interactive approval disappear.
       await page.clock.fastForward(31 * 60 * 1000);
-      await expect(page.getByRole("button", { name: "Phê duyệt thay đổi" })).toHaveCount(0);
-      const regenerate = page.getByRole("button", { name: "Tạo lại đề xuất" });
-      await expect(regenerate).toBeVisible();
+      const approve = page.getByRole("button", { name: "Phê duyệt thay đổi" });
+      await expect(approve).toBeVisible();
+      await expect(page.getByRole("button", { name: "Tạo lại đề xuất" })).toHaveCount(0);
       const refreshed=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/v1/assistant/workspace" && response.ok());
       await page.evaluate(()=>window.dispatchEvent(new Event("focus")));
       await refreshed;
-      await expect(regenerate).toBeVisible();
-      await expect(page.getByRole("button",{name:"Phê duyệt thay đổi",exact:true})).toHaveCount(0);
+      await expect(approve).toBeVisible();
       expect((await f.sql`SELECT status FROM assistant_actions WHERE id=${proposal.id}`)[0].status).toBe("pending");
-      await page.screenshot({ path: testInfo.outputPath("expired-proposal.png"), fullPage: true });
-      const bounds = await regenerate.boundingBox();
+      expect((await f.sql`SELECT expires_at FROM assistant_actions WHERE id=${proposal.id}`)[0].expires_at).toBeNull();
+      await page.screenshot({ path: testInfo.outputPath("non-expiring-approval.png"), fullPage: true });
+      const bounds = await approve.boundingBox();
       expect(bounds.x).toBeGreaterThanOrEqual(0);
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
       if (viewport.width === 320) expect(bounds.height).toBeGreaterThanOrEqual(44);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
-      await regenerate.click();
-      await expect(page.getByLabel("Yêu cầu cho trợ lý")).toHaveValue(/Cập nhật hoạt động đầu tiên/);
 
     } finally { await f.cleanup(); }
   });

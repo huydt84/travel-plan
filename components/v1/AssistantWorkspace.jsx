@@ -83,12 +83,12 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
   useEffect(() => {
     const expiries = chat.turns.flatMap((turn) => [
       ...(turn.changeSet?.status === "staged" ? [Date.parse(turn.changeSet.expiresAt)] : []),
-      ...(turn.actions || []).filter((action) => action.status === "pending").map((action) => Date.parse(action.expiresAt)),
+      ...(turn.actions || []).filter((action) => action.status === "pending" && action.expiresAt).map((action) => Date.parse(action.expiresAt)),
     ]);
     if (!expiries.length) return;
     const timer = setTimeout(() => setTurns((items) => items.map((turn) => ({ ...turn,
       ...(turn.changeSet?.status === "staged" && Date.parse(turn.changeSet.expiresAt) <= Date.now() ? { changeSet: { ...turn.changeSet, status: "expired", confirmationToken: null } } : {}),
-      actions: turn.actions?.map((action) => action.status === "pending" && Date.parse(action.expiresAt) <= Date.now() ? { ...action, status: "expired", confirmationToken: null } : action),
+      actions: turn.actions?.map((action) => action.status === "pending" && action.expiresAt && Date.parse(action.expiresAt) <= Date.now() ? { ...action, status: "expired", confirmationToken: null } : action),
     }))), Math.max(0, Math.min(...expiries) - Date.now()));
     return () => clearTimeout(timer);
   }, [chat.turns, setTurns]);

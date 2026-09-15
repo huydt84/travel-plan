@@ -68,7 +68,7 @@ test("all four update types and multiple targets commit against final dates and 
   }finally{await f.close();}
 });
 
-test("stale targets, expired approvals, and immutable arguments cannot be applied",async()=>{
+test("stale targets, non-expiring approvals, and immutable arguments cannot be applied",async()=>{
   const f=await fixture();
   try {
     const initial=await f.stage();const saved=await f.batches.approve(initial.action.id,f.email,initial.action.confirmationToken);await f.finish(initial.turn.id);
@@ -79,13 +79,12 @@ test("stale targets, expired approvals, and immutable arguments cannot be applie
     await f.sql`UPDATE trips SET title='Concurrent editor' WHERE id=${snapshot.tripId}`;
     await expect(f.batches.approve(staged.action.id,f.email,staged.action.confirmationToken)).rejects.toMatchObject({code:"PLAN_CONFLICT"});
     expect((await snapshotFromDatabase(f.sql,snapshot.tripId)).trip.title).toBe("Concurrent editor");
-    const accepted=await f.store.acceptRequest({ownerEmail:f.email,clientTurnId:randomUUID(),input:"Expired",title:"Expired",leaseMs:60000,maxTurnsPerHour:100});
-    const expired=await f.batches.stage({turnId:accepted.turn.id,call:{id:"expired",arguments:args},compiled:compileBatch(args,[await snapshotFromDatabase(f.sql,snapshot.tripId)]),citations:[],usedContext:[],lifetimeMs:-86400000,email:f.email});
-    // Expiry is enforced by reconciliation even when no browser is connected.
+    const accepted=await f.store.acceptRequest({ownerEmail:f.email,clientTurnId:randomUUID(),input:"Approval can wait",title:"Approval can wait",leaseMs:60000,maxTurnsPerHour:100});
+    const pending=await f.batches.stage({turnId:accepted.turn.id,call:{id:"pending",arguments:args},compiled:compileBatch(args,[await snapshotFromDatabase(f.sql,snapshot.tripId)]),citations:[],usedContext:[],lifetimeMs:-86400000,email:f.email});
     await f.store.reconcile(f.email);
-    expect((await f.batches.list([accepted.turn.id],f.email))[0].status).toBe("expired");
-    expect((await f.store.getTurn(accepted.turn.id,f.email)).status).toBe("completed");
-    expect(expired.id).toBeTruthy();
+    expect((await f.batches.list([accepted.turn.id],f.email))[0]).toMatchObject({ id: pending.id, status: "pending", expiresAt: null });
+    expect((await f.store.getTurn(accepted.turn.id,f.email)).status).toBe("awaiting_approval");
+    await f.batches.reject(pending.id, f.email);
   }finally{await f.close();}
 });
 
@@ -138,7 +137,7 @@ test("pending batch can be revised into a fresh immutable approval", async () =>
     expect(revised.status).toBe("pending");
     expect(revised.confirmationToken).toBeTruthy();
     expect(revised.confirmationToken).not.toBe(initial.action.confirmationToken);
-    expect(Date.parse(revised.expiresAt)).toBeGreaterThan(Date.parse(initial.action.expiresAt));
+    expect(revised.expiresAt).toBeNull();
     expect(revised.preview.changes.find((change) => change.targetKey === "activity:draft:visit1").after.key)
       .toBe(initial.action.preview.changes.find((change) => change.targetKey === "activity:draft:visit1").after.key);
     expect(revised.preview.changes.find((change) => change.targetKey === "trip:draft:trip").after.title).toBe("Kyoto đã chỉnh giờ");
@@ -222,7 +221,7 @@ test("revision fences a trip changed after snapshot compilation", async () => {
   } finally { await f.close(); }
 });
 
-test("revision rejects forged fields, duplicate edits, cross-account reads and expired proposals", async () => {
+test("revision rejects forged fields, duplicate edits, and cross-account reads", async () => {
   const f = await fixture();
   try {
     const pending = await f.stage();
@@ -242,9 +241,6 @@ test("revision rejects forged fields, duplicate edits, cross-account reads and e
     await f.sql`UPDATE users SET role='admin' WHERE email=${f.email}`;
     expect((await f.batches.list([pending.turn.id], f.email))[0].status).toBe("pending");
     await f.batches.reject(pending.action.id, f.email);
-    const accepted = await f.store.acceptRequest({ ownerEmail: f.email, clientTurnId: randomUUID(), input: "Expired revision", title: "Expired revision", leaseMs: 60000, maxTurnsPerHour: 100 });
-    const expired = await f.batches.stage({ turnId: accepted.turn.id, call: { id: "expired", arguments: f.args }, compiled: compileBatch(f.args, [], [{ url: "https://www.japan.travel/" }]), citations: [], usedContext: [], lifetimeMs: -1000, email: f.email });
-    await expect(f.batches.revise({ ...base, id: expired.id, expectedDigest: expired.digest, edits: [edit] })).rejects.toMatchObject({ code: "ACTION_EXPIRED" });
   } finally { await f.close(); }
 });
 

@@ -6,7 +6,7 @@ import { apiJson, observeRun } from "./transport.mjs";
 
 // A refresh cannot make a locally expired immutable approval actionable again.
 const currentTurn = (turn) => ({ ...turn, actions: turn.actions?.map((action) =>
-  action.status === "pending" && Date.parse(action.expiresAt) <= Date.now()
+  action.status === "pending" && action.expiresAt && Date.parse(action.expiresAt) <= Date.now()
     ? { ...action, status: "expired", confirmationToken: null } : action) });
 
 export function useConversation({ initialWorkspace, viewer }) {
