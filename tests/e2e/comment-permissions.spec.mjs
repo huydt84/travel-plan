@@ -11,13 +11,42 @@ test("members manage their own contributions while global hiding stays private",
   const otherContext = await browser.newContext({ baseURL, extraHTTPHeaders: localHeaders(`comment-other-${marker}@localhost.invalid`, "Other Member") });
   const ownerContext = await browser.newContext({ baseURL });
   const authorPage = await authorContext.newPage();
+  const otherPage = await otherContext.newPage();
   const ownerPage = await ownerContext.newPage();
   const created = [];
   let slug;
 
   try {
+    await gotoHealthy(otherPage, "/");
     await gotoHealthy(authorPage, "/");
-    slug = await authorPage.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+    slug = `comment-permissions-${marker}`;
+    const trip = await ownerContext.request.post("/api/trips", { data: {
+      slug,
+      title: "Comment permissions",
+      startDate: "2030-01-01",
+      endDate: "2030-01-01",
+      timezone: "Asia/Tokyo",
+      location: "Tokyo",
+      memberEmails: [
+        `comment-author-${marker}@localhost.invalid`,
+        `comment-other-${marker}@localhost.invalid`,
+      ],
+    } });
+    expect(trip.status()).toBe(201);
+    const visibleTrips = await authorContext.request.get("/api/trips");
+    expect((await visibleTrips.json()).trips.some((item) => item.slug === slug)).toBe(true);
+    expect((await ownerContext.request.post(`/api/trips/${slug}/schedule`, { data: {
+      startDate: "2030-01-01",
+      endDate: "2030-01-01",
+      start: "09:00",
+      end: "10:00",
+      title: "Comment fixture",
+      type: "Visit",
+      icon: "x",
+      detail: "",
+      refs: [],
+    } })).status()).toBe(201);
+    await gotoHealthy(authorPage, `/?trip=${encodeURIComponent(slug)}`);
     for (const [kind, body] of [["comment", `Bình luận ${marker}`], ["suggestion", `Đề xuất ${marker}`]]) {
       const response = await authorContext.request.post(`/api/trips/${encodeURIComponent(slug)}/suggestions`, { data: { activityId: null, kind, body } });
       expect(response.status()).toBe(201);
@@ -81,7 +110,7 @@ test("members manage their own contributions while global hiding stays private",
     created.splice(0, 1);
   } finally {
     if (slug) {
-      for (const contribution of created) await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}/suggestions/${contribution.id}`);
+      await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}`);
     }
     await authorContext.close();
     await otherContext.close();
@@ -123,7 +152,7 @@ test("owner promotes and demotes an admin without sharing role management", asyn
 
     await memberPage.reload();
     await expect(memberPage.getByRole("heading", { level: 1, name: "Gửi góp ý trên lịch" })).toBeVisible();
-    expect((await memberContext.request.patch("/api/trips/not-a-real-trip", { data: { title: "Không được phép" } })).status()).toBe(403);
+    expect((await memberContext.request.patch("/api/trips/not-a-real-trip", { data: { title: "Không được phép" } })).status()).toBe(404);
   } finally {
     await ownerContext.request.patch(`/api/admin/users/${encodeURIComponent(adminEmail)}`, { data: { role: "member" } });
     await memberContext.close();
@@ -142,7 +171,17 @@ test("visibility notifications open the hidden drawer and remain idempotent", as
 
   try {
     await gotoHealthy(authorPage, "/");
-    slug = await authorPage.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+    slug = `visibility-notification-${marker}`;
+    const trip = await authorContext.request.post("/api/trips", { data: {
+      slug,
+      title: "Visibility notification",
+      startDate: "2030-01-01",
+      endDate: "2030-01-01",
+      timezone: "Asia/Tokyo",
+      location: "Tokyo",
+    } });
+    expect(trip.status()).toBe(201);
+    await gotoHealthy(authorPage, `/?trip=${encodeURIComponent(slug)}`);
     const created = await authorContext.request.post(`/api/trips/${encodeURIComponent(slug)}/suggestions`, {
       data: { activityId: null, kind: "comment", body: `Sẽ được ẩn ${marker}` },
     });
@@ -165,7 +204,7 @@ test("visibility notifications open the hidden drawer and remain idempotent", as
     await expect(target).toHaveClass(/is-notification-target/);
     await expect(target.locator(".suggestion-status.hidden")).toHaveText("Đã ẩn");
   } finally {
-    if (contribution && slug) await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}/suggestions/${contribution.id}`);
+    if (slug) await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}`);
     await authorContext.close();
     await ownerContext.close();
   }

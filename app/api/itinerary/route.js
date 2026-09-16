@@ -1,21 +1,22 @@
 import { NextResponse } from "next/server";
-import { getCachedItinerary, listCachedTrips } from "../../../lib/trip-cache";
+import { getCachedItinerary } from "../../../lib/trip-cache";
+import { getViewer } from "../../../lib/auth";
+import { listVisibleTrips, requireTripAccess } from "../../../lib/trip-access-repository";
+import { apiError } from "../../../lib/api-response";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   const requestedSlug = new URL(request.url).searchParams.get("slug");
+  const viewer = await getViewer();
 
   try {
-    const slug = requestedSlug || (await listCachedTrips())[0]?.slug;
+    const slug = requestedSlug || (await listVisibleTrips(viewer))[0]?.slug;
     if (!slug) return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+    await requireTripAccess(viewer, slug, "view", { allowAdmin: false });
     const itinerary = await getCachedItinerary(slug);
     return NextResponse.json(itinerary);
   } catch (error) {
-    const status = error.code === "TRIP_NOT_FOUND" ? 404 : 503;
-    return NextResponse.json(
-      { error: status === 404 ? "Trip not found" : "Itinerary service unavailable" },
-      { status },
-    );
+    return apiError(error);
   }
 }

@@ -87,21 +87,18 @@ test("handoff admission is atomic, replay-safe, quota-free, and repeatable",asyn
 });
 
 test("owner phrases remain on the assistant path",async()=>{
-  const sql=createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI),store=createAssistantStore({sql});
-  let conversationId=null;
+  const f=await fixture();
   try {
-    const result=await store.acceptMessage({
-      actor:{email:ownerEmail,name:"Owner",isAdmin:true,isOwner:true},
+    const result=await f.store.acceptMessage({
+      actor:{...f.actor,isOwner:true},
       conversationId:null,clientTurnId:randomUUID(),input:"Vợ yêu, kiểm tra lịch",title:"Owner request",
       leaseMs:60000,maxTurnsPerHour:100,background:true,triggerMatch:true,notificationRecipient:ownerEmail,
     });
-    conversationId=result.conversation.id;
     expect(result.mode).toBe("assistant");
-    expect(await sql`SELECT * FROM assistant_handoffs WHERE conversation_id=${conversationId}`).toHaveLength(0);
-    await store.failTurn(result.turn.id,"TEST");
+    expect(await f.sql`SELECT * FROM assistant_handoffs WHERE conversation_id=${result.conversation.id}`).toHaveLength(0);
+    await f.store.failTurn(result.turn.id,"TEST");
   } finally {
-    if(conversationId) await sql`DELETE FROM assistant_conversations WHERE id=${conversationId}`;
-    await sql.end();
+    await f.cleanup();
   }
 });
 

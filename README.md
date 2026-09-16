@@ -49,7 +49,7 @@ pnpm run trip:import:local examples/trip-import.example.json --apply
 
 Local imports do not revalidate the production site. Regular `pnpm run dev`, `pnpm run db:migrate`, and `pnpm run trip:import` retain Google authentication and Neon through the normal `POSTGRES_URI`. `LOCAL_ADMIN_BYPASS` is intentionally set only by local pnpm scripts; do not add it to Vercel or a shared environment file.
 
-The compatibility read API is available at `GET /api/itinerary`. Trip and schedule writes require an authenticated owner or admin. Signed-in members can create comments and suggestions and manage their own contributions within the limits below.
+The compatibility read API is available at `GET /api/itinerary` after membership authorization. Any authenticated user can create a trip and becomes its Leader. Members can comment, suggest changes, and select schedule branches; Leaders manage their trip, schedule, and registered membership.
 
 The Google OAuth callback URLs are:
 
@@ -60,21 +60,22 @@ The Google OAuth callback URLs are:
 
 The owner is the account whose email matches `AUTH_OWNER_EMAIL`. This role is fixed and includes every admin capability. Other authenticated accounts start as members. Only the owner can promote a member to admin or demote an admin to member.
 
-Trip plans and schedules are publicly readable, including by signed-out visitors. Authentication and role checks apply to writes and to non-public contribution data.
+Trip plans and schedules are private. Signed-out visitors receive no trip names or itinerary data, and a signed-in non-member receives `404` for direct slug access. Admin/Owner global access is exposed through `/admin/trips`; the main tracker still filters by membership.
 
 | Capability | Owner | Admin | Member |
 | --- | --- | --- | --- |
-| Read trip plans and schedules | Yes | Yes | Yes; also public to signed-out visitors |
-| Create, update, or delete trip plans | Yes | Yes | No |
-| Create, update, or delete schedule items; add cited sources | Yes | Yes | No |
+| Read trip plans and schedules | Membership on tracker; all in Admin | Membership on tracker; all in Admin | Membership only |
+| Create trip plans | Yes; creator is Leader | Yes; creator is Leader | Yes; creator is Leader |
+| Update or delete trip plans | Global override | Global override | Only as trip Leader |
+| Create, update, or delete schedule items; add cited sources | Yes | Yes | Only as trip Leader |
 | Create comments and suggestions | Yes | Yes | Yes, while signed in |
-| View contributions | All, including hidden and rejected items | All, including hidden and rejected items | Public items plus their own hidden or rejected items |
+| View contributions | All, including hidden and rejected items | All, including hidden and rejected items | Visible trip items plus their own hidden or rejected items |
 | Manage contributions | Change any status or visibility; delete any item | Change any status or visibility; delete any item | Hide, unhide, or delete their own items; set their own comments to `open` or `resolved` |
-| Send invitation emails | Yes; permission is implicit | Yes; permission is implicit | Only after an owner or admin approves their request |
+| Send invitation emails | Only to current trip Members | Only to current trip Members | Only as trip Leader and after permission approval |
 | Review invitation permission requests and global delivery history | Yes | Yes | No; members can view their own permission state, quota, and delivery history |
 | View the user and activity audit | Yes | Yes | No |
 | Promote members or demote admins | Yes | No | No |
-| Receive personal in-app notifications | No; the owner is intentionally excluded | Yes, for trips in which they participate | Yes, for trips in which they participate |
+| Receive personal in-app notifications | Yes, when personally affected | Yes, when personally affected | Yes, when added, removed, promoted, or affected by trip activity |
 
 ## Trip assistant
 
@@ -88,26 +89,30 @@ See [the maintenance guide](docs/maintenance.md) for module ownership, versioned
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| `GET` / `POST` | `/api/trips` | List trip plans publicly or create one as owner/admin |
-| `GET` / `PATCH` / `DELETE` | `/api/trips/:slug` | Read publicly, or update/delete as owner/admin |
-| `GET` / `POST` | `/api/trips/:slug/schedule` | List schedule items publicly or create one as owner/admin |
-| `GET` / `PATCH` / `DELETE` | `/api/trips/:slug/schedule/:activityId` | Read publicly, or update/delete as owner/admin |
+| `GET` / `POST` | `/api/trips` | List the caller's memberships or create a Leader-owned trip |
+| `GET` / `PATCH` / `DELETE` | `/api/trips/:slug` | Read as a Member; update/delete as Leader or Admin |
+| `GET` / `POST` | `/api/trips/:slug/schedule` | Read as a Member; create as Leader or Admin |
+| `GET` / `PATCH` / `DELETE` | `/api/trips/:slug/schedule/:activityId` | Read as a Member; update/delete as Leader or Admin |
+| `GET` / `POST` | `/api/trips/:slug/members` | Read the roster or add one registered Member |
+| `DELETE` | `/api/trips/:slug/members/:email` | Remove a Member; the Leader cannot be deleted |
+| `PUT` | `/api/trips/:slug/members/:email/leader` | Atomically transfer leadership |
+| `GET` | `/api/admin/trips/:slug/audit` | Read the immutable Admin/Owner activity log |
 | `GET` / `POST` | `/api/trips/:slug/suggestions` | List contributions under the visibility policy or submit one while signed in |
 | `PATCH` / `DELETE` | `/api/trips/:slug/suggestions/:suggestionId` | Manage a contribution under the role and ownership policy |
-| `POST` | `/api/trips/:slug/sources` | Add a cited place source as owner/admin |
+| `POST` | `/api/trips/:slug/sources` | Add a cited place source as Leader/Admin |
 | `POST` | `/api/invitations` | Send invitation emails with implicit or approved permission |
 
-Create trip fields: `slug`, `title`, `date`, `timezone`, `location`.
+Create trip fields: `slug`, `title`, `startDate`, `endDate`, `timezone`, `location`, and optional `memberEmails`.
 
 Create schedule fields: `start`, `end`, optional `displayEnd`, `type`, `icon`, `title`, `detail`, and optional citation numbers in `refs`.
 
-Invitation requests include `recipients`, `requestId`, `tripSlug`, `subject`, and `message`. The signed-in sender selects a trip, receives a subject and message draft generated from its current schedule, and may edit both fields before sending. Owners and admins have implicit permission; members must first request permission and receive approval from an owner or admin. The server validates the selected trip and the final draft. Addresses are normalized and deduplicated, with a maximum of 100 per request. Each address is sent as a separate Gmail message and cannot see the other recipients. The request UUID is included in the message headers for tracing.
+Invitation requests include `recipients`, `requestId`, `tripSlug`, `subject`, and `message`. A trip Leader or Admin selects a trip, receives a subject and message draft generated from its current schedule, and may edit both fields before sending. Every recipient must already be a registered Member of that trip; permission, quota, and history checks still apply. The server validates membership and the final draft before any Gmail side effect. Addresses are normalized and deduplicated, with a maximum of 6 per request. Each address is sent as a separate Gmail message and cannot see the other recipients. The request UUID is included in the message headers for tracing.
 
 Invitations are sent from the approved sender's own Gmail account through Google OAuth; there is no separate sender address or mail-service API key. Enable the Gmail API in the same Google Cloud project, add the `https://www.googleapis.com/auth/gmail.send` scope to the OAuth consent screen, and sign out/in once to grant it. OAuth access and refresh tokens remain in the encrypted server session and are never returned to the browser. `APP_URL` becomes the invitation link.
 
 ## Notifications
 
-Members and admins receive in-app notifications when another participant comments or suggests a change in a trip they have contributed to. Participation persists after contribution deletion. When an owner or admin changes a contribution's status or visibility, its non-owner author receives an in-app update. The owner intentionally has no notification bell.
+Members, Leaders, and admins receive in-app notifications for relevant trip activity. Membership notifications cover being added, removed, or receiving leadership; contribution participation persists after contribution deletion. When a Leader or Admin changes a contribution's status or visibility, its author receives an in-app update.
 
 New non-owner contributions also enqueue a private owner email through Resend. Create a sending-only Resend API key, register Resend with the same address as `AUTH_OWNER_EMAIL`, and configure `RESEND_API_KEY`. The free `onboarding@resend.dev` sender can then deliver to that owner address without a custom domain. Email delivery happens after the contribution response; failures never roll back the contribution.
 
@@ -143,4 +148,4 @@ Apply the reviewed import atomically:
 pnpm run trip:import examples/trip-import.example.json --apply
 ```
 
-An import upserts the trip, citations, and schedule by stable item key, then removes entries omitted from the imported schedule. Suggestions attached to a removed entry are preserved as trip-level notes.
+An import upserts the trip, citations, and schedule by stable item key, then removes entries omitted from the imported schedule. New imports assign the configured Owner as Leader; updates preserve membership. Suggestions attached to a removed entry are preserved as trip-level notes, and imports are audited.

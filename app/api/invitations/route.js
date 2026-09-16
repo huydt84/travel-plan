@@ -13,6 +13,8 @@ import {
   resolveInvitationPermission,
 } from "../../../lib/invitation-permission-repository";
 import { getCachedItinerary } from "../../../lib/trip-cache";
+import { assertTripMemberEmails } from "../../../lib/trip-access-repository";
+import { recordTripAudit } from "../../../lib/trip-audit-repository";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,4 +22,5 @@ export const runtime = "nodejs";
 export const POST = createInvitationHandler({
   requireAuthenticated, resolveInvitationPermission, getGoogleMailAccess, getCachedItinerary,
   reserveInvitationBatch, claimInvitationRecipients, sendInvitationBatch, saveInvitationDeliveries,
+  assertTripMemberEmails, recordTripAudit,
 });

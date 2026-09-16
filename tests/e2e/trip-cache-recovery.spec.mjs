@@ -4,7 +4,7 @@ import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
 import { expect, test } from "./fixtures.mjs";
 
 for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
-test(`home recovers a deleted cached trip at ${viewport.width}`, async ({ page, request }, testInfo) => {
+test(`home recovers a deleted cached trip at ${viewport.width}`, async ({ page, request, runtimeHealth }, testInfo) => {
   await page.setViewportSize(viewport);
   const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
   const slug = `cache-recovery-${randomUUID()}`;
@@ -45,6 +45,9 @@ test(`home recovers a deleted cached trip at ${viewport.width}`, async ({ page, 
     await page.getByRole("button", { name: "Lịch sử", exact: true }).click();
     await expect(page.getByRole("navigation", { name: "Lịch sử trò chuyện" })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("recovered-history.png") });
+    const expectedDeletedResource = "console: Failed to load resource: the server responded with a status of 404 (Not Found)";
+    expect(runtimeHealth.filter((failure) => failure !== expectedDeletedResource)).toEqual([]);
+    runtimeHealth.splice(0, runtimeHealth.length);
   } finally {
     await sql`DELETE FROM trips WHERE slug=${slug}`;
     if (original[0]) await request.patch(`/api/trips/${original[0].slug}`, { data: { title: original[0].title } });

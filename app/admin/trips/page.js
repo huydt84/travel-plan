@@ -2,8 +2,9 @@ import AdminApp from "../../../components/AdminApp";
 import { getViewer } from "../../../lib/auth";
 import { listSuggestions } from "../../../lib/suggestion-repository";
 import { countPendingInvitationRequests } from "../../../lib/invitation-permission-repository";
-import { getItinerary, listTrips } from "../../../lib/itinerary-repository";
+import { getItinerary } from "../../../lib/itinerary-repository";
 import { countOpenTripRequests } from "../../../lib/trip-request-repository";
+import { listAdminTrips } from "../../../lib/trip-access-repository";
 
 import { localizedMetadata } from "../../../lib/locale-server";
 export const generateMetadata = () => localizedMetadata("metadata.adminTrips");
@@ -22,7 +23,7 @@ export default async function TripsAdminPage({ searchParams }) {
     const [{ trip: requestedTrip }, trips, invitationCount, requestCount] = await Promise.all([
       searchParams,
       // Management must not open a cached trip deleted by another process.
-      listTrips(),
+      listAdminTrips(viewer),
       countPendingInvitationRequests(),
       countOpenTripRequests(),
     ]);

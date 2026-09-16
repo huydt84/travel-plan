@@ -7,6 +7,8 @@ import {
   resolveInvitationPermission,
 } from "../../../lib/invitation-permission-repository";
 import { getCachedItinerary } from "../../../lib/trip-cache";
+import { requireTripAccess } from "../../../lib/trip-access-repository";
+import { apiError } from "../../../lib/api-response";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,18 +18,9 @@ export async function GET(request) {
   if (!tripSlug) return NextResponse.json({ error: "Hãy chọn một chuyến đi hợp lệ" }, { status: 400 });
 
   try {
-    const plan = await getCachedItinerary(tripSlug);
     const viewer = await getViewer();
-    if (!viewer) {
-      return NextResponse.json({
-        authState: "guest",
-        permission: { status: "not_requested" },
-        gmailAuthorized: false,
-        quota: null,
-        history: [],
-        trip: { slug: plan.trip.slug, title: plan.trip.title },
-      });
-    }
+    await requireTripAccess(viewer, tripSlug, "manageMembers");
+    const plan = await getCachedItinerary(tripSlug);
 
     const [permission, quota, history, mailState] = await Promise.all([
       resolveInvitationPermission(viewer),
@@ -48,9 +41,6 @@ export async function GET(request) {
       trip: { slug: plan.trip.slug, title: plan.trip.title },
     });
   } catch (error) {
-    if (error.code === "TRIP_NOT_FOUND") {
-      return NextResponse.json({ error: "Chuyến đi không còn tồn tại" }, { status: 404 });
-    }
-    return NextResponse.json({ error: "Không thể tải quyền gửi lời rủ" }, { status: 500 });
+    return apiError(error);
   }
 }

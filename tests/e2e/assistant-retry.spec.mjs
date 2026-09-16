@@ -11,17 +11,31 @@ import { expect, gotoHealthy, test } from "./fixtures.mjs";
 async function fixture(request) {
   const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
   const slug = `retry-${randomUUID()}`;
+  const email = `assistant-retry-${randomUUID()}@localhost.invalid`;
+  await sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at)
+    VALUES(${email},'Assistant retry','admin',NOW(),NOW(),NOW())`;
   const [trip] = await sql`INSERT INTO trips(slug,title,trip_date,end_date,timezone,location)
     VALUES(${slug},'Retry journey','2030-01-01','2030-01-01','Asia/Tokyo','Kyoto') RETURNING id`;
+  await sql`INSERT INTO trip_participants(trip_id,user_email,role,added_by_email)
+    VALUES(${trip.id},${email},'leader',${email})`;
   const store = createAssistantStore({ sql });
   const background = createBackgroundStore(store);
-  const accept = (options = {}) => store.acceptRequest({ ownerEmail: "local-admin@localhost.invalid", tripSlug: slug,
+  const accept = (options = {}) => store.acceptRequest({ ownerEmail: email, tripSlug: slug,
     clientTurnId: randomUUID(), input: "Tóm tắt chuyến đi", title: "Retry", leaseMs: 60000, maxTurnsPerHour: 100,
     conversationId: null, background: true, ...options });
-  return { sql, slug, trip, store, background, accept, async close() {
+  return { sql, slug, trip, email, store, background, accept, async close() {
     await cleanupAssistantTrips(sql, [trip.id]);
-    await request.delete(`/api/trips/${slug}`); await sql.end();
+    await request.delete(`/api/trips/${slug}`);
+    await sql`DELETE FROM users WHERE email=${email}`;
+    await sql.end();
   } };
+}
+
+async function useFixtureActor(page, fixtureState) {
+  await page.setExtraHTTPHeaders({
+    "x-local-viewer-email": fixtureState.email,
+    "x-local-viewer-name": "Assistant retry",
+  });
 }
 
 test("dispatch races fence delayed workers, expiry and duplicate delivery", async ({ request }) => {
@@ -29,7 +43,7 @@ test("dispatch races fence delayed workers, expiry and duplicate delivery", asyn
   try {
     const a = await f.accept();
     await dispatchAttempt(a.turn.id, { store: f.background, start: async () => { throw new Error("Unavailable"); } });
-    expect((await f.store.getTurn(a.turn.id, "local-admin@localhost.invalid")).errorCode).toBe("DISPATCH_FAILED");
+    expect((await f.store.getTurn(a.turn.id, f.email)).errorCode).toBe("DISPATCH_FAILED");
     expect(await f.background.claim(a.turn.id, 55000, "late-worker")).toBe(false);
     expect(await f.background.append(a.turn.id, { type: "answer-delta", text: "late" })).toBeNull();
     await expect(f.store.publishTurn({ turnId: a.turn.id, output: "late", citations: [] })).rejects.toMatchObject({ code: "TURN_INTERRUPTED" });
@@ -38,11 +52,11 @@ test("dispatch races fence delayed workers, expiry and duplicate delivery", asyn
       expect(await f.background.claim(b.turn.id, 55000, "claimed-worker")).toBe(true);
       throw new Error("Acknowledgement lost");
     } });
-    expect((await f.store.getTurn(b.turn.id, "local-admin@localhost.invalid")).status).toBe("running");
+    expect((await f.store.getTurn(b.turn.id, f.email)).status).toBe("running");
     expect(await f.background.claim(b.turn.id, 55000, "duplicate")).toBe(false);
     const c = await f.accept();
     await f.sql`UPDATE assistant_turns SET lease_expires_at=NOW()-INTERVAL '1 second' WHERE id=${c.turn.id}`;
-    await f.store.reconcile("local-admin@localhost.invalid");
+    await f.store.reconcile(f.email);
     expect(await f.background.claim(c.turn.id, 55000, "delayed")).toBe(false);
   } finally { await f.close(); }
 });
@@ -61,7 +75,7 @@ test("retry is atomic, actor scoped, latest-only and paginated as one exchange",
     await f.store.failTurn(a.turn.id, "TURN_CANCELLED");
     const next = await f.accept({ conversationId: original.conversation.id, retryOfTurnId: a.turn.id });
     await f.store.publishTurn({ turnId: next.turn.id, output: "Completed", citations: [] });
-    const turns = await f.store.listTurns(original.conversation.id, "local-admin@localhost.invalid");
+    const turns = await f.store.listTurns(original.conversation.id, f.email);
     expect(turns).toHaveLength(1); expect(turns[0].exchangeId).toBe(original.turn.id);
     expect(turns[0].output).toBe("Completed");
     expect(await f.sql`SELECT id FROM assistant_turns WHERE conversation_id=${original.conversation.id}`).toHaveLength(3);
@@ -69,7 +83,7 @@ test("retry is atomic, actor scoped, latest-only and paginated as one exchange",
     await f.store.failTurn(failed.turn.id, "DISPATCH_FAILED");
     await f.accept({ conversationId: original.conversation.id, input: "Later message" });
     await expect(f.accept({ conversationId: original.conversation.id, retryOfTurnId: failed.turn.id })).rejects.toMatchObject({ code: "RETRY_UNAVAILABLE" });
-    const older = await f.store.listTurns(original.conversation.id, "local-admin@localhost.invalid", { before: { id: failed.turn.id, createdAt: failed.turn.createdAt } });
+    const older = await f.store.listTurns(original.conversation.id, f.email, { before: { id: failed.turn.id, createdAt: failed.turn.createdAt } });
     expect(older.map((turn) => turn.id)).toEqual([next.turn.id]);
   } finally { await f.close(); }
 });
@@ -80,9 +94,9 @@ test("replacing the latest turn overwrites its persisted input and generated art
     const original = await f.accept();
     await f.store.publishTurn({ turnId: original.turn.id, output: "Old answer", citations: [{ id: "old" }] });
     const clientTurnId = randomUUID();
-    const first = await f.store.replaceLatestTurn({ turnId: original.turn.id, ownerEmail: "local-admin@localhost.invalid",
+    const first = await f.store.replaceLatestTurn({ turnId: original.turn.id, ownerEmail: f.email,
       clientTurnId, input: "Edited latest message", leaseMs: 60000, maxTurnsPerHour: 100 });
-    const replay = await f.store.replaceLatestTurn({ turnId: original.turn.id, ownerEmail: "local-admin@localhost.invalid",
+    const replay = await f.store.replaceLatestTurn({ turnId: original.turn.id, ownerEmail: f.email,
       clientTurnId, input: "Edited latest message", leaseMs: 60000, maxTurnsPerHour: 100 });
     expect(replay.replayed).toBe(true);
     expect(first.turn).toMatchObject({ id: original.turn.id, input: "Edited latest message", output: null, citations: [], status: "running" });
@@ -92,12 +106,12 @@ test("replacing the latest turn overwrites its persisted input and generated art
     expect(await f.sql`SELECT seq FROM assistant_events WHERE turn_id=${original.turn.id}`).toEqual([{ seq: 1 }]);
     expect(await f.sql`SELECT turn_id FROM assistant_jobs WHERE turn_id=${original.turn.id}`).toHaveLength(1);
     await f.store.publishTurn({ turnId: original.turn.id, output: "New answer", citations: [] });
-    expect(await f.store.listModelHistory(original.conversation.id, "local-admin@localhost.invalid")).toEqual([
+    expect(await f.store.listModelHistory(original.conversation.id, f.email)).toEqual([
       expect.objectContaining({ id: original.turn.id, input: "Edited latest message", output: "New answer" }),
     ]);
     const later = await f.accept({ conversationId: original.conversation.id, input: "Later message" });
     await f.store.publishTurn({ turnId: later.turn.id, output: "Later answer", citations: [] });
-    await expect(f.store.replaceLatestTurn({ turnId: original.turn.id, ownerEmail: "local-admin@localhost.invalid",
+    await expect(f.store.replaceLatestTurn({ turnId: original.turn.id, ownerEmail: f.email,
       clientTurnId: randomUUID(), input: "Too late", leaseMs: 60000, maxTurnsPerHour: 100 })).rejects.toMatchObject({ code: "REPLACE_UNAVAILABLE" });
   } finally { await f.close(); }
 });
@@ -106,6 +120,7 @@ for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) {
   test(`latest message edit and response regeneration fit at ${width}`, async ({ page }, testInfo) => {
     const f = await fixture(page.request);
     try {
+      await useFixtureActor(page, f);
       await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
       const original = await f.accept();
       await f.store.publishTurn({ turnId: original.turn.id, output: "Câu trả lời ban đầu", citations: [] });
@@ -144,6 +159,7 @@ for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) {
 test("unconfirmed submission keeps its identity and does not overwrite a newer draft", async ({ page }) => {
   const f = await fixture(page.request);
   try {
+    await useFixtureActor(page, f);
     await gotoHealthy(page, `/assistant?trip=${f.slug}`);
     const input = page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" });
     await page.getByRole("button", { name: "Thêm chuyến đi này" }).click();
@@ -168,6 +184,7 @@ for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) {
   test(`failed answer retries in place and preserves draft at ${width}`, async ({ page }) => {
     const f = await fixture(page.request); let release;
     try {
+      await useFixtureActor(page, f);
       const original = await f.accept();
       await f.background.append(original.turn.id, { type: "answer-delta", runId: original.turn.id, text: "Nội dung chưa hoàn tất" });
       await f.store.failTurn(original.turn.id, "TURN_INTERRUPTED");

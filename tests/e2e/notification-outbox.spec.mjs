@@ -22,7 +22,16 @@ test("concurrent outbox workers deliver one contribution email once", async ({ b
 
   try {
     await gotoHealthy(page, "/");
-    slug = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+    slug = `outbox-${marker}`;
+    expect((await ownerContext.request.post("/api/trips", { data: {
+      slug,
+      title: "Outbox fixture",
+      startDate: "2030-01-01",
+      endDate: "2030-01-01",
+      timezone: "Asia/Tokyo",
+      location: "Tokyo",
+      memberEmails: [`outbox-${marker}@localhost.invalid`],
+    } })).status()).toBe(201);
     const response = await contributorContext.request.post(`/api/trips/${encodeURIComponent(slug)}/suggestions`, {
       data: { activityId: null, kind: "comment", body: `Outbox concurrency ${marker}` },
     });
@@ -67,9 +76,7 @@ test("concurrent outbox workers deliver one contribution email once", async ({ b
       resendMessageId: `resend-${marker}`,
     });
   } finally {
-    if (suggestion && slug) {
-      await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}/suggestions/${suggestion.id}`);
-    }
+    if (slug) await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}`);
     await sql.end();
     await page.close();
     await contributorContext.close();

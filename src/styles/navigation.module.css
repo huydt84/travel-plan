@@ -123,6 +123,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.trip-context-actions { display: flex; align-items: center; gap: 8px; }
 .viewer-utilities {
   composes: viewer-utilities from global;
   position: relative;
@@ -316,6 +317,9 @@
     gap: 8px;
     padding-left: 12px;
   }
+  .trip-context-actions { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .trip-context-actions::-webkit-scrollbar { display: none; }
+  .trip-context-actions .invite-link { width: auto; min-width: max-content; }
   .viewer-utilities {
     border-right: 0;
   }
@@ -374,6 +378,7 @@
   .trip-context .invite-link :global(.action-icon) {
     display: none;
   }
+  .trip-context .trip-context-actions .invite-link { width: auto; min-width: max-content; padding-inline: 11px; }
   .viewer-utilities {
     grid-column: 3;
     grid-row: 2;

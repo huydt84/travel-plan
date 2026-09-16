@@ -29,6 +29,8 @@ test("fresh schema, legacy adoption, and reruns preserve data and enforce constr
     expect((await db.query("SELECT * FROM trips")).rows).toEqual([]);
     const { rows: [trip] } = await db.query(`INSERT INTO trips (slug,title,trip_date,end_date,timezone,location)
       VALUES ('kept','Edited title','2032-01-01','2032-01-02','Asia/Tokyo','Edited location') RETURNING *`);
+    await db.query(`INSERT INTO trip_participants (trip_id,user_email,role,added_by_email)
+      VALUES ($1,'local-admin@localhost.invalid','leader','local-admin@localhost.invalid')`, [trip.id]);
     await db.query("INSERT INTO users (email, name, role, first_login, last_login, last_active_at) VALUES ('member@example.com','Member','member',NOW(),NOW(),NOW())");
     const { rows: [activity] } = await db.query(`INSERT INTO activities
       (trip_id,item_key,sort_order,start_date,start_time,end_date,end_time,type,icon,title,detail)
@@ -43,10 +45,13 @@ test("fresh schema, legacy adoption, and reruns preserve data and enforce constr
     await expect(db.query(`INSERT INTO notifications (recipient_email,trip_id,event_type,actor_name)
       VALUES ('member@example.com',$1,'contribution_created','Member')`, [trip.id])).rejects.toMatchObject({ code: "23514" });
     // A current installation predating the ledger must be adopted without seeding.
-    await db.query("DELETE FROM users");
+    await db.query("SET CONSTRAINTS ALL IMMEDIATE");
     await db.query("DROP TABLE pgmigrations");
     expect(await migrate()).toHaveLength(migrationCount);
-    expect((await db.query("SELECT email,name FROM users")).rows).toEqual([{ email: "member@example.com", name: "Member" }]);
+    expect((await db.query("SELECT email,name FROM users ORDER BY email")).rows).toEqual([
+      { email: "local-admin@localhost.invalid", name: "local-admin" },
+      { email: "member@example.com", name: "Member" },
+    ]);
     const before = (await db.query("SELECT * FROM trips")).rows;
     expect(before[0]).toMatchObject({ title: "Edited title", location: "Edited location" });
     expect((await db.query("SELECT item_key FROM activities")).rows).toEqual([{ item_key: "stable-key" }]);
@@ -54,7 +59,7 @@ test("fresh schema, legacy adoption, and reruns preserve data and enforce constr
     expect((await db.query("SELECT * FROM trips")).rows).toEqual(before);
     await db.query("DELETE FROM activities");
     expect((await db.query("SELECT activity_id,body FROM suggestions")).rows).toEqual([{ activity_id: null, body: "Preserve me" }]);
-    expect((await db.query("SELECT * FROM trip_participants")).rows).toHaveLength(1);
+    expect((await db.query("SELECT * FROM trip_participants")).rows).toHaveLength(2);
     for (const table of ["invitation_permissions", "invitation_deliveries", "invitation_batches", "trip_request_places", "trip_request_sources", "trip_request_fulfillments", "admin_notification_outbox", "assistant_change_sets", "assistant_requests"]) {
       expect((await db.query(`SELECT * FROM ${table}`)).rows).toEqual([]);
     }

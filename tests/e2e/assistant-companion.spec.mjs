@@ -7,38 +7,56 @@ import { createAssistantStore } from "../../lib/v1/store.mjs";
 import { createBackgroundStore } from "../../lib/v1/background-store.mjs";
 import { expect, gotoHealthy, test } from "./fixtures.mjs";
 
-const ownerEmail = "local-admin@localhost.invalid";
 async function fixture(request, persistent = false) {
   const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
+  const email = `assistant-companion-${randomUUID()}@localhost.invalid`;
+  await sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at)
+    VALUES(${email},'Assistant companion','admin',NOW(),NOW(),NOW())`;
   if (persistent) {
     const existing = await sql`SELECT id,slug,title FROM trips ORDER BY created_at`;
     const kyoto = existing.find((trip) => trip.slug === "kyoto-local-assistant");
     const original = existing.find((trip) => trip.id !== kyoto?.id);
     expect(original).toBeTruthy(); expect(kyoto).toBeTruthy();
-    return { sql, trips: [original, kyoto], async close() { await sql.end(); } };
+    await sql`INSERT INTO trip_participants(trip_id,user_email,role,added_by_email)
+      VALUES(${original.id},${email},'member',${email}),(${kyoto.id},${email},'member',${email})`;
+    return { sql, email, trips: [original, kyoto], store: createAssistantStore({ sql }), async close() {
+      await sql`DELETE FROM trip_participants WHERE user_email=${email}`;
+      await sql`DELETE FROM users WHERE email=${email}`;
+      await sql.end();
+    } };
   }
   const trips = [];
   for (const title of ["Tokyo companion", "Kyoto companion"]) {
     const slug = `companion-${randomUUID()}`;
     const [trip] = await sql`INSERT INTO trips(slug,title,trip_date,end_date,timezone,location)
       VALUES(${slug},${title},'2030-01-01','2030-01-01','Asia/Tokyo','Japan') RETURNING id,slug,title`;
+    await sql`INSERT INTO trip_participants(trip_id,user_email,role,added_by_email)
+      VALUES(${trip.id},${email},'leader',${email})`;
     await sql`INSERT INTO activities(trip_id,item_key,sort_order,start_date,start_time,end_date,end_time,type,icon,title,detail)
       VALUES(${trip.id},'museum',0,'2030-01-01','09:00','2030-01-01','10:00','Visit','pin','Museum','Original')`;
     trips.push(trip);
   }
-  return { sql, trips, store: createAssistantStore({ sql }), async close() {
+  return { sql, email, trips, store: createAssistantStore({ sql }), async close() {
     await cleanupAssistantTrips(sql, trips.map((trip) => trip.id));
     for (const trip of trips) {
       if (request) await request.delete(`/api/trips/${trip.slug}`);
       else await sql`DELETE FROM trips WHERE id=${trip.id}`;
     }
+    await sql`DELETE FROM users WHERE email=${email}`;
     await sql.end();
   } };
+}
+async function useFixtureActor(page, fixtureState) {
+  await page.setExtraHTTPHeaders({
+    "x-local-viewer-email": fixtureState.email,
+    "x-local-viewer-name": "Assistant companion",
+  });
 }
 
 test("a real workflow streams before completion and survives switching trips and closing chat", async ({ page }) => {
   const f = await fixture(page.request, process.env.E2E_LOCAL_TRIP_SWITCH === "true");
   try {
+    await useFixtureActor(page, f);
     await page.request.patch(`/api/trips/${f.trips[0].slug}`, { data: { title: f.trips[0].title } });
     await gotoHealthy(page, `/?trip=${f.trips[0].slug}`);
     await page.getByRole("button", { name: "Trợ lý", exact: true }).click();
@@ -91,7 +109,8 @@ test("a real workflow streams before completion and survives switching trips and
 test("Stop persists an incomplete reply and never stages a proposal", async ({ page }) => {
   const f = await fixture(page.request);
   try {
-    const accepted = await f.store.acceptRequest({ ownerEmail, tripSlug: f.trips[0].slug, clientTurnId: randomUUID(), conversationId: null,
+    await useFixtureActor(page, f);
+    const accepted = await f.store.acceptRequest({ ownerEmail: f.email, tripSlug: f.trips[0].slug, clientTurnId: randomUUID(), conversationId: null,
       input: "Tóm tắt trước khi dừng", title: "Stop test", leaseMs: 60000, maxTurnsPerHour: 100, background: true });
     const background = createBackgroundStore(f.store);
     await background.claim(accepted.turn.id, 60000);
@@ -109,7 +128,8 @@ test("Stop persists an incomplete reply and never stages a proposal", async ({ p
 test("Markdown, grouped citations, keyboard focus and unsafe content", async ({ page }) => {
   const f = await fixture(page.request);
   try {
-    const accepted = await f.store.acceptRequest({ ownerEmail, tripSlug: f.trips[0].slug, clientTurnId: randomUUID(), conversationId: null, input: "Markdown test", title: "Markdown", leaseMs: 60000, maxTurnsPerHour: 100 });
+    await useFixtureActor(page, f);
+    const accepted = await f.store.acceptRequest({ ownerEmail: f.email, tripSlug: f.trips[0].slug, clientTurnId: randomUUID(), conversationId: null, input: "Markdown test", title: "Markdown", leaseMs: 60000, maxTurnsPerHour: 100 });
     await f.store.publishTurn({ turnId: accepted.turn.id, output: "### Giờ mở cửa\n\n**Hasedera** [E5, E12]\n\n- Vé vào cửa\n- Lối đi\n\n| Mục | Giờ |\n| --- | --- |\n| Cổng | 09:00 |\n\n```js\nconst trip = 1;\n```\n\n<script>alert(1)</script>\n\n[Unsafe](javascript:alert(1))", citations: [{ id: "E5", title: "Temple", url: "https://example.com/temple" }, { id: "E12", title: "Hours", url: "https://example.com/hours" }] });
     await gotoHealthy(page, `/assistant?trip=${f.trips[0].slug}&conversation=${accepted.conversation.id}`);
     await expect(page.getByRole("heading", { name: "Giờ mở cửa" })).toBeVisible();
@@ -127,8 +147,9 @@ test("Markdown, grouped citations, keyboard focus and unsafe content", async ({ 
 test("conversation and turn pagination reach old history without losing scroll position", async ({ page }) => {
   const f = await fixture(page.request);
   try {
+    await useFixtureActor(page, f);
     await f.sql`INSERT INTO assistant_conversations(id,owner_email,trip_id,title,created_at,updated_at)
-      SELECT gen_random_uuid(),${ownerEmail},${f.trips[0].id},'History ' || i,
+      SELECT gen_random_uuid(),${f.email},${f.trips[0].id},'History ' || i,
         NOW()+INTERVAL '1 day'-i*INTERVAL '1 minute',NOW()+INTERVAL '1 day'-i*INTERVAL '1 minute' FROM generate_series(1,35) i`;
     const [conversation] = await f.sql`SELECT id FROM assistant_conversations WHERE trip_id=${f.trips[0].id} AND title='History 35'`;
     await f.sql`INSERT INTO assistant_turns(id,conversation_id,client_turn_id,input_text,output_text,status,created_at,completed_at)
@@ -151,7 +172,8 @@ test("conversation and turn pagination reach old history without losing scroll p
 test("durable acceptance, single dispatch and worker claims remain idempotent", async ({ page }) => {
   const f = await fixture(page.request);
   try {
-    const input = { ownerEmail, tripSlug: f.trips[0].slug, conversationId: null, clientTurnId: randomUUID(), input: "Queued", title: "Queued", leaseMs: 600000, maxTurnsPerHour: 100, background: true };
+    await useFixtureActor(page, f);
+    const input = { ownerEmail: f.email, tripSlug: f.trips[0].slug, conversationId: null, clientTurnId: randomUUID(), input: "Queued", title: "Queued", leaseMs: 600000, maxTurnsPerHour: 100, background: true };
     const [a, b] = await Promise.all([f.store.acceptRequest(input), f.store.acceptRequest(input)]);
     expect(a.turn.id).toBe(b.turn.id);
     const background = createBackgroundStore(f.store);
@@ -163,9 +185,9 @@ test("durable acceptance, single dispatch and worker claims remain idempotent", 
     await f.store.failTurn(a.turn.id, "TURN_CANCELLED");
     expect(await background.append(a.turn.id, { type: "answer-delta", runId: a.turn.id, text: "Must not publish" })).toBeNull();
     await expect(f.store.publishTurn({ turnId: a.turn.id, output: "Late", citations: [] })).rejects.toMatchObject({ code: "TURN_INTERRUPTED" });
-    expect((await f.store.getTurn(a.turn.id, ownerEmail)).output).toBe("Partial");
+    expect((await f.store.getTurn(a.turn.id, f.email)).output).toBe("Partial");
     expect((await background.events(a.turn.id, 1)).map((event) => event.seq)).toEqual([2]);
-    const terminal = { type: "cancelled", runId: a.turn.id, turn: await f.store.getTurn(a.turn.id, ownerEmail) };
+    const terminal = { type: "cancelled", runId: a.turn.id, turn: await f.store.getTurn(a.turn.id, f.email) };
     expect(await Promise.all([background.append(a.turn.id, terminal), background.append(a.turn.id, terminal)])).toEqual([3, 3]);
     expect((await background.events(a.turn.id, 2))).toHaveLength(1);
   } finally { await f.close(); }
@@ -183,8 +205,9 @@ test("intermediate widths keep chat controls inside the viewport", async ({ page
 test("Back and Forward preserve conversation drafts independently of the visible trip", async ({ page }) => {
   const f = await fixture(page.request);
   try {
-    const a = await f.store.createConversation({ ownerEmail, title: "Draft A" });
-    const b = await f.store.createConversation({ ownerEmail, title: "Draft B" });
+    await useFixtureActor(page, f);
+    const a = await f.store.createConversation({ ownerEmail: f.email, title: "Draft A" });
+    const b = await f.store.createConversation({ ownerEmail: f.email, title: "Draft B" });
     await gotoHealthy(page, `/assistant?trip=${f.trips[0].slug}&conversation=${a.id}`);
     const input = page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" });
     await expect(input).toBeEnabled(); await input.fill("Tokyo draft");
@@ -201,6 +224,7 @@ test("Back and Forward preserve conversation drafts independently of the visible
 test("composer respects IME composition and Shift Enter", async ({ page }) => {
   const f = await fixture(page.request);
   try {
+    await useFixtureActor(page, f);
     await gotoHealthy(page, `/assistant?trip=${f.trips[0].slug}`);
     const input = page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" });
     await expect(input).toBeEnabled(); await input.fill("かな");
@@ -215,7 +239,8 @@ test("composer respects IME composition and Shift Enter", async ({ page }) => {
 test("reading earlier messages preserves scroll and announces a background response", async ({ page }) => {
   const f = await fixture(page.request);
   try {
-    const a = await f.store.acceptRequest({ ownerEmail, tripSlug: f.trips[0].slug, conversationId: null,
+    await useFixtureActor(page, f);
+    const a = await f.store.acceptRequest({ ownerEmail: f.email, tripSlug: f.trips[0].slug, conversationId: null,
       clientTurnId: randomUUID(), input: "Long reply", title: "Long reply", leaseMs: 60000, maxTurnsPerHour: 100, background: true });
     const background = createBackgroundStore(f.store);
     await background.claim(a.turn.id, 60000);
@@ -233,5 +258,6 @@ test("reading earlier messages preserves scroll and announces a background respo
     await expect(page.getByRole("button", { name: /Long reply.*Đang trả lời/ })).toBeVisible();
     await f.store.publishTurn({ turnId: a.turn.id, output: "Finished reply", citations: [] });
     await expect(page.getByRole("button", { name: /Long reply.*Đang trả lời/ })).toHaveCount(0, { timeout: 10000 });
+    await expect(page.getByText("Finished reply", { exact: true })).toBeVisible({ timeout: 10000 });
   } finally { await f.close(); }
 });

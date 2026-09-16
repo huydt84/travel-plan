@@ -1459,6 +1459,9 @@
     margin-top: 5px;
     white-space: nowrap;
   }
+  .admin-users-table td:first-child :global(.admin-ghost) {
+    min-height: 44px;
+  }
   .user-role-control select {
     min-height: 44px;
     font-size: 16px;

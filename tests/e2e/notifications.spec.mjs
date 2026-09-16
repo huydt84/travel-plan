@@ -23,7 +23,20 @@ test("contributors receive in-app updates while owner delivery stays email-only"
 
   try {
     await gotoHealthy(pageA, "/");
-    slug = await pageA.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+    await gotoHealthy(pageB, "/");
+    slug = `notifications-${marker}`;
+    expect((await ownerContext.request.post("/api/trips", { data: {
+      slug,
+      title: "Notification fixture",
+      startDate: "2030-01-01",
+      endDate: "2030-01-01",
+      timezone: "Asia/Tokyo",
+      location: "Tokyo",
+      memberEmails: [aEmail, bEmail],
+    } })).status()).toBe(201);
+    await contextA.request.post("/api/notifications/read-all");
+    await contextB.request.post("/api/notifications/read-all");
+    await gotoHealthy(pageA, `/?trip=${encodeURIComponent(slug)}`);
 
     const responseA = await contextA.request.post(`/api/trips/${encodeURIComponent(slug)}/suggestions`, {
       data: { activityId: null, kind: "comment", body: bodyA },
@@ -54,7 +67,8 @@ test("contributors receive in-app updates while owner delivery stays email-only"
 
     const selfNotifications = await contextB.request.get("/api/notifications");
     expect(selfNotifications.status()).toBe(200);
-    expect((await selfNotifications.json()).notifications.some((item) => item.contribution.id === suggestionB.id)).toBe(false);
+    expect((await selfNotifications.json()).notifications.some((item) => item.contribution?.id === suggestionB.id)).toBe(false);
+    await contextB.request.post("/api/notifications/read-all");
 
     const moderation = await ownerContext.request.patch(`/api/trips/${encodeURIComponent(slug)}/suggestions/${suggestionB.id}`, {
       data: { status: "resolved" },
@@ -63,7 +77,7 @@ test("contributors receive in-app updates while owner delivery stays email-only"
     const statusNotifications = await contextB.request.get("/api/notifications");
     expect(statusNotifications.status()).toBe(200);
     const statusNotificationCount = (await statusNotifications.json()).notifications
-      .filter((item) => item.type === "contribution_status_changed" && item.contribution.id === suggestionB.id).length;
+      .filter((item) => item.type === "contribution_status_changed" && item.contribution?.id === suggestionB.id).length;
     expect(statusNotificationCount).toBe(1);
     const repeatedModeration = await ownerContext.request.patch(`/api/trips/${encodeURIComponent(slug)}/suggestions/${suggestionB.id}`, {
       data: { status: "resolved" },
@@ -71,7 +85,7 @@ test("contributors receive in-app updates while owner delivery stays email-only"
     expect(repeatedModeration.status()).toBe(200);
     const afterRepeatedModeration = await contextB.request.get("/api/notifications");
     expect((await afterRepeatedModeration.json()).notifications
-      .filter((item) => item.type === "contribution_status_changed" && item.contribution.id === suggestionB.id)).toHaveLength(1);
+      .filter((item) => item.type === "contribution_status_changed" && item.contribution?.id === suggestionB.id)).toHaveLength(1);
 
     await gotoHealthy(pageB, `/?trip=${encodeURIComponent(slug)}`);
     const bBell = pageB.getByRole("button", { name: /Mở thông báo, 1 thông báo chưa đọc/ });
@@ -104,10 +118,9 @@ test("contributors receive in-app updates while owner delivery stays email-only"
     expect(rejection.status()).toBe(200);
     const notificationsAfterRejection = await contextA.request.get("/api/notifications");
     expect(notificationsAfterRejection.status()).toBe(200);
-    expect((await notificationsAfterRejection.json()).notifications.some((item) => item.contribution.id === suggestionB.id)).toBe(false);
+    expect((await notificationsAfterRejection.json()).notifications.some((item) => item.contribution?.id === suggestionB.id)).toBe(false);
   } finally {
-    if (suggestionA && slug) await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}/suggestions/${suggestionA.id}`);
-    if (suggestionB && slug) await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}/suggestions/${suggestionB.id}`);
+    if (slug) await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}`);
     await contextA.close();
     await contextB.close();
     await ownerContext.close();
@@ -122,12 +135,25 @@ test("participation survives deletion and notification APIs enforce pagination a
   const contextB = await browser.newContext({ baseURL, extraHTTPHeaders: localHeaders(bEmail, "History B") });
   const ownerContext = await browser.newContext({ baseURL });
   const pageA = await contextA.newPage();
+  const pageB = await contextB.newPage();
   const created = [];
   let slug;
 
   try {
     await gotoHealthy(pageA, "/");
-    slug = await pageA.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+    await gotoHealthy(pageB, "/");
+    slug = `notification-history-${marker}`;
+    expect((await ownerContext.request.post("/api/trips", { data: {
+      slug,
+      title: "Notification history fixture",
+      startDate: "2030-01-01",
+      endDate: "2030-01-01",
+      timezone: "Asia/Tokyo",
+      location: "Tokyo",
+      memberEmails: [aEmail, bEmail],
+    } })).status()).toBe(201);
+    await contextA.request.post("/api/notifications/read-all");
+    await contextB.request.post("/api/notifications/read-all");
 
     const firstContribution = await contextA.request.post(`/api/trips/${encodeURIComponent(slug)}/suggestions`, {
       data: { activityId: null, kind: "comment", body: `A tham gia ${marker}` },
@@ -173,11 +199,10 @@ test("participation survives deletion and notification APIs enforce pagination a
     expect((await afterReadAll.json()).unreadCount).toBe(0);
   } finally {
     if (slug) {
-      for (const contribution of created) {
-        await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}/suggestions/${contribution.id}`);
-      }
+      await ownerContext.request.delete(`/api/trips/${encodeURIComponent(slug)}`);
     }
     await pageA.close();
+    await pageB.close();
     await contextA.close();
     await contextB.close();
     await ownerContext.close();
@@ -191,9 +216,16 @@ test("empty notification panel closes with Escape and restores trigger focus", a
     extraHTTPHeaders: localHeaders(`notification-empty-${marker}@localhost.invalid`, "Empty Contributor"),
   });
   const page = await context.newPage();
+  let slug;
 
   try {
     await gotoHealthy(page, "/");
+    slug = `notification-empty-${marker}`;
+    expect((await context.request.post("/api/trips", { data: {
+      slug, title: "Empty notifications", startDate: "2030-01-01", endDate: "2030-01-01",
+      timezone: "Asia/Tokyo", location: "Tokyo",
+    } })).status()).toBe(201);
+    await gotoHealthy(page, `/?trip=${slug}`);
     const bell = page.getByRole("button", { name: "Mở thông báo" });
     await bell.click();
     await expect(page.getByText("Chưa có cập nhật", { exact: true })).toBeVisible();
@@ -201,6 +233,7 @@ test("empty notification panel closes with Escape and restores trigger focus", a
     await expect(page.getByRole("heading", { name: "Thông báo" })).toHaveCount(0);
     await expect(bell).toBeFocused();
   } finally {
+    if (slug) await context.request.delete(`/api/trips/${slug}`);
     await page.close();
     await context.close();
   }
@@ -213,19 +246,27 @@ test("notification panel recovers from an initial API error", async ({ browser, 
     extraHTTPHeaders: localHeaders(`notification-error-${marker}@localhost.invalid`, "Error Contributor"),
   });
   const page = await context.newPage();
+  let slug;
 
   try {
+    await gotoHealthy(page, "/");
+    slug = `notification-error-${marker}`;
+    expect((await context.request.post("/api/trips", { data: {
+      slug, title: "Notification error", startDate: "2030-01-01", endDate: "2030-01-01",
+      timezone: "Asia/Tokyo", location: "Tokyo",
+    } })).status()).toBe(201);
     await page.route("**/api/notifications?**", (route) => route.fulfill({
       status: 503,
       contentType: "application/json",
       body: JSON.stringify({ error: "Bảng tin đang tạm ngắt" }),
     }), { times: 1 });
-    await gotoHealthy(page, "/");
+    await gotoHealthy(page, `/?trip=${slug}`);
     await page.getByRole("button", { name: "Mở thông báo" }).click();
     await expect(page.locator(".notification-state[role='alert']")).toContainText("Bảng tin đang tạm ngắt");
     await page.getByRole("button", { name: "Thử lại" }).click();
     await expect(page.getByText("Chưa có cập nhật", { exact: true })).toBeVisible();
   } finally {
+    if (slug) await context.request.delete(`/api/trips/${slug}`);
     await page.close();
     await context.close();
   }

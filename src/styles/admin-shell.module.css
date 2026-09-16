@@ -81,6 +81,8 @@
   display: grid;
   margin-top: 14px;
 }
+.ownership-filter { display: grid; gap: 5px; padding: 8px 0 14px; border-bottom: 1px solid var(--navy); color: var(--muted); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.ownership-filter select { min-height: 40px; padding: 0 9px; border: 1px solid var(--navy); border-radius: 3px; color: var(--navy); background: white; font-size: 11px; }
 .trip-list-item {
   composes: trip-list-item from global;
   width: 100%;
@@ -168,6 +170,32 @@
 .admin-notice button :global(.action-icon) {
   vertical-align: -3px;
 }
+.workspace-tabs { display: flex; gap: 0; margin: 24px 0 0; border-bottom: 2px solid var(--navy); }
+.workspace-tabs button { min-height: 44px; padding: 0 18px; border: 0; color: var(--navy); background: transparent; font-weight: 800; text-transform: uppercase; }
+.workspace-tabs button[aria-selected="true"] { color: white; background: var(--green); }
+.member-section,.audit-section { margin: 28px 0 42px; }
+.member-section .admin-section-head p { max-width: 60ch; margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+.member-email-action { min-height: 40px; padding: 0 10px; border: 1px solid var(--green); border-radius: 3px; color: var(--green-dark); background: transparent; font-size: 10px; font-weight: 800; }
+.member-email-action:hover { color: white; background: var(--green); }
+.member-add { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.member-add label { display: grid; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.member-add input { min-height: 44px; padding: 0 12px; border: 1px solid var(--navy); border-radius: 3px; color: var(--navy); background: white; font-size: 14px; }
+.member-error { margin: 10px 0; color: #8e3028; font-size: 12px; }
+.member-list { position: relative; }
+.member-list::before { position: absolute; top: 0; bottom: 0; left: 78px; width: 2px; background: var(--navy); content: ""; }
+.member-row { position: relative; display: grid; grid-template-columns: 64px 28px minmax(150px,1fr) 90px auto; align-items: center; gap: 8px; min-height: 72px; border-bottom: 1px solid var(--line); }
+.member-time { color: var(--muted); font: 700 9px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; text-transform: uppercase; }
+.member-stop { z-index: 1; width: 14px; height: 14px; justify-self: center; border: 2px solid var(--navy); border-radius: 50%; background: var(--yellow); }
+.member-identity { display: grid; gap: 3px; min-width: 0; }
+.member-identity strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.member-identity small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.member-role { font-size: 10px; text-transform: uppercase; }
+.member-actions { display: flex; justify-content: flex-end; gap: 5px; }
+.member-actions button { min-height: 36px; padding: 0 9px; border: 1px solid var(--navy); border-radius: 3px; color: var(--navy); background: transparent; font-size: 9px; font-weight: 800; }
+.member-actions button:hover { background: var(--paper); }
+.audit-list article { display: grid; grid-template-columns: 170px minmax(0,1fr); gap: 24px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.audit-list time,.audit-list small { color: var(--muted); font-size: 10px; }
+.audit-list p { margin: 3px 0; font: 600 18px/1.2 var(--display); }
 .admin-nav {
   composes: admin-nav from global;
   display: grid;
@@ -229,6 +257,11 @@
   .admin-shell button {
     min-width: 44px;
   }
+  .member-add { grid-template-columns: 1fr; }
+  .member-row { grid-template-columns: 48px 24px minmax(0,1fr) auto; padding: 10px 0; }
+  .member-list::before { left: 60px; }
+  .member-actions { grid-column: 3 / -1; justify-content: flex-start; }
+  .audit-list article { grid-template-columns: 1fr; gap: 6px; }
   .admin-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;

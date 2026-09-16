@@ -17,12 +17,19 @@ async function fixture() {
   }
   const refs = trips.map((t) => ({ kind: "trip", id: String(t.id) }));
   await sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at) VALUES(${ownerEmail},'Assistant fixture','admin',NOW(),NOW(),NOW()) ON CONFLICT(email) DO UPDATE SET role='admin'`;
+  for (const trip of trips) await sql`INSERT INTO trip_participants(trip_id,user_email,role,added_by_email) VALUES(${trip.id},${ownerEmail},'leader',${ownerEmail})`;
   const store = createAssistantStore({ sql });
   const accept = (options = {}) => store.acceptRequest({ ownerEmail, clientTurnId: randomUUID(), conversationId: null, input: "Context question", title: "Context", leaseMs: 60000, maxTurnsPerHour: 100, ...options });
   return { sql, store, trips, refs, accept, ownerEmail, close: async () => {
     await sql`DELETE FROM assistant_conversations WHERE owner_email=${ownerEmail}`;
     await sql`DELETE FROM trips WHERE id=ANY(${trips.map((t) => t.id)}::BIGINT[])`; await sql`DELETE FROM users WHERE email=${ownerEmail}`; await sql.end();
   } };
+}
+async function useFixtureActor(page, fixtureState) {
+  await page.setExtraHTTPHeaders({
+    "x-local-viewer-email": fixtureState.ownerEmail,
+    "x-local-viewer-name": "Assistant fixture",
+  });
 }
 test("no-trip acceptance, context capture, pin conflict, replay and retry are independent of trips", async () => {
   const f = await fixture();
@@ -86,6 +93,9 @@ test("a conversation referencing A publishes and applies an explicit proposal on
 });
 for (const [width, height] of [[320,760],[1440,900],[1920,1080]]) {
   test(`mentions, pins, no-trip send and independent navigation at ${width}`, async ({ page }) => {
+    const f = await fixture();
+    try {
+    await useFixtureActor(page, f);
     await page.setViewportSize({ width, height });
     await gotoHealthy(page, "/assistant");
     const input = page.getByLabel("Yêu cầu cho trợ lý"); await expect(input).toBeEnabled();
@@ -137,13 +147,14 @@ for (const [width, height] of [[320,760],[1440,900],[1920,1080]]) {
     await page.screenshot({ path: `.impeccable/review/assistant-context/${width}-conversation.png` });
     await pins.getByRole("button", { name: /^Bỏ ghim/ }).click(); await expect(pins).toHaveCount(0);
     await page.reload(); await expect(input).toHaveValue("Bản nháp cùng cuộc trò chuyện"); await expect(pins).toHaveCount(0);
-    const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
-    await sql`DELETE FROM assistant_conversations WHERE id=${conversation}::UUID`;
-    await sql.end();
+    } finally { await f.close(); }
   });
 }
 
 test("tool chooser supports model-only messages, keyboard focus and conversation persistence",async({page})=>{
+  const f=await fixture();
+  try {
+  await useFixtureActor(page,f);
   await page.setViewportSize({width:320,height:760});
   await gotoHealthy(page,"/assistant");
   await expect(page.getByLabel("Yêu cầu cho trợ lý")).toBeEnabled();
@@ -165,5 +176,5 @@ test("tool chooser supports model-only messages, keyboard focus and conversation
   const conversation=new URL(page.url()).searchParams.get("conversation");expect(conversation).toBeTruthy();
   await page.reload();await expect(page.getByRole("button",{name:"Công cụ 0/8",exact:true})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(320);
-  const sql=createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);await sql`DELETE FROM assistant_conversations WHERE id=${conversation}::UUID`;await sql.end();
+  } finally {await f.close();}
 });

@@ -5,22 +5,28 @@ import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
 import { createAssistantStore } from "../../lib/v1/store.mjs";
 import { expect, gotoHealthy, test } from "./fixtures.mjs";
 
-const ownerEmail = "local-admin@localhost.invalid";
 async function setup(page) {
   const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
   const slug = `browser-harness-${randomUUID()}`;
+  const email = `assistant-recovery-${randomUUID()}@localhost.invalid`;
+  await sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at)
+    VALUES(${email},'Assistant recovery','admin',NOW(),NOW(),NOW())`;
   const [trip] = await sql`INSERT INTO trips(slug,title,trip_date,end_date,timezone,location)
     VALUES(${slug},'Browser harness','2030-01-01','2030-01-01','Asia/Tokyo','Tokyo') RETURNING id`;
+  await sql`INSERT INTO trip_participants(trip_id,user_email,role,added_by_email)
+    VALUES(${trip.id},${email},'leader',${email})`;
   await sql`INSERT INTO activities(trip_id,item_key,sort_order,start_date,start_time,end_date,end_time,type,icon,title,detail)
     VALUES(${trip.id},'museum',0,'2030-01-01','09:00','2030-01-01','10:00','Visit','pin','Museum','Original')`;
+  await page.setExtraHTTPHeaders({"x-local-viewer-email":email,"x-local-viewer-name":"Assistant recovery"});
   await gotoHealthy(page, `/assistant?trip=${slug}`);
   await page.getByRole("button", { name: "Thêm chuyến đi này" }).click();
   await expect(page.getByLabel("Yêu cầu cho trợ lý")).toBeEnabled();
-  return { sql, trip, slug, store: createAssistantStore({ sql }), cleanup: async () => {
+  return { sql, trip, slug, email, store: createAssistantStore({ sql }), cleanup: async () => {
     try {
       await cleanupAssistantTrips(sql, [trip.id]);
       const response = await page.request.delete(`/api/trips/${slug}`);
       expect(response.status()).toBe(204);
+      await sql`DELETE FROM users WHERE email=${email}`;
     } finally { await sql.end(); }
   } };
 }
@@ -56,7 +62,7 @@ test("reload reconciles a running lease and explicit retry creates one new turn"
     let accepted;
     await page.route("**/api/v1/assistant/turns", async (route) => {
       const body = route.request().postDataJSON();
-      accepted = await f.store.acceptRequest({ ownerEmail, tripSlug: f.slug, conversationId: body.conversationId,
+      accepted = await f.store.acceptRequest({ ownerEmail:f.email, tripSlug: f.slug, conversationId: body.conversationId,
         clientTurnId: body.clientTurnId, input: body.message, title: "Recovery", leaseMs: 60000, maxTurnsPerHour: 30 });
       await route.fulfill({ status: 202, contentType: "application/json", body: JSON.stringify({ runId: accepted.turn.id, conversationId: accepted.conversation.id }) });
     });
@@ -86,7 +92,7 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
       await send(page, "Cập nhật hoạt động đầu tiên với một ghi chú thử nghiệm");
       await expect(page.getByRole("heading", { name: "Cần phê duyệt" })).toBeVisible();
       await expect(page.getByRole("button", { name: "Phê duyệt thay đổi" })).toBeVisible();
-      const [proposal] = await f.sql`SELECT a.* FROM assistant_actions a JOIN assistant_turns t ON t.id=a.turn_id JOIN assistant_conversations c ON c.id=t.conversation_id WHERE c.owner_email=${ownerEmail} ORDER BY a.created_at DESC LIMIT 1`;
+      const [proposal] = await f.sql`SELECT a.* FROM assistant_actions a JOIN assistant_turns t ON t.id=a.turn_id JOIN assistant_conversations c ON c.id=t.conversation_id WHERE c.owner_email=${f.email} ORDER BY a.created_at DESC LIMIT 1`;
       // Advancing time must not make an interactive approval disappear.
       await page.clock.fastForward(31 * 60 * 1000);
       const approve = page.getByRole("button", { name: "Phê duyệt thay đổi" });
@@ -135,7 +141,7 @@ test("assistant HTTP boundaries isolate actors and reject cross-origin or empty 
     await f.sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at)
       VALUES(${other},'Harness admin','admin',NOW(),NOW(),NOW())`;
     await f.sql`INSERT INTO users(email,name,role,first_login,last_login,last_active_at) VALUES(${member},'Member','member',NOW(),NOW(),NOW())`;
-    const accepted = await f.store.acceptRequest({ ownerEmail, tripSlug: f.slug, conversationId: null,
+    const accepted = await f.store.acceptRequest({ ownerEmail:f.email, tripSlug: f.slug, conversationId: null,
       clientTurnId: randomUUID(), input: "Private request", title: "Private", leaseMs: 60000, maxTurnsPerHour: 100 });
     await f.store.publishTurn({ turnId: accepted.turn.id, output: "Private answer", citations: [] });
     const otherHeaders = { "x-local-viewer-email": other, "x-local-viewer-name": "Harness admin", origin: baseURL };

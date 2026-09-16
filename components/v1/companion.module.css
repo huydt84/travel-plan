@@ -15,6 +15,8 @@
   .withCompanion :global(.trip-context) { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--navy); }
 }
 @media (max-width: 680px) {
+  .launcher { padding-inline: 9px; gap: 5px; }
+  .launcher > svg { display: none; }
   :global(.trip-context):has(.launcher) { grid-template-columns: minmax(0, 1fr) auto; }
   :global(.trip-context):has(.launcher) :global(.trip-picker) { grid-column: 1 / -1; }
 }

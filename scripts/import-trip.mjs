@@ -106,7 +106,9 @@ if (!apply) {
   process.exit(0);
 }
 
-await applyTripImport(sql, payload);
+await applyTripImport(sql, payload, {
+  ownerEmail: process.env.AUTH_OWNER_EMAIL?.trim().toLowerCase() || "local-admin@localhost.invalid",
+});
 const { trip } = payload;
 
 console.log("Import committed successfully.");

@@ -33,8 +33,12 @@ export async function DELETE(_request, context) {
   const unauthorized = await requireAdmin();
   if (unauthorized) return unauthorized;
   try {
+    const viewer = await getViewer();
     const { requestId } = await context.params;
-    return NextResponse.json(await detachTripRequest({ requestId: requestIdFrom(requestId) }));
+    return NextResponse.json(await detachTripRequest({
+      requestId: requestIdFrom(requestId),
+      actor: viewer,
+    }));
   } catch (error) {
     return apiError(error);
   }

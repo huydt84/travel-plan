@@ -41,6 +41,7 @@ import { SuggestionList, useContributions } from "./tracker/Contributions";
 import InvitationDialog from "./InvitationDialog";
 import NotificationCenter from "./NotificationCenter";
 import ViewerMenu from "./ViewerMenu";
+import TripMembersPanel from "./TripMembersPanel";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useLocale } from "./LocaleProvider";
 import { translateActivityType } from "../lib/i18n.mjs";
@@ -86,6 +87,7 @@ export default function TripTracker({
   initialGmailReturn = false,
   viewer,
   trips,
+  access,
 }) {
   const router = useRouter();
   const { t, intlLocale, locale } = useLocale();
@@ -105,6 +107,7 @@ export default function TripTracker({
   const [branchAction, setBranchAction] = useState({ id: null, error: "" });
   const [invitationOpen, setInvitationOpen] = useState(initialInvitationOpen);
   const [gmailReturn, setGmailReturn] = useState(initialGmailReturn);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState(initialData.trip.startDate);
   const [scheduleBusy, setScheduleBusy] = useState(false);
   const [scheduleNotice, setScheduleNotice] = useState("");
@@ -558,22 +561,32 @@ export default function TripTracker({
               {tripDateLabel} · {data.trip.location}
             </small>
           </label>
-          <AssistantLauncher tripSlug={data.trip.slug} />
-          <button
-            className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`}
-            type="button"
-            onClick={() => setInvitationOpen(true)}
-          >
-            <ActionIcon name="invite" />
-            <span>{t("nav.invite")}</span>
-          </button>
+          <div className={navigationStyles["trip-context-actions"]}>
+            <AssistantLauncher tripSlug={data.trip.slug} />
+            {access?.canManageMembers && <button
+              className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`}
+              type="button"
+              onClick={() => setInvitationOpen(true)}
+            >
+              <ActionIcon name="invite" />
+              <span>{t("nav.invite")}</span>
+            </button>}
+            <button
+              className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`}
+              type="button"
+              onClick={() => setMembersOpen(true)}
+            >
+              <ActionIcon name="invite" />
+              <span>{t("visibility.members")}</span>
+            </button>
+          </div>
         </div>
         <div className={navigationStyles["viewer-utilities"]}>
           <LanguageSwitcher />
-          {viewer?.isAdmin && (
+          {access?.canManage && (
             <Link
               className={`${navigationStyles["admin-link"]} ${trackerStyles["desktop-manage-link"]}`}
-              href={ADMIN_ROUTES.trips}
+              href={`/trips/manage?trip=${encodeURIComponent(data.trip.slug)}`}
             >
               {t("common.manage")}
             </Link>
@@ -616,6 +629,7 @@ export default function TripTracker({
           gmailReturn={gmailReturn}
         />
       );
+  const memberPanel = membersOpen && <TripMembersPanel trip={data.trip} access={access} onClose={() => setMembersOpen(false)} />;
   const tripSupplement = <>
       <section
         className={contributionsStyles["trip-suggestions"]}
@@ -697,6 +711,7 @@ export default function TripTracker({
         {announcement}
       </p>
       {invitation}
+      {memberPanel}
   </>;
   if (!itinerary.length) {
     return (
@@ -721,7 +736,7 @@ export default function TripTracker({
             <Link className={trackerStyles["jump-button"]} href="/">
               {t("tracker.chooseTrip")}
             </Link>
-            {viewer?.isAdmin && (
+            {access?.canManage && (
               <Button
                 variant="primary"
                 type="button"
@@ -736,7 +751,7 @@ export default function TripTracker({
             )}
           </div>
         </section>
-        {viewer?.isAdmin && scheduleEditor?.key === "new" && (
+        {access?.canManage && scheduleEditor?.key === "new" && (
           <div className={trackerStyles["public-schedule-editor"]}>
             <ScheduleForm
               key="new"
@@ -1285,7 +1300,7 @@ export default function TripTracker({
       <div className={trackerStyles["section-heading"]}>
         <h2>{t("tracker.fullSchedule")}</h2>
         <div className={trackerStyles["schedule-heading-actions"]}>
-          {viewer?.isAdmin && (
+          {access?.canManage && (
             <Button
               variant="primary"
               type="button"
@@ -1319,7 +1334,7 @@ export default function TripTracker({
         </p>
       )}
 
-      {viewer?.isAdmin && scheduleEditor?.key === "new" && (
+      {access?.canManage && scheduleEditor?.key === "new" && (
         <div className={trackerStyles["public-schedule-editor"]}>
           <ScheduleForm
             key="new"
@@ -1351,6 +1366,7 @@ export default function TripTracker({
                 group={startBranchGroup}
                 startsTrip
                 viewer={viewer}
+                canSelectBranch={access?.canSelectBranch}
                 sourceMap={sourceMap}
                 suggestionsByActivity={suggestionsByActivity}
                 suggestionListProps={suggestionListProps}
@@ -1393,7 +1409,7 @@ export default function TripTracker({
                         <span className={trackerStyles["done-label"]}>
                           {t("trackerExtra.passed")}
                         </span>
-                        {viewer?.isAdmin && (
+                        {access?.canManage && (
                           <div className={trackerStyles["timeline-owner-actions"]}>
                             <Button
                               variant="ghost"
@@ -1454,7 +1470,7 @@ export default function TripTracker({
                         : t("tracker.loginToComment")}
                     </button>
                   </div>
-                  {viewer?.isAdmin &&
+                  {access?.canManage &&
                     scheduleEditor?.key === String(item.id) && (
                       <ScheduleForm
                         key={scheduleEditor.key}
@@ -1478,6 +1494,7 @@ export default function TripTracker({
                   <BranchJunction
                     group={branchGroup}
                     viewer={viewer}
+                    canSelectBranch={access?.canSelectBranch}
                     sourceMap={sourceMap}
                     suggestionsByActivity={suggestionsByActivity}
                     suggestionListProps={suggestionListProps}
@@ -1501,6 +1518,7 @@ function BranchJunction({
   group,
   startsTrip = false,
   viewer,
+  canSelectBranch,
   sourceMap,
   suggestionsByActivity,
   suggestionListProps,
@@ -1604,7 +1622,7 @@ function BranchJunction({
                     <strong>{branch.label}</strong>
                     <small>{branch.condition}</small>
                   </button>
-                  {viewer?.isAdmin && !isSelected && (
+                  {canSelectBranch && !isSelected && (
                     <button
                       className={trackerStyles["branch-select-button"]}
                       type="button"

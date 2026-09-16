@@ -8,6 +8,7 @@ import { useId, useRef, useState } from "react";
 import { calendarDayDifference } from "../../lib/trip-dates.mjs";
 import { normalizeScheduleRefs } from "../../lib/schedule-editor-state.mjs";
 import { ActionIcon } from "../Icons";
+import { requestJson as api } from "../../lib/request-json.mjs";
 
 const emptySource = { title: "", url: "" };
 const emptyPlace = { name: "", address: "", latitude: "", longitude: "", website: "", googlePlaceId: "", notes: "" };
@@ -25,6 +26,8 @@ export function TripForm({ editor, busy, onSave, onCancel }) {
     ...editor.values,
     moveSchedule: Boolean(editor.originalSlug),
   });
+  const [memberRows, setMemberRows] = useState(() => editor.originalSlug ? [] : (editor.values.memberEmails?.length ? editor.values.memberEmails : [""]));
+  const [memberErrors, setMemberErrors] = useState({});
   const field = (name) => ({
     value: values[name] || "",
     onChange: (event) => setValues({ ...values, [name]: event.target.value }),
@@ -51,10 +54,20 @@ export function TripForm({ editor, busy, onSave, onCancel }) {
   return (
     <form
       className={`${scheduleEditorStyles["admin-editor"]} ${scheduleEditorStyles["admin-form"]}`}
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
+        const normalized = memberRows.map((email) => email.trim().toLowerCase()).filter(Boolean);
+        if (!editor.originalSlug && normalized.length) {
+          const results = await Promise.all(normalized.map(async (email) => {
+            try { await api("/api/users/lookup", { method: "POST", body: JSON.stringify({ email }) }); return [email, ""]; }
+            catch { return [email, t("visibility.unregisteredEmail")]; }
+          }));
+          const errors = Object.fromEntries(results.filter(([, message]) => message));
+          setMemberErrors(errors);
+          if (Object.keys(errors).length) return;
+        }
         onSave(
-          { ...values, moveSchedule: canMoveSchedule && values.moveSchedule },
+          { ...values, memberEmails: [...new Set(normalized)], moveSchedule: canMoveSchedule && values.moveSchedule },
           editor.originalSlug,
         );
       }}
@@ -69,6 +82,24 @@ export function TripForm({ editor, busy, onSave, onCancel }) {
           {t("adminExtra.message165")}
         </Button>
       </div>
+      {!editor.originalSlug && (
+        <fieldset className={scheduleEditorStyles["member-email-editor"]}>
+          <legend>{t("visibility.addMembersOnCreate")}</legend>
+          <p>{t("visibility.registeredOnlyHelp")}</p>
+          {memberRows.map((email, index) => <div key={index} className={scheduleEditorStyles["member-email-row"]}>
+            <label><span>{t("visibility.memberEmail", { number: index + 1 })}</span>
+              <input type="email" value={email} placeholder="friend@example.com" aria-invalid={Boolean(memberErrors[email.trim().toLowerCase()])}
+                onChange={(event) => {
+                  const next = [...memberRows]; next[index] = event.target.value; setMemberRows(next);
+                  setMemberErrors((current) => { const copy = { ...current }; delete copy[email.trim().toLowerCase()]; return copy; });
+                }} />
+              {memberErrors[email.trim().toLowerCase()] && <small role="alert">{memberErrors[email.trim().toLowerCase()]}</small>}
+            </label>
+            {memberRows.length > 1 && <button type="button" onClick={() => setMemberRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} aria-label={t("visibility.removeEmail", { number: index + 1 })}><ActionIcon name="close" /></button>}
+          </div>)}
+          <Button type="button" variant="ghost" onClick={() => setMemberRows((current) => [...current, ""])}>{t("visibility.addAnotherEmail")}</Button>
+        </fieldset>
+      )}
       <div className={scheduleEditorStyles["form-grid"]}>
         <label>
           {t("adminExtra.message166")}{" "}

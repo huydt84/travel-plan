@@ -8,13 +8,13 @@ web
 
 ## Users
 
-The primary users are a small group of friends preparing for and following a day-trip itinerary together. The trip owner maintains the plan; signed-in contributors can add comments and proposed changes.
+The primary users are registered groups of friends preparing for and following a private itinerary together. Every trip has exactly one Leader; its Members can follow the schedule, choose branches, and contribute notes.
 
 ## Product Purpose
 
 The product makes a shared trip plan useful before departure and during the trip itself. Before the trip, the group can understand the sequence, timing, locations, and sources and contribute notes. During the trip, everyone can immediately see what is happening now, what comes next, and how the day is progressing.
 
-Success means the group can coordinate without repeatedly asking where to go or what comes next, while the owner can update the plan without introducing ambiguity.
+Success means the group can coordinate without repeatedly asking where to go or what comes next, while the trip Leader can update the plan without introducing ambiguity.
 
 ## Positioning
 
@@ -22,29 +22,29 @@ Unlike a generic itinerary document, the product turns a schedule into a live, t
 
 ## Operating Context
 
-The public tracker is used on phones while moving through Japan and on larger screens while planning. Users may be outdoors, in transit, under time pressure, or working with intermittent attention. The owner uses a separate administration surface to manage trips, schedule entries, and contributor suggestions.
+The member tracker is used on phones while moving through Japan and on larger screens while planning. Signed-out visitors see only an access screen. Leaders use `/trips/manage`; Admin and Owner use `/admin/trips` for global oversight.
 
 ## Capabilities and Constraints
 
-- Multiple trips can be selected from the public tracker.
+- Multiple trips can be selected from the tracker, filtered by the signed-in user's membership.
 - Each trip has a date, timezone, location, cited sources, and an ordered schedule.
 - The tracker derives before, active, gap, and completed states from Japan-local time and displays a live clock and countdown.
 - Signed-in contributors can submit comments or suggested changes for an activity or the whole trip.
-- Only the owner can create, edit, and delete trips and schedule entries or moderate suggestions.
+- Any authenticated user can create a trip and becomes its Leader. Leaders manage their trip and membership; Admin/Owner can override from the admin area.
 - The interface and product copy are primarily Vietnamese.
 - Existing data, authentication, URLs, roles, schedule semantics, citations, and live behavior must remain intact through the redesign.
-- The public tracker and the owner administration area are both in redesign scope.
+- The private tracker, personal Leader workspace, and Admin/Owner area are all in redesign scope.
 
 ## Evidence on Hand
 
-The repository contains working public and admin interfaces, production data access through Neon Postgres, trip-import tooling, authentication and authorization, real itinerary content, citations, suggestions, and responsive behavior. No testimonials, commercial claims, or formal brand assets are present and none should be fabricated.
+The repository contains working member and admin interfaces, production data access through Neon Postgres, trip-import tooling, authentication and authorization, real itinerary content, citations, suggestions, and responsive behavior. No testimonials, commercial claims, or formal brand assets are present and none should be fabricated.
 
 ## Product Principles
 
 - Make “now” and “next” unmistakable at a glance.
 - Support calm preparation and fast in-motion decisions with the same source of truth.
 - Keep timing, provenance, and participant input attached to the itinerary context where they matter.
-- Preserve owner control while making contribution lightweight for the group.
+- Preserve Admin/Owner oversight while keeping day-to-day ownership with each trip's Leader.
 - Design for interrupted attention and one-handed mobile use without diminishing desktop planning.
 
 ## Accessibility & Inclusion

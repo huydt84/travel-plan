@@ -168,7 +168,7 @@ components:
 
 **Creative North Star: "The Living Transit Atlas"**
 
-The interface treats a day trip as one piece of transit infrastructure. Every activity is a station on a continuous route, the current activity opens from that route as a foldout station board, the next activity is an attached transfer fascia, and contributions remain anchored to the stop or whole-day region they affect. The public tracker tells the whole-day/current/next/contribution story; the owner control room edits the same underlying line instead of becoming a visually unrelated dashboard.
+The interface treats a day trip as one piece of transit infrastructure. Every activity is a station on a continuous route, the current activity opens from that route as a foldout station board, the next activity is an attached transfer fascia, and contributions remain anchored to the stop or whole-day region they affect. The private member tracker tells the whole-day/current/next/contribution story; Leader and admin control rooms edit the same underlying line instead of becoming a visually unrelated dashboard.
 
 The world is warm paper printed with navy station ink, route green, and transfer yellow. Compressed headings, tabular time, clipped enamel-like panels, timetable rules, and route-node geometry create authority without luxury styling. Density is intentional but calm: large status and time are readable under interrupted attention, while details and provenance remain available in place.
 
@@ -181,7 +181,7 @@ The integrated assistant extends this same world with a ruled reading column, a 
 - Route green means current, completed, progress, or constructive action; transfer yellow means next or pending attention.
 - Compressed display type carries stations and time; neutral sans carries explanation and forms.
 - Square, ruled, clipped construction replaces detached rounded travel cards.
-- Public, owner, and assistant views share the same paper and timetable grammar at different reading densities.
+- Member, Leader, admin, and assistant views share the same paper and timetable grammar at different reading densities.
 
 ## Colors
 
@@ -229,7 +229,7 @@ The palette is deliberately small and operational: navy establishes station auth
 ### Hierarchy
 
 - **Display** (700, fluid 44–80px, 0.86 line-height): Active station names, primary countdowns, and the largest admin headings. Display text may wrap tightly but stays balanced and uppercase when it represents a station-board declaration.
-- **Headline** (700, fluid 35–56px, 0.95 line-height): Major public sections and plan summaries.
+- **Headline** (700, fluid 35–56px, 0.95 line-height): Major tracker sections and plan summaries.
 - **Title** (600, 24px, 1.05 line-height): Timetable rows, editor sections, and compact station names.
 - **Body** (400, 12px, 1.62 line-height): Existing compact itinerary detail and explanatory copy; this incumbent scale does not govern conversation prose.
 - **Conversation:** The conversation-body role governs user messages and the workspace. Dedicated-page replies retain conversation-response sizing even at 320px; only companion replies use conversation-response-compact. Responses stay within 72ch. Assistant structure uses neutral sans throughout: assistant-title for the header, assistant-title-compact at container widths up to 600px, assistant-welcome for welcome and access headings, assistant-drawer-title for drawer headings, and assistant-subtitle for evidence and change headings. Composer entry uses assistant-entry; source and change body details use assistant-detail, with secondary drawer metadata at 12px. Headings inside Markdown remain neutral sans for continuous reading.
@@ -244,13 +244,13 @@ The palette is deliberately small and operational: navy establishes station auth
 
 ## Layout
 
-The public shell is centered with a 1380px ceiling and 40px desktop gutters. A slim trip-control band sits above the main live board. At desktop widths the board is a true 30/70 Foldout Spine: a minimum 280px route overview on the left and the active station stage on the right, separated by a 2px seam. The active route segment crosses that seam into the station board; the relationship must remain physically visible. Lower sections narrow to 1120px and continue the same time/rail/content columns.
+The member tracker shell is centered with a 1380px ceiling and 40px desktop gutters. A slim trip-control band sits above the main live board. At desktop widths the board is a true 30/70 Foldout Spine: a minimum 280px route overview on the left and the active station stage on the right, separated by a 2px seam. The active route segment crosses that seam into the station board; the relationship must remain physically visible. Lower sections narrow to 1120px and continue the same time/rail/content columns.
 
 At 900px and below, the live board remains two-column but the route grows to 34% with a 245px minimum. The active station's countdown moves below the title, and the control band wraps its live clock into a full-width lower row. This is a compression state, not yet the mobile composition.
 
 At 680px and below, the desktop live board disappears and the itinerary becomes one vertical route. The current stop's foldout is attached to the right of its node, with its next-stop strip attached inside the foldout. A fixed compact now/next dock provides one-handed recovery while the page scrolls. The admin control room changes from a 285px sticky trip rail plus content to a single column; trip selection becomes a horizontal rail, form grids become single-column, and row actions remain attached to their schedule item.
 
-Spacing follows compact operational increments rather than airy marketing rhythm. Controls cluster around 7–18px gaps; panels use 18–40px padding; public section breaks may reach 58–76px where a new timetable region begins. Safe-area insets are honored at the top and bottom.
+Spacing follows compact operational increments rather than airy marketing rhythm. Controls cluster around 7–18px gaps; panels use 18–40px padding; tracker section breaks may reach 58–76px where a new timetable region begins. Safe-area insets are honored at the top and bottom.
 
 **The Attached-Seam Rule.** The current node, active rail, foldout, and next fascia must read as one connected object in the first viewport and on mobile.
 
@@ -315,7 +315,7 @@ Circles are semantic and scarce: route nodes, live indicators, and user avatars 
 
 ### Navigation
 
-The trip-control band is one ruled strip containing product mark, trip selector, viewer actions, and JST clock. Desktop cells are separated by 1px navy rules. At compact widths the product wordmark may hide, while the icon, trip identity, auth action, and clock remain. The owner trip list is a vertical timetable rail on desktop and a horizontally scrollable selection rail on mobile; the active trip becomes a solid route-green field.
+The trip-control band is one ruled strip containing trip selector, member access, viewer actions, and local clock. Desktop cells are separated by 1px navy rules. At compact widths actions form a horizontally recoverable control rail. The Leader trip list and membership roster use timetable rows—never card grids—and the active trip becomes a solid route-green field. Signed-out and no-trip states retain the same route geometry without exposing trip data.
 
 ### Route Spine and Nodes
 
@@ -331,7 +331,7 @@ The next stop is a directional yellow-paper strip with a navy label block, green
 
 ### Timetable Rows
 
-Public and owner rows share time/rail/content alignment, thin separators, condensed titles, type pictograms, and restrained body detail. The public current row opens into a clipped green-wash panel. Owner rows add edit/delete controls but keep the route node and time column intact. Suggestion moderation uses a compact metadata/copy/control grid beneath the same plan, not a separate application shell.
+Member and Leader rows share time/rail/content alignment, thin separators, condensed titles, type pictograms, and restrained body detail. The member current row opens into a clipped green-wash panel. Leader rows add edit/delete controls but keep the route node and time column intact. Suggestion moderation uses a compact metadata/copy/control grid beneath the same plan, not a separate application shell.
 
 ### Integrated Assistant
 

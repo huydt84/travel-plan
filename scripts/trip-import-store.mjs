@@ -24,7 +24,7 @@ export function flattenTripImport(payload) {
   return { importGroups, importActivities };
 }
 
-export async function applyTripImport(sql, payload, { createOnly = false } = {}) {
+export async function applyTripImport(sql, payload, { createOnly = false, ownerEmail = "local-admin@localhost.invalid" } = {}) {
   const { importGroups, importActivities } = flattenTripImport(payload);
   const { trip, sources, schedule } = payload;
   const itemKeys = importActivities.map((item) => item.key);
@@ -44,6 +44,11 @@ export async function applyTripImport(sql, payload, { createOnly = false } = {})
           location = EXCLUDED.location,
           updated_at = NOW()`}
       `),
+      tx`INSERT INTO trip_participants (trip_id,user_email,role,added_by_email,joined_at,last_participated_at)
+        SELECT trip.id,${ownerEmail},'leader',${ownerEmail},NOW(),NOW()
+        FROM trips trip WHERE trip.slug=${trip.slug}
+          AND NOT EXISTS (SELECT 1 FROM trip_participants participant WHERE participant.trip_id=trip.id AND participant.role='leader')
+        ON CONFLICT (trip_id,user_email) DO NOTHING`,
     ];
 
     for (const source of sources) {
@@ -196,6 +201,11 @@ export async function applyTripImport(sql, payload, { createOnly = false } = {})
       WHERE trip_id = (SELECT id FROM trips WHERE slug = ${trip.slug})
         AND source_number <> ALL(${sourceNumbers}::integer[])
     `);
+    queries.push(tx`INSERT INTO trip_audit_events (
+        trip_id,trip_slug,trip_title,actor_email,actor_name,actor_role,source,action,entity_type,after_value
+      ) SELECT id,slug,title,${ownerEmail},'Trip importer','owner','import','trip.imported','trip',
+        jsonb_build_object('slug',slug,'scheduleCount',${importActivities.length}::INTEGER,'sourceCount',${sources.length}::INTEGER)
+      FROM trips WHERE slug=${trip.slug}`);
     return queries;
   }, { isolationLevel: "Serializable" });
 

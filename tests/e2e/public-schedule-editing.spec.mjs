@@ -39,11 +39,15 @@ itineraryTest("owner can maintain activities from the normal schedule", async ({
   expect(plan.itinerary.map((item) => item.title)).not.toContain("Bữa trưa thử nghiệm");
 });
 
-itineraryTest("members keep suggestion access without schedule management controls", async ({ page, tripSlug }) => {
+itineraryTest("members keep suggestion access without schedule management controls", async ({ page, request, tripSlug }) => {
   await page.setExtraHTTPHeaders({
     "x-local-viewer-email": "schedule-member@example.com",
     "x-local-viewer-name": "Schedule member",
   });
+  await gotoHealthy(page, "/");
+  expect((await request.post(`/api/trips/${tripSlug}/members`, {
+    data: { email: "schedule-member@example.com" },
+  })).status()).toBe(201);
   await gotoHealthy(page, `/?trip=${tripSlug}`);
 
   await expect(page.getByRole("button", { name: "Thêm vào ngày này" })).toHaveCount(0);

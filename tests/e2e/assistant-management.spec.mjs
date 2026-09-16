@@ -238,21 +238,24 @@ for (const [width,height] of [[320,760],[1440,900],[1920,1080]]) {
   test(`owner error log keeps diagnostics out of chat at ${width}`, async ({page,request}) => {
     const f=await fixture();let ownerTurn;
     try {
-      ownerTurn=await f.accept({ownerEmail:owner,background:true,title:"Diagnostic owner test"});
+      ownerTurn=await f.accept({background:true,title:"Diagnostic owner test"});
       const providerError=Object.assign(new Error("Bearer SECRET_SENTINEL prompt=PRIVATE_SENTINEL"),{status:503,cause:Object.assign(new Error("private"),{code:"ECONNRESET"})});
       await dispatchAttempt(ownerTurn.turn.id,{store:createBackgroundStore(f.store),start:async()=>{throw providerError;}});
+      const actorHeaders={"x-local-viewer-email":f.email,"x-local-viewer-name":"Test admin"};
       const response=await request.get("/api/admin/assistant/failures");expect(response.status()).toBe(200);
       const body=await response.json();const recorded=body.items.find(item=>item.id===ownerTurn.turn.id);
       expect(recorded.diagnostics).toMatchObject({phase:"dispatch",upstreamStatus:503,cause:{systemCode:"ECONNRESET"}});
       expect(JSON.stringify(body)).not.toMatch(/SECRET_SENTINEL|PRIVATE_SENTINEL/);
       for (const email of [f.email,"member-management@example.com"]) expect((await request.get("/api/admin/assistant/failures",{headers:{"x-local-viewer-email":email}})).status()).toBe(403);
-      const personal=await request.get(`/api/v1/assistant/workspace?conversation=${ownerTurn.conversation.id}`);
+      const personal=await request.get(`/api/v1/assistant/workspace?conversation=${ownerTurn.conversation.id}`,{headers:actorHeaders});
       expect(JSON.stringify(await personal.json())).not.toMatch(/error_diagnostics|upstreamStatus|ECONNRESET/);
+      await page.setExtraHTTPHeaders(actorHeaders);
       await page.setViewportSize({width,height});
       await gotoHealthy(page,`/assistant?conversation=${ownerTurn.conversation.id}`);
       await expect(page.getByText("Không thể bắt đầu trả lời. Hãy thử lại.",{exact:true})).toBeVisible();
       await expect(page.getByText("DISPATCH_FAILED",{exact:true})).toHaveCount(0);
       await expect(page.getByRole("article").getByRole("alert")).toHaveCount(0);
+      await page.setExtraHTTPHeaders({"x-local-viewer-email":owner,"x-local-viewer-name":"Owner"});
       await gotoHealthy(page,"/admin/assistant");await page.getByRole("link",{name:"Nhật ký lỗi",exact:true}).click();
       const entry=page.getByRole("article").filter({hasText:"Diagnostic owner test"});
       await expect(entry).toBeVisible();await expect(entry.getByText(ownerTurn.turn.id,{exact:true})).toHaveCount(0);
@@ -286,7 +289,7 @@ test("deadline is diagnosed distinctly and late failure cannot overwrite it",asy
 test("owner log includes recovered tool errors and paginates legacy failures without duplicates",async()=>{
   const f=await fixture();let first;
   try {
-    first=await f.accept({ownerEmail:owner});
+    first=await f.accept();
     const tool=await f.store.createToolRun({turnId:first.turn.id,toolName:"search_web"});
     await f.store.finishToolRun(tool,{status:"failed",errorCode:"RESEARCH_UNAVAILABLE",resultMetadata:{diagnostics:{phase:"search_web",upstreamStatus:503}}});
     await f.store.publishTurn({turnId:first.turn.id,output:"The source is unavailable",citations:[]});

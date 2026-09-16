@@ -16,6 +16,7 @@ import { PlaceForm, TripForm, ScheduleForm, SourceForm } from "./admin/EditorFor
 import AdminNav from "./AdminNav";
 import ConfirmDialog from "./ConfirmDialog";
 import LanguageSwitcher from "./LanguageSwitcher";
+import InvitationDialog from "./InvitationDialog";
 import { useLocale } from "./LocaleProvider";
 import { adminErrorMessage } from "../lib/i18n-admin.mjs";
 import { translateActivityType } from "../lib/i18n.mjs";
@@ -74,6 +75,7 @@ const placeUsageCount = (plan, placeId) =>
   ].filter((item) => item.placeId === placeId).length;
 
 export default function AdminApp({
+  scope = "admin",
   viewer,
   initialTrips,
   initialSelectedSlug,
@@ -81,11 +83,13 @@ export default function AdminApp({
   initialSuggestions,
   pendingInvitationCount = 0,
   pendingTripRequestCount = 0,
+  initialCreateOpen = false,
 }) {
-  if (!viewer?.email) return <Login />;
-  if (!viewer.isAdmin) return <ContributorOnly user={viewer} />;
+  if (!viewer?.email) return <Login scope={scope} />;
+  if (scope === "admin" && !viewer.isAdmin) return <ContributorOnly user={viewer} />;
   return (
     <Dashboard
+      scope={scope}
       user={viewer}
       initialTrips={initialTrips}
       initialSelectedSlug={initialSelectedSlug}
@@ -93,11 +97,12 @@ export default function AdminApp({
       initialSuggestions={initialSuggestions}
       pendingInvitationCount={pendingInvitationCount}
       pendingTripRequestCount={pendingTripRequestCount}
+      initialCreateOpen={initialCreateOpen}
     />
   );
 }
 
-function Login() {
+function Login({ scope }) {
   const { t } = useLocale();
   return (
     <main
@@ -113,7 +118,7 @@ function Login() {
         <button
           className={scheduleEditorStyles["google-login"]}
           type="button"
-          onClick={() => signIn("google", { redirectTo: ADMIN_ROUTES.trips })}
+          onClick={() => signIn("google", { redirectTo: scope === "personal" ? "/trips/manage" : ADMIN_ROUTES.trips })}
         >
           <GoogleIcon />
           {t("common.loginGoogle")}
@@ -158,6 +163,7 @@ function ContributorOnly({ user }) {
 }
 
 function Dashboard({
+  scope,
   user,
   initialTrips,
   initialSelectedSlug,
@@ -165,12 +171,13 @@ function Dashboard({
   initialSuggestions,
   pendingInvitationCount,
   pendingTripRequestCount,
+  initialCreateOpen,
 }) {
   const { t, intlLocale, locale } = useLocale();
   const [trips, setTrips] = useState(initialTrips);
   const [selectedSlug, setSelectedSlug] = useState(initialSelectedSlug);
   const [plan, setPlan] = useState(initialPlan);
-  const [tripEditor, setTripEditor] = useState(null);
+  const [tripEditor, setTripEditor] = useState(initialCreateOpen ? { values: { ...emptyTrip, memberEmails: [] }, originalSlug: null } : null);
   const [sourceEditor, setSourceEditor] = useState(null);
   const [placeEditor, setPlaceEditor] = useState(null);
   const [suggestions, setSuggestions] = useState(initialSuggestions);
@@ -182,6 +189,14 @@ function Dashboard({
   const [suggestionFilter, setSuggestionFilter] = useState("visible");
   const [suggestionToDelete, setSuggestionToDelete] = useState(null);
   const [suggestionDeleteError, setSuggestionDeleteError] = useState("");
+  const [members, setMembers] = useState([]);
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberError, setMemberError] = useState("");
+  const [memberBusy, setMemberBusy] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState("plan");
+  const [auditEvents, setAuditEvents] = useState([]);
+  const [ownershipFilter, setOwnershipFilter] = useState("all");
+  const [invitationOpen, setInvitationOpen] = useState(false);
   const {
     editor: scheduleEditor,
     setEditor: setScheduleEditor,
@@ -195,13 +210,14 @@ function Dashboard({
     discardDialog,
   } = useScheduleDraft(busy);
 
-  const loadTrips = useCallback(async (preferredSlug) => {
-    const data = await api("/api/trips");
-    setTrips(data.trips);
-    const nextSlug = preferredSlug || data.trips[0]?.slug || "";
+  const loadTrips = useCallback(async (preferredSlug, nextOwnership = ownershipFilter) => {
+    const data = await api(scope === "admin" ? `/api/admin/trips?ownership=${nextOwnership}` : "/api/trips");
+    const nextTrips = scope === "personal" ? data.trips.filter((trip) => trip.membershipRole === "leader") : data.trips;
+    setTrips(nextTrips);
+    const nextSlug = preferredSlug || nextTrips[0]?.slug || "";
     setSelectedSlug(nextSlug);
     return nextSlug;
-  }, []);
+  }, [scope, ownershipFilter]);
 
   const refreshPlan = useCallback(async (slug) => {
     if (!slug) {
@@ -221,6 +237,26 @@ function Dashboard({
       setLoadingPlan(false);
     }
   }, []);
+
+  const loadMembers = useCallback(async (slug) => {
+    if (!slug) return;
+    const data = await api(`/api/trips/${encodeURIComponent(slug)}/members`);
+    setMembers(data.members);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedSlug) return;
+    api(`/api/trips/${encodeURIComponent(selectedSlug)}/members`)
+      .then((data) => setMembers(data.members))
+      .catch((requestError) => setMemberError(adminErrorMessage(requestError, t, locale)));
+  }, [selectedSlug, loadMembers, locale, t]);
+
+  useEffect(() => {
+    if (scope !== "admin" || workspaceTab !== "activity" || !selectedSlug) return;
+    api(`/api/admin/trips/${encodeURIComponent(selectedSlug)}/audit`)
+      .then((data) => setAuditEvents(data.events))
+      .catch((requestError) => setError(adminErrorMessage(requestError, t, locale)));
+  }, [scope, workspaceTab, selectedSlug, locale, t]);
 
   const selectTrip = (slug, trigger) => {
     if (slug === selectedSlug || loadingPlan) return;
@@ -256,6 +292,48 @@ function Dashboard({
     } finally {
       setBusy(false);
     }
+  };
+
+  const addMember = async (event) => {
+    event.preventDefault();
+    setMemberBusy(true); setMemberError("");
+    try {
+      await api(`/api/trips/${encodeURIComponent(selectedSlug)}/members`, {
+        method: "POST", body: JSON.stringify({ email: memberEmail }),
+      });
+      setMemberEmail("");
+      await Promise.all([loadMembers(selectedSlug), loadTrips(selectedSlug)]);
+      setNotice(t("visibility.memberAdded"));
+    } catch (requestError) { setMemberError(adminErrorMessage(requestError, t, locale)); }
+    finally { setMemberBusy(false); }
+  };
+
+  const removeMember = async (email) => {
+    if (!window.confirm(t("visibility.removeMemberConfirm", { email }))) return;
+    setMemberBusy(true); setMemberError("");
+    try {
+      await api(`/api/trips/${encodeURIComponent(selectedSlug)}/members/${encodeURIComponent(email)}`, { method: "DELETE" });
+      await Promise.all([loadMembers(selectedSlug), loadTrips(selectedSlug)]);
+      setNotice(t("visibility.memberRemoved"));
+    } catch (requestError) { setMemberError(adminErrorMessage(requestError, t, locale)); }
+    finally { setMemberBusy(false); }
+  };
+
+  const transferLeader = async (email) => {
+    if (!window.confirm(t("visibility.transferConfirm", { email }))) return;
+    setMemberBusy(true); setMemberError("");
+    try {
+      await api(`/api/trips/${encodeURIComponent(selectedSlug)}/members/${encodeURIComponent(email)}/leader`, { method: "PUT" });
+      if (scope === "personal") {
+        setPlan(null); setSelectedSlug("");
+        const nextSlug = await loadTrips();
+        await refreshPlan(nextSlug);
+      } else {
+        await Promise.all([loadMembers(selectedSlug), loadTrips(selectedSlug)]);
+      }
+      setNotice(t("visibility.leaderTransferred"));
+    } catch (requestError) { setMemberError(adminErrorMessage(requestError, t, locale)); }
+    finally { setMemberBusy(false); }
   };
 
   const saveTrip = (values, originalSlug) =>
@@ -629,7 +707,7 @@ function Dashboard({
           <Link href="/" className={adminShellStyles["admin-back"]}>
             {t("adminExtra.message026")}
           </Link>
-          <h1>{t("admin.tripManagement")}</h1>
+          <h1>{scope === "admin" ? t("admin.tripManagement") : t("visibility.myTripManagement")}</h1>
           <small className={adminShellStyles["admin-user"]}>
             {user.authMode === "local-dev"
               ? t("adminExtra.localAdmin")
@@ -666,12 +744,12 @@ function Dashboard({
         </div>
       )}
 
-      <AdminNav
-        tripSlug={selectedSlug}
-        active="trips"
-        pendingInvitationCount={pendingInvitationCount}
-        pendingTripRequestCount={pendingTripRequestCount}
-      />
+      {scope === "admin" && <AdminNav
+          tripSlug={selectedSlug}
+          active="trips"
+          pendingInvitationCount={pendingInvitationCount}
+          pendingTripRequestCount={pendingTripRequestCount}
+        />}
 
       <div className={adminShellStyles["admin-grid"]}>
         <aside className={adminShellStyles["admin-sidebar"]}>
@@ -684,7 +762,7 @@ function Dashboard({
                 guardScheduleDraft(
                   () => {
                     setScheduleEditor(null);
-                    setTripEditor({ values: emptyTrip, originalSlug: null });
+                    setTripEditor({ values: { ...emptyTrip, memberEmails: [] }, originalSlug: null });
                   },
                   t("adminExtra.message003", {
                     value0:
@@ -698,6 +776,15 @@ function Dashboard({
             </Button>
           </div>
           <div className={adminShellStyles["trip-list"]}>
+            {scope === "admin" && <label className={adminShellStyles["ownership-filter"]}>
+              <span>{t("visibility.ownershipFilter")}</span>
+              <select value={ownershipFilter} onChange={(event) => {
+                const next = event.target.value; setOwnershipFilter(next);
+                loadTrips(null, next).then(refreshPlan).catch((requestError) => setError(adminErrorMessage(requestError, t, locale)));
+              }}>
+                <option value="all">{t("visibility.allTrips")}</option><option value="mine">{t("visibility.myLedTrips")}</option><option value="others">{t("visibility.otherTrips")}</option>
+              </select>
+            </label>}
             {trips.map((trip) => (
               <button
                 className={`${adminShellStyles["trip-list-item"]}${selectedSlug === trip.slug ? " active" : ""}`}
@@ -711,6 +798,7 @@ function Dashboard({
                   {formatTripDateRange(trip, {}, intlLocale)} ·{" "}
                   {trip.scheduleCount} {t("adminExtra.message030")}
                 </span>
+                <span>{trip.leader?.displayName || t("visibility.leader")} · {trip.memberCount} {t("visibility.people")}</span>
               </button>
             ))}
             {!trips.length && (
@@ -774,6 +862,20 @@ function Dashboard({
                   </Button>
                 </div>
               </div>
+
+              {scope === "admin" && (
+                <div className={adminShellStyles["workspace-tabs"]} role="tablist" aria-label={t("visibility.tripWorkspace")}>
+                  <button type="button" role="tab" aria-selected={workspaceTab === "plan"} onClick={() => setWorkspaceTab("plan")}>{t("visibility.planTab")}</button>
+                  <button type="button" role="tab" aria-selected={workspaceTab === "activity"} onClick={() => setWorkspaceTab("activity")}>{t("visibility.activityTab")}</button>
+                </div>
+              )}
+
+              {workspaceTab === "activity" && scope === "admin" ? (
+                <AuditTimeline events={auditEvents} />
+              ) : <>
+              <MemberManager members={members} email={memberEmail} busy={memberBusy} error={memberError}
+                onEmailChange={setMemberEmail} onAdd={addMember} onRemove={removeMember} onTransfer={transferLeader}
+                onInvite={() => setInvitationOpen(true)} />
 
               <section
                 className={scheduleEditorStyles["admin-sources"]}
@@ -1357,6 +1459,7 @@ function Dashboard({
                     </p>
                   )}
               </div>
+              </>}
             </>
           )}
           {!tripEditor && !loadingPlan && !plan && (
@@ -1387,7 +1490,56 @@ function Dashboard({
           onConfirm={confirmRemoveSuggestion}
         />
       )}
+      {invitationOpen && plan && <InvitationDialog open viewer={user} trip={plan.trip} itinerary={plan.itinerary}
+        onClose={() => setInvitationOpen(false)} />}
     </main>
+  );
+}
+
+function MemberManager({ members, email, busy, error, onEmailChange, onAdd, onRemove, onTransfer, onInvite }) {
+  const { t, intlLocale } = useLocale();
+  return (
+    <section className={adminShellStyles["member-section"]} aria-labelledby="trip-members-title">
+      <div className={adminShellStyles["admin-section-head"]}>
+        <div><h2 id="trip-members-title">{t("visibility.members")}</h2><p>{t("visibility.memberHelp")}</p></div>
+        <button className={adminShellStyles["member-email-action"]} type="button" onClick={onInvite}>{t("visibility.emailMembers")}</button>
+      </div>
+      <form className={adminShellStyles["member-add"]} onSubmit={onAdd}>
+        <label><span>{t("visibility.registeredEmail")}</span><input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} required placeholder="friend@example.com" /></label>
+        <Button variant="primary" disabled={busy}>{busy ? t("common.loading") : t("visibility.addMember")}</Button>
+      </form>
+      {error && <p className={adminShellStyles["member-error"]} role="alert">{error}</p>}
+      <div className={adminShellStyles["member-list"]}>
+        {members.map((member) => (
+          <div className={adminShellStyles["member-row"]} key={member.email || `${member.displayName}-${member.role}`}>
+            <span className={adminShellStyles["member-time"]}>{new Intl.DateTimeFormat(intlLocale, { month: "short", day: "2-digit" }).format(new Date(member.joinedAt))}</span>
+            <span className={adminShellStyles["member-stop"]} aria-hidden="true" />
+            <span className={adminShellStyles["member-identity"]}><strong>{member.displayName}</strong><small>{member.email}</small></span>
+            <strong className={adminShellStyles["member-role"]}>{member.role === "leader" ? t("visibility.leader") : t("visibility.member")}</strong>
+            {member.role !== "leader" && <span className={adminShellStyles["member-actions"]}>
+              <button type="button" disabled={busy} onClick={() => onTransfer(member.email)}>{t("visibility.makeLeader")}</button>
+              <button type="button" disabled={busy} onClick={() => onRemove(member.email)}>{t("common.delete")}</button>
+            </span>}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AuditTimeline({ events }) {
+  const { t, intlLocale } = useLocale();
+  return (
+    <section className={adminShellStyles["audit-section"]} aria-labelledby="audit-title">
+      <div className={adminShellStyles["admin-section-head"]}><h2 id="audit-title">{t("visibility.auditTitle")}</h2></div>
+      <div className={adminShellStyles["audit-list"]}>
+        {events.map((event) => <article key={event.id}>
+          <time>{new Intl.DateTimeFormat(intlLocale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(event.createdAt))}</time>
+          <div><strong>{event.actor.name}</strong><p>{event.action}</p><small>{event.source} · {event.entity.type}{event.entity.id ? ` · ${event.entity.id}` : ""}</small></div>
+        </article>)}
+        {!events.length && <p className={scheduleEditorStyles["admin-empty"]}>{t("visibility.noAudit")}</p>}
+      </div>
+    </section>
   );
 }
 

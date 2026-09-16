@@ -44,6 +44,9 @@ test("member lifecycle, admin fulfillment, and in-app notification stay connecte
     created = await attachedResponse.json();
     expect(created.state).toBe("fulfilled");
     expect(created.trip.slug).toBe(trip.slug);
+    expect((await memberContext.request.get(`/api/trips/${trip.slug}`)).status()).toBe(200);
+    const attachedMembers = await (await ownerContext.request.get(`/api/trips/${trip.slug}/members`)).json();
+    expect(attachedMembers.members).toEqual(expect.arrayContaining([expect.objectContaining({ email: memberEmail, role: "member" })]));
 
     const duplicateAttach = await ownerContext.request.put(`/api/admin/trip-requests/${created.id}/fulfillment`, { data: { tripSlug: trip.slug } });
     expect(duplicateAttach.status()).toBe(200);
@@ -97,6 +100,8 @@ test("creating a trip from a request is transactional and deletion reopens the r
     });
     expect(created.status()).toBe(201);
     expect((await created.json()).slug).toBe(slug);
+    const createdMembers = await (await ownerContext.request.get(`/api/trips/${slug}/members`)).json();
+    expect(createdMembers.members).toEqual(expect.arrayContaining([expect.objectContaining({ email: `trip-create-${marker}@localhost.invalid`, role: "leader" })]));
     const list = await memberContext.request.get("/api/trip-requests");
     expect((await list.json()).requests.find((item) => item.id === request.id).state).toBe("fulfilled");
 

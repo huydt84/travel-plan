@@ -90,9 +90,12 @@ export default function ViewerMenu({ viewer }) {
           </div>
           <Link
             className={navigationStyles["viewer-menu-item"]}
-            href="/requests"
+            href="/trips/manage"
             onClick={() => setOpen(false)}
           >
+            {t("nav.myTrips")}
+          </Link>
+          <Link className={navigationStyles["viewer-menu-item"]} href="/requests" onClick={() => setOpen(false)}>
             {t("nav.myRequests")}
           </Link>
           <button

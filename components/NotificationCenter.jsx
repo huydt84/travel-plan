@@ -44,6 +44,9 @@ const notificationCopy = (notification, t) => {
       detail: t("notifications.tripLinked", { actor: notification.actor.name, trip: notification.trip.title }),
     };
   }
+  if (notification.type === "trip_member_added") return { title: t("notifications.memberAdded"), detail: t("notifications.memberAddedDetail", { actor: notification.actor.name }) };
+  if (notification.type === "trip_member_removed") return { title: t("notifications.memberRemoved"), detail: t("notifications.memberRemovedDetail", { actor: notification.actor.name }) };
+  if (notification.type === "trip_leader_received") return { title: t("notifications.leaderReceived"), detail: t("notifications.leaderReceivedDetail", { actor: notification.actor.name }) };
   if (notification.type === "contribution_visibility_changed") {
     return {
       title: notification.contribution.hidden
@@ -328,6 +331,8 @@ export default function NotificationCenter() {
                       ? notification.handoff.title
                       : notification.request
                       ? notification.request.places.join(" · ")
+                      : notification.membership
+                      ? t("visibility.members")
                       : notification.contribution.activityTitle ||
                         t("notifications.wholeTrip");
                     const area = notification.handoff
