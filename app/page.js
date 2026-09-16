@@ -5,12 +5,13 @@ import { getCachedItinerary } from "../lib/trip-cache";
 import { currentDateInTimezone } from "../lib/trip-dates.mjs";
 import { listVisibleTrips, requireTripAccess } from "../lib/trip-access-repository";
 import { notFound } from "next/navigation";
+import { resolveLocalPersonaSwitcher } from "../lib/runtime-config.mjs";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage({ searchParams }) {
   const [params, viewer] = await Promise.all([searchParams, getViewer()]);
-  if (!viewer) return <TripAccessState state="signed-out" />;
+  if (!viewer) return <TripAccessState state="signed-out" localPersonaSwitcher={resolveLocalPersonaSwitcher()} />;
   const trips = await listVisibleTrips(viewer);
   const { trip: requestedTrip, invite, gmail } = params;
   if (typeof requestedTrip === "string" && !trips.some((trip) => trip.slug === requestedTrip)) notFound();

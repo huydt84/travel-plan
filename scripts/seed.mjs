@@ -2,6 +2,8 @@ import { createSqlAdapter } from "../lib/sql-adapter.mjs";
 import { resolveDatabaseConfig } from "../lib/runtime-config.mjs";
 import { normalizeTripImport } from "./trip-import-utils.mjs";
 import { applyTripImport } from "./trip-import-store.mjs";
+import { resolveLocalAdminMode } from "../lib/runtime-config.mjs";
+import { seedLocalPersonas } from "./local-persona-seed.mjs";
 
 let data;
 try {
@@ -28,5 +30,9 @@ try {
     process.exitCode = 1;
   }
 } finally {
+  if (resolveLocalAdminMode().enabled) {
+    await seedLocalPersonas(sql);
+    console.log("Local permission personas ready.");
+  }
   await sql.end();
 }

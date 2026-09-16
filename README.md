@@ -30,7 +30,11 @@ pnpm run db:seed:local
 pnpm run dev:admin
 ```
 
-Open `http://127.0.0.1:3000/admin/trips`. The header identifies this session as **Local admin · Docker Postgres**. The default database is `postgresql://travel:travel@127.0.0.1:55432/travel_local`; `LOCAL_POSTGRES_URI` may override it, but local admin rejects non-loopback hosts and never falls back to `POSTGRES_URI`. Its read cache is also namespaced away from normal data.
+Open `http://127.0.0.1:3000/dev/personas` to switch among Owner, Admin, Leader, Member, Outsider, and Anonymous. The fixed Leader and Member belong to the isolated `local-permission-lab` trip; Admin and Owner can override it only from admin surfaces. The persona cookie selects an identity only: global and trip roles are always read back from the local database. `db:seed:local` recreates this catalog and the two demo memberships idempotently without modifying other local trips.
+
+The admin header identifies this session as **Local admin · Docker Postgres**. The default database is `postgresql://travel:travel@127.0.0.1:55432/travel_local`; `LOCAL_POSTGRES_URI` may override it, but local admin rejects non-loopback hosts and never falls back to `POSTGRES_URI`. Its read cache is also namespaced away from normal data. The persona page and cookie require both local admin mode and `LOCAL_PERSONA_SWITCHER=true`; `dev:admin` enables them, while the normal Playwright server and production do not.
+
+Run the permission harness twice against the same local database with `pnpm run test:permissions:repeat`. Run the dedicated browser switcher and responsive checks with `pnpm run test:personas`; the normal `pnpm test` includes both the complete E2E suite and this local-only check.
 
 Stop the container without deleting its data with:
 

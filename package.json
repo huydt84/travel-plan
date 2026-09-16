@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
-    "dev:admin": "LOCAL_ADMIN_BYPASS=true node scripts/dev-server.mjs --hostname 127.0.0.1",
+    "dev:admin": "LOCAL_ADMIN_BYPASS=true LOCAL_PERSONA_SWITCHER=true node scripts/dev-server.mjs --hostname 127.0.0.1",
     "dev:cleanup": "node scripts/dev-process-cleanup.mjs",
     "build": "next build",
     "start": "next start",
-    "test": "pnpm run lint && pnpm run test:unit && pnpm run test:e2e",
+    "test": "pnpm run lint && pnpm run test:unit && pnpm run test:e2e && pnpm run test:personas",
     "test:quick": "pnpm run lint && pnpm run test:unit",
     "lint": "eslint . --max-warnings=0",
     "test:unit": "node --test scripts/*.test.mjs",
@@ -28,7 +28,10 @@
     "vercel:env": "node --env-file=.env scripts/sync-vercel-env.mjs",
     "deploy:prod": "pnpm run vercel:env && pnpm run db:migrate && pnpm exec vercel --prod --yes",
     "db:seed": "node --env-file=.env scripts/seed.mjs",
-    "db:seed:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true node scripts/seed.mjs",
+    "db:seed:local": "NODE_ENV=development LOCAL_ADMIN_BYPASS=true LOCAL_PERSONA_SWITCHER=true node scripts/seed.mjs",
+    "test:permissions": "playwright test tests/e2e/trip-permission-matrix.spec.mjs tests/e2e/trip-visibility.spec.mjs",
+    "test:permissions:repeat": "pnpm run test:permissions && pnpm run test:permissions",
+    "test:personas": "playwright test --config playwright.personas.config.mjs",
     "test:assistant:live": "node --env-file=.env scripts/assistant-smoke.mjs"
   },
   "dependencies": {

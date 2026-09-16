@@ -8,7 +8,7 @@ import { TypeIcon } from "./Icons";
 import { useLocale } from "./LocaleProvider";
 import styles from "../src/styles/trip-access.module.css";
 
-export default function TripAccessState({ state, viewer = null }) {
+export default function TripAccessState({ state, viewer = null, localPersonaSwitcher = false }) {
   const { t } = useLocale();
   const signedOut = state === "signed-out";
   return (
@@ -18,6 +18,7 @@ export default function TripAccessState({ state, viewer = null }) {
         <div className={styles.utilities}>
           <LanguageSwitcher />
           {viewer && <ViewerMenu viewer={viewer} />}
+          {!viewer && localPersonaSwitcher && <Link href="/dev/personas">Test personas</Link>}
         </div>
       </header>
       <section className={styles.stage}>

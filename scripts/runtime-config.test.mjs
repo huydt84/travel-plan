@@ -6,6 +6,7 @@ import {
   resolveDatabaseUrl,
   resolveLocalAdminMode,
   resolveLocalAdminViewer,
+  resolveLocalPersonaSwitcher,
 } from "../lib/runtime-config.mjs";
 
 test("keeps local admin disabled by default and uses the normal database", () => {
@@ -15,6 +16,13 @@ test("keeps local admin disabled by default and uses the normal database", () =>
   assert.equal(resolveLocalAdminViewer(env), null);
   assert.equal(resolveDatabaseUrl(env), env.POSTGRES_URI);
   assert.deepEqual(resolveDatabaseConfig(env), { databaseUrl: env.POSTGRES_URI, driver: "neon-http" });
+});
+
+test("persona switcher requires the explicit local-only flag", () => {
+  assert.equal(resolveLocalPersonaSwitcher({ NODE_ENV: "development", LOCAL_ADMIN_BYPASS: "true" }), false);
+  assert.equal(resolveLocalPersonaSwitcher({ NODE_ENV: "development", LOCAL_ADMIN_BYPASS: "true", LOCAL_PERSONA_SWITCHER: "true" }), true);
+  assert.equal(resolveLocalPersonaSwitcher({ NODE_ENV: "development", LOCAL_PERSONA_SWITCHER: "true", POSTGRES_URI: "postgresql://production.example/travel" }), false);
+  assert.throws(() => resolveLocalPersonaSwitcher({ NODE_ENV: "production", LOCAL_ADMIN_BYPASS: "true", LOCAL_PERSONA_SWITCHER: "true" }), /only allowed/);
 });
 
 test("local admin returns an owner viewer and exclusively selects the local database", () => {

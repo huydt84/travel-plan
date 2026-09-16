@@ -10,6 +10,11 @@ export async function GET(request, context) {
   const viewer = await getViewer();
   const { slug } = await context.params;
   try {
+    if (!viewer?.email) {
+      const error = new Error("Bạn cần đăng nhập bằng Google");
+      error.code = "AUTH_REQUIRED";
+      throw error;
+    }
     if (!viewer?.isAdmin) {
       const error = new Error("Chỉ admin mới có quyền xem lịch sử hoạt động");
       error.code = "TRIP_FORBIDDEN";

@@ -117,6 +117,11 @@ export default function ViewerMenu({ viewer }) {
               {t("common.manage")}
             </Link>
           )}
+          {viewer.localPersonaSwitcher && (
+            <Link className={navigationStyles["viewer-menu-item"]} href="/dev/personas" onClick={() => setOpen(false)}>
+              Test personas
+            </Link>
+          )}
           {!localDev && (
             <button
               className={navigationStyles["viewer-menu-item"]}

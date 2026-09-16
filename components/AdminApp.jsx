@@ -715,6 +715,7 @@ function Dashboard({
           </small>
         </div>
         <LanguageSwitcher />
+        {user.localPersonaSwitcher && <Link href="/dev/personas" className={adminShellStyles["admin-back"]}>Test personas</Link>}
         {user.authMode !== "local-dev" && (
           <Button variant="ghost" onClick={logout}>
             {t("common.logout")}
