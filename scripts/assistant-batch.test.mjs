@@ -11,9 +11,21 @@ test("mixed batch resolves forward references and previews all create fields wit
   const before = JSON.stringify(args);
   const result = compileBatch(args, [], [{ url: "https://example.com/" }]);
   assert.deepEqual(result.operations.map((o) => o.kind), ["trip.create", "place.create", "source.create", "activity.create"]);
+  assert.equal(result.operations[0].value.currency, trip.currency || "JPY");
   assert.deepEqual(result.operations.at(-1).value.sources, [{ draftId: "source" }]);
   assert.equal(result.preview.changes.at(-1).after.place, "Museum");
   assert.equal(JSON.stringify(args), before);
+});
+test("trip currency is available to assistant create and update operations", () => {
+  const usdSnapshot = { ...structuredClone(snapshot), trip: { ...snapshot.trip, currency: "USD" } };
+  const preserved = compileBatch({ operations: [
+    { kind: "trip.update", target: { id: "1" }, set: { title: "USD trip" } },
+  ] }, [usdSnapshot]);
+  assert.equal(preserved.operations[0].value.currency, "USD");
+  const changed = compileBatch({ operations: [
+    { kind: "trip.update", target: { id: "1" }, set: { currency: "VND" } },
+  ] }, [usdSnapshot]);
+  assert.equal(changed.operations[0].value.currency, "VND");
 });
 test("explicit multiple targets and coordinated final dates preserve activity keys", () => {
   const second = { ...structuredClone(snapshot), tripId: "2", backbone: [{ ...activity, id: "2" }], trip: { ...trip, slug: "second" } };

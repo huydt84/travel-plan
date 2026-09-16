@@ -121,6 +121,7 @@ export default function TripRequestAdminApp({
       endDate: selected.endDate,
       timezone: "Asia/Tokyo",
       location: selected.places.join(", "),
+      currency: "JPY",
     });
   };
   const createTrip = async (event) => {
@@ -517,6 +518,22 @@ export default function TripRequestAdminApp({
                             })
                           }
                         />
+                      </label>
+                      <label>
+                        {t("expenses.currency")}{" "}
+                        <select
+                          value={tripDraft.currency}
+                          onChange={(event) =>
+                            setTripDraft({
+                              ...tripDraft,
+                              currency: event.target.value,
+                            })
+                          }
+                        >
+                          <option value="JPY">JPY</option>
+                          <option value="VND">VND</option>
+                          <option value="USD">USD</option>
+                        </select>
                       </label>
                     </div>
                     <Footer>

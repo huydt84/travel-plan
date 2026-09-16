@@ -38,6 +38,7 @@ export function normalizeTripImport(raw) {
     endDate: rawTrip.endDate ? text(rawTrip.endDate, "trip.endDate", 10) : legacyDate,
     timezone: text(rawTrip.timezone || "Asia/Tokyo", "trip.timezone", 80),
     location: text(rawTrip.location, "trip.location", 160),
+    currency: text(rawTrip.currency || "JPY", "trip.currency", 3),
   };
   if (!slugPattern.test(trip.slug)) fail("trip.slug must use lowercase letters, numbers and single hyphens");
   if (!isIsoDate(trip.startDate)) fail("trip.startDate must use YYYY-MM-DD");
@@ -45,6 +46,7 @@ export function normalizeTripImport(raw) {
   if (trip.endDate < trip.startDate) fail("trip.endDate must not be before trip.startDate");
   try { new Intl.DateTimeFormat("en", { timeZone: trip.timezone }).format(); }
   catch { fail("trip.timezone must be a valid IANA timezone"); }
+  if (!["VND", "JPY", "USD"].includes(trip.currency)) fail("trip.currency must be VND, JPY or USD");
 
   const rawSources = raw.sources ?? [];
   if (!Array.isArray(rawSources)) fail("sources must be an array");

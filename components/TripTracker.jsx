@@ -38,6 +38,7 @@ import {
 } from "../lib/trip-dates.mjs";
 import { ActionIcon, TypeIcon } from "./Icons";
 import { SuggestionList, useContributions } from "./tracker/Contributions";
+import { ActivityExpenses, ExpenseSummary, useExpenseLedger } from "./tracker/Expenses";
 import InvitationDialog from "./InvitationDialog";
 import NotificationCenter from "./NotificationCenter";
 import ViewerMenu from "./ViewerMenu";
@@ -92,6 +93,7 @@ export default function TripTracker({
   const router = useRouter();
   const { t, intlLocale, locale } = useLocale();
   const [data, setData] = useState(initialData);
+  const expenseLedger = useExpenseLedger(initialData.trip.slug);
   const [now, setNow] = useState(() => new Date(initialNow));
   const [announcement, setAnnouncement] = useState("");
   const {
@@ -631,6 +633,7 @@ export default function TripTracker({
       );
   const memberPanel = membersOpen && <TripMembersPanel trip={data.trip} access={access} onClose={() => setMembersOpen(false)} />;
   const tripSupplement = <>
+      <ExpenseSummary ledger={expenseLedger} />
       <section
         className={contributionsStyles["trip-suggestions"]}
         aria-labelledby="trip-suggestions-title"
@@ -1109,6 +1112,7 @@ export default function TripTracker({
                 anchorItems={false}
                 {...suggestionListProps}
               />
+              {stationSuggestionActivityId && <ActivityExpenses activity={state.current} ledger={expenseLedger} />}
             </section>
 
             {stationNext && (
@@ -1370,6 +1374,7 @@ export default function TripTracker({
                 sourceMap={sourceMap}
                 suggestionsByActivity={suggestionsByActivity}
                 suggestionListProps={suggestionListProps}
+                expenseLedger={expenseLedger}
                 branchAction={branchAction}
                 onSelect={selectPublicBranch}
                 onSuggest={openSuggestion}
@@ -1460,6 +1465,7 @@ export default function TripTracker({
                       suggestions={suggestionsByActivity.get(item.id) || []}
                       {...suggestionListProps}
                     />
+                    <ActivityExpenses activity={item} ledger={expenseLedger} />
                     <button
                       className={contributionsStyles["suggestion-trigger"]}
                       type="button"
@@ -1498,6 +1504,7 @@ export default function TripTracker({
                     sourceMap={sourceMap}
                     suggestionsByActivity={suggestionsByActivity}
                     suggestionListProps={suggestionListProps}
+                    expenseLedger={expenseLedger}
                     branchAction={branchAction}
                     onSelect={selectPublicBranch}
                     onSuggest={openSuggestion}
@@ -1522,6 +1529,7 @@ function BranchJunction({
   sourceMap,
   suggestionsByActivity,
   suggestionListProps,
+  expenseLedger,
   branchAction,
   onSelect,
   onSuggest,
@@ -1689,6 +1697,7 @@ function BranchJunction({
                             }
                             {...suggestionListProps}
                           />
+                          <ActivityExpenses activity={item} ledger={expenseLedger} />
                           <button
                             className={
                               contributionsStyles["suggestion-trigger"]

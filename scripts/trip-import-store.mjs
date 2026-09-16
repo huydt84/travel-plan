@@ -34,14 +34,15 @@ export async function applyTripImport(sql, payload, { createOnly = false, ownerE
   return sql.transaction((tx) => {
     const queries = [
       executeQuery(tx, query`
-        INSERT INTO trips (slug, title, trip_date, end_date, timezone, location)
-        VALUES (${trip.slug}, ${trip.title}, ${trip.startDate}, ${trip.endDate}, ${trip.timezone}, ${trip.location})
+        INSERT INTO trips (slug, title, trip_date, end_date, timezone, location, currency)
+        VALUES (${trip.slug}, ${trip.title}, ${trip.startDate}, ${trip.endDate}, ${trip.timezone}, ${trip.location}, ${trip.currency})
         ${createOnly ? empty : query`ON CONFLICT (slug) DO UPDATE SET
           title = EXCLUDED.title,
           trip_date = EXCLUDED.trip_date,
           end_date = EXCLUDED.end_date,
           timezone = EXCLUDED.timezone,
           location = EXCLUDED.location,
+          currency = EXCLUDED.currency,
           updated_at = NOW()`}
       `),
       tx`INSERT INTO trip_participants (trip_id,user_email,role,added_by_email,joined_at,last_participated_at)

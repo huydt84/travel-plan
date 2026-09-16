@@ -20,6 +20,7 @@ import InvitationDialog from "./InvitationDialog";
 import { useLocale } from "./LocaleProvider";
 import { adminErrorMessage } from "../lib/i18n-admin.mjs";
 import { translateActivityType } from "../lib/i18n.mjs";
+import { ExpenseDashboard, useExpenseLedger } from "./tracker/Expenses";
 import {
   activityInstants,
   calendarDayDifference,
@@ -35,6 +36,7 @@ const emptyTrip = {
   endDate: "",
   timezone: "Asia/Tokyo",
   location: "",
+  currency: "JPY",
 };
 const emptySchedule = {
   startDate: "",
@@ -197,6 +199,7 @@ function Dashboard({
   const [auditEvents, setAuditEvents] = useState([]);
   const [ownershipFilter, setOwnershipFilter] = useState("all");
   const [invitationOpen, setInvitationOpen] = useState(false);
+  const expenseLedger = useExpenseLedger(selectedSlug);
   const {
     editor: scheduleEditor,
     setEditor: setScheduleEditor,
@@ -332,6 +335,17 @@ function Dashboard({
         await Promise.all([loadMembers(selectedSlug), loadTrips(selectedSlug)]);
       }
       setNotice(t("visibility.leaderTransferred"));
+    } catch (requestError) { setMemberError(adminErrorMessage(requestError, t, locale)); }
+    finally { setMemberBusy(false); }
+  };
+
+  const setMemberExpensePermission = async (email, canManageExpenses) => {
+    setMemberBusy(true); setMemberError("");
+    try {
+      await api(`/api/trips/${encodeURIComponent(selectedSlug)}/members/${encodeURIComponent(email)}/expense-permission`, {
+        method: "PUT", body: JSON.stringify({ canManageExpenses }),
+      });
+      await Promise.all([loadMembers(selectedSlug), expenseLedger.refresh()]);
     } catch (requestError) { setMemberError(adminErrorMessage(requestError, t, locale)); }
     finally { setMemberBusy(false); }
   };
@@ -830,7 +844,7 @@ function Dashboard({
                   </code>
                   <p>
                     {formatTripDateRange(plan.trip, {}, intlLocale)} ·{" "}
-                    {plan.trip.location} · {plan.trip.timezone}
+                    {plan.trip.location} · {plan.trip.timezone} · {plan.trip.currency}
                   </p>
                 </div>
                 <div className={scheduleEditorStyles["admin-actions"]}>
@@ -876,7 +890,13 @@ function Dashboard({
               ) : <>
               <MemberManager members={members} email={memberEmail} busy={memberBusy} error={memberError}
                 onEmailChange={setMemberEmail} onAdd={addMember} onRemove={removeMember} onTransfer={transferLeader}
+                onExpensePermission={setMemberExpensePermission}
                 onInvite={() => setInvitationOpen(true)} />
+
+              <ExpenseDashboard ledger={expenseLedger} activities={[
+                ...(plan.backbone || plan.itinerary || []),
+                ...(plan.branchGroups || []).flatMap((group) => group.branches.flatMap((branch) => branch.itinerary)),
+              ]} />
 
               <section
                 className={scheduleEditorStyles["admin-sources"]}
@@ -1497,7 +1517,7 @@ function Dashboard({
   );
 }
 
-function MemberManager({ members, email, busy, error, onEmailChange, onAdd, onRemove, onTransfer, onInvite }) {
+function MemberManager({ members, email, busy, error, onEmailChange, onAdd, onRemove, onTransfer, onExpensePermission, onInvite }) {
   const { t, intlLocale } = useLocale();
   return (
     <section className={adminShellStyles["member-section"]} aria-labelledby="trip-members-title">
@@ -1517,6 +1537,11 @@ function MemberManager({ members, email, busy, error, onEmailChange, onAdd, onRe
             <span className={adminShellStyles["member-stop"]} aria-hidden="true" />
             <span className={adminShellStyles["member-identity"]}><strong>{member.displayName}</strong><small>{member.email}</small></span>
             <strong className={adminShellStyles["member-role"]}>{member.role === "leader" ? t("visibility.leader") : t("visibility.member")}</strong>
+            {member.role !== "leader" && <label className={adminShellStyles["member-expense-permission"]}>
+              <input type="checkbox" checked={Boolean(member.canManageExpenses)} disabled={busy}
+                onChange={(event) => onExpensePermission(member.email, event.target.checked)} />
+              <span><strong>{t("expenses.permission")}</strong><small>{t("expenses.permissionHelp")}</small></span>
+            </label>}
             {member.role !== "leader" && <span className={adminShellStyles["member-actions"]}>
               <button type="button" disabled={busy} onClick={() => onTransfer(member.email)}>{t("visibility.makeLeader")}</button>
               <button type="button" disabled={busy} onClick={() => onRemove(member.email)}>{t("common.delete")}</button>

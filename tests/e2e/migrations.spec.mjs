@@ -32,11 +32,20 @@ test("fresh schema, legacy adoption, and reruns preserve data and enforce constr
     await db.query(`INSERT INTO trip_participants (trip_id,user_email,role,added_by_email)
       VALUES ($1,'local-admin@localhost.invalid','leader','local-admin@localhost.invalid')`, [trip.id]);
     await db.query("INSERT INTO users (email, name, role, first_login, last_login, last_active_at) VALUES ('member@example.com','Member','member',NOW(),NOW(),NOW())");
+    await db.query("INSERT INTO trip_participants (trip_id,user_email,role,added_by_email) VALUES ($1,'member@example.com','member','local-admin@localhost.invalid')", [trip.id]);
     const { rows: [activity] } = await db.query(`INSERT INTO activities
       (trip_id,item_key,sort_order,start_date,start_time,end_date,end_time,type,icon,title,detail)
       VALUES ($1,'stable-key',0,'2032-01-01','09:00','2032-01-01','10:00','Visit','x','Kept','') RETURNING id`, [trip.id]);
     await db.query(`INSERT INTO suggestions (trip_id,activity_id,author_email,author_name,body)
       VALUES ($1,$2,'member@example.com','Member','Preserve me')`, [trip.id, activity.id]);
+    expect((await db.query("SELECT currency FROM trips WHERE id=$1", [trip.id])).rows[0]).toEqual({ currency: "JPY" });
+    expect((await db.query("SELECT can_manage_expenses FROM trip_participants WHERE trip_id=$1 AND user_email='member@example.com'", [trip.id])).rows[0]).toEqual({ can_manage_expenses: false });
+    await db.query(`INSERT INTO activity_expenses(trip_id,activity_id,payer_email,amount_minor,created_by_email,updated_by_email)
+      VALUES($1,$2,'member@example.com',100,'local-admin@localhost.invalid','local-admin@localhost.invalid')`, [trip.id, activity.id]);
+    await expect(db.query("DELETE FROM trip_participants WHERE trip_id=$1 AND user_email='member@example.com'", [trip.id])).rejects.toMatchObject({ code: "23503" });
+    await expect(db.query("DELETE FROM activities WHERE id=$1", [activity.id])).rejects.toMatchObject({ code: "23503" });
+    await expect(db.query(`INSERT INTO activity_expenses(trip_id,activity_id,payer_email,amount_minor,created_by_email,updated_by_email)
+      VALUES($1,$2,'member@example.com',0,'local-admin@localhost.invalid','local-admin@localhost.invalid')`, [trip.id, activity.id])).rejects.toMatchObject({ code: "23514" });
     await expect(db.query("UPDATE users SET role = 'superuser'")).rejects.toMatchObject({ code: "23514" });
     await expect(db.query("UPDATE activities SET end_time = '08:00'")).rejects.toMatchObject({ code: "23514" });
     await expect(db.query("UPDATE trips SET trip_date = '2032-01-02'")).rejects.toMatchObject({ code: "23514" });
@@ -57,6 +66,7 @@ test("fresh schema, legacy adoption, and reruns preserve data and enforce constr
     expect((await db.query("SELECT item_key FROM activities")).rows).toEqual([{ item_key: "stable-key" }]);
     expect(await migrate()).toHaveLength(0);
     expect((await db.query("SELECT * FROM trips")).rows).toEqual(before);
+    await db.query("DELETE FROM activity_expenses");
     await db.query("DELETE FROM activities");
     expect((await db.query("SELECT activity_id,body FROM suggestions")).rows).toEqual([{ activity_id: null, body: "Preserve me" }]);
     expect((await db.query("SELECT * FROM trip_participants")).rows).toHaveLength(2);

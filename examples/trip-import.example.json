@@ -5,7 +5,8 @@
     "startDate": "2030-01-15",
     "endDate": "2030-01-16",
     "timezone": "Asia/Tokyo",
-    "location": "Sample City"
+    "location": "Sample City",
+    "currency": "JPY"
   },
   "sources": [
     {

@@ -129,6 +129,13 @@ export function TripForm({ editor, busy, onSave, onCancel }) {
         <label>
           {t("adminExtra.message170")} <input {...field("timezone")} required />
         </label>
+        <label>
+          {t("expenses.currency")} <select {...field("currency")}>
+            <option value="JPY">JPY</option>
+            <option value="VND">VND</option>
+            <option value="USD">USD</option>
+          </select>
+        </label>
         <label className="wide">
           {t("adminExtra.message171")} <input {...field("location")} required />
         </label>
