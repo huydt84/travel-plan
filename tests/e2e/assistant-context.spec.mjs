@@ -70,6 +70,37 @@ test("resource search distinguishes identical sources in two trips by stable ide
     await expect(service.search({ email: "member@example.com" })).rejects.toMatchObject({ code: "PILOT_FORBIDDEN" });
   } finally { await f.close(); }
 });
+test("trip context gives the assistant exact expense totals without exposing member emails", async () => {
+  const f = await fixture();
+  try {
+    const [activity] = await f.sql`INSERT INTO activities(trip_id,item_key,sort_order,start_date,start_time,end_date,end_time,type,icon,title,detail)
+      VALUES(${f.trips[0].id},'assistant-expense',0,'2030-01-01','09:00','2030-01-01','10:00','Meal','🍜','Assistant expense','Expense context fixture')
+      RETURNING id`;
+    await f.sql`INSERT INTO activity_expenses(trip_id,activity_id,payer_email,amount_minor,created_by_email,updated_by_email)
+      VALUES(${f.trips[0].id},${activity.id},${f.ownerEmail},125,${f.ownerEmail},${f.ownerEmail})`;
+
+    const context = await createContextService({ sql: f.sql }).read(
+      { email: f.ownerEmail, isAdmin: true },
+      f.refs[0],
+    );
+
+    expect(context.available).toBe(true);
+    expect(context.content.expenses).toMatchObject({
+      currency: "JPY",
+      totalAmount: "125",
+      averageAmount: "125",
+      participantCount: 1,
+      recentEntriesTruncated: false,
+    });
+    expect(context.content.expenses.activities).toEqual([
+      expect.objectContaining({ activityId: String(activity.id), title: "Assistant expense", totalAmount: "125", expenseCount: 1 }),
+    ]);
+    expect(context.content.expenses.recentEntries).toEqual([
+      expect.objectContaining({ activityId: String(activity.id), payer: "Assistant fixture", amount: "125", recordedBy: "Assistant fixture" }),
+    ]);
+    expect(JSON.stringify(context.content.expenses)).not.toContain(f.ownerEmail);
+  } finally { await f.close(); }
+});
 test("a conversation referencing A publishes and applies an explicit proposal only to B", async () => {
   const f = await fixture();
   try {

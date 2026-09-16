@@ -239,7 +239,11 @@ test("routes use explicit waypoints, trip timezone and Maps link modes", async (
 test("snapshot retry exhaustion never labels inconsistent data with a new revision", async () => {
   let revision = 0;
   const sql = async (strings) => strings.join("").includes("item_key") ? [] : [{ id: 1, plan_revision: ++revision }];
-  await assert.rejects(readTripSnapshot("test", { sql, readItinerary: async () => snapshot }), { code: "PLAN_BUSY" });
+  await assert.rejects(readTripSnapshot("test", {
+    sql,
+    readItinerary: async () => snapshot,
+    readExpenses: async () => ({ currency: "JPY", totalAmount: "0", averageAmount: "0", participantCount: 0, members: [], activities: [], recentEntries: [], recentEntriesTruncated: false }),
+  }), { code: "PLAN_BUSY" });
 });
 
 test("stream parser rejects missing terminal events, duplicate sequence and wrong run IDs", async () => {

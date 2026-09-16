@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createContextService, canonicalRefs } from "../lib/v1/context.mjs";
-import { createGeminiModelAdapter } from "../lib/v1/gemini-adapter.mjs";
+import { createGeminiModelAdapter, createLocalModelAdapter } from "../lib/v1/gemini-adapter.mjs";
 import { executeTool } from "../lib/v1/tool-runtime.mjs";
 import { safeEvidence } from "../lib/v1/evidence.mjs";
 import { snapshot, call, scriptedClient } from "./assistant-fixtures.mjs";
@@ -18,8 +18,31 @@ test("context service rejects unauthorized search and reads before querying", as
   assert.equal((await service.read(actor, trip)).available, false);
 });
 test("assembly reports omitted data rather than silently overflowing its budget", async () => {
-  const service = createContextService({ maxChars: 500, sql: async () => [{ kind: "trip", id: "1", label: "Trip", trip_id: "1", trip_title: "Trip", slug: "trip", revision: 1, content: { detail: "x".repeat(1000) } }] });
+  const service = createContextService({
+    maxChars: 500,
+    sql: async () => [{ kind: "trip", id: "1", label: "Trip", trip_id: "1", trip_title: "Trip", slug: "trip", revision: 1, content: {} }],
+    readSnapshot: async () => ({
+      ...snapshot,
+      trip: { ...snapshot.trip, detail: "x".repeat(1000) },
+    }),
+  });
   const [item] = await service.assemble(actor, [trip]); assert.equal(item.omitted, true); assert.equal(item.content, undefined);
+});
+test("oversized trip context keeps exact expense totals structured", async () => {
+  const expenses = { currency: "JPY", totalAmount: "300", averageAmount: "150", participantCount: 2,
+    members: [{ displayName: "Leader", role: "leader", totalAmount: "300", differenceAmount: "150", comparison: "more" }],
+    activities: [{ activityId: "1", title: "Museum", totalAmount: "300", expenseCount: 1 }],
+    recentEntries: [{ activityId: "1", activityTitle: "Museum", payer: "Leader", amount: "300", recordedBy: "Leader", createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-01T00:00:00.000Z" }],
+    recentEntriesTruncated: false };
+  const service = createContextService({
+    maxChars: 4000,
+    sql: async () => [{ kind: "trip", id: "1", label: "Trip", trip_id: "1", trip_title: "Trip", slug: "trip", revision: 1, content: {} }],
+    readSnapshot: async () => ({ ...snapshot, expenses, backbone: [{ ...snapshot.backbone[0], detail: "x".repeat(10000) }] }),
+  });
+  const item = await service.read(actor, trip);
+  assert.equal(item.truncated, true);
+  assert.equal(item.content.expenses.totalAmount, "300");
+  assert.equal(item.content.schedule.truncated, true);
 });
 test("a no-context model turn can discover and read two trips with internal citations", async () => {
   const refs = [trip, { kind: "trip", id: "2" }];
@@ -32,6 +55,21 @@ test("a no-context model turn can discover and read two trips with internal cita
   const result = await createGeminiModelAdapter({ client }).run({ message: "Compare trips", actor, contextService });
   assert.equal(result.usedContext.length, 2); assert.equal(result.citations.length, 2); assert.ok(result.citations.every(safeEvidence));
   assert.equal(result.operations, null);
+});
+test("local assistant answers expense questions from the trip snapshot", async () => {
+  const expenses = { currency: "JPY", totalAmount: "300", averageAmount: "150", participantCount: 2,
+    members: [
+      { displayName: "Leader", role: "leader", totalAmount: "300", differenceAmount: "150", comparison: "more" },
+      { displayName: "Member", role: "member", totalAmount: "0", differenceAmount: "-150", comparison: "less" },
+    ], activities: [], recentEntries: [], recentEntriesTruncated: false };
+  const result = await createLocalModelAdapter().run({
+    message: "Tổng chi tiêu của chuyến là bao nhiêu?",
+    resolvedContext: [{ ref: trip, available: true }],
+    contextService: { targetSnapshot: async () => ({ ...snapshot, expenses }) },
+    actor,
+  });
+  assert.match(result.text, /tổng 300 JPY; trung bình 150 JPY/);
+  assert.match(result.text, /Member: 0 JPY \(-150 so với trung bình\)/);
 });
 test("write tools cannot execute through the read tool runtime", async () => {
   await assert.rejects(executeTool("apply_changes", { operations: [] }, { evidence: [] }, {}), { code: "APPROVAL_REQUIRED" });
