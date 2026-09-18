@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { requestJson as api } from "../../lib/request-json.mjs";
 import { useLocale } from "../LocaleProvider";
 import Button from "../ui/Button";
+import FormFieldLabel from "../ui/FormFieldLabel";
 import ConfirmDialog from "../ConfirmDialog";
 import styles from "../../src/styles/expenses.module.css";
 
@@ -145,10 +146,10 @@ function ExpenseDialog({ editor, payers, currency, busy, error, onClose, onSave 
     <Dialog.Portal><Dialog.Overlay className={styles.overlay} /><Dialog.Content className={styles.dialog} aria-describedby={undefined}>
       <Dialog.Title>{editor.expenseId ? t("expenses.edit") : t("expenses.add")}</Dialog.Title>
       <form onSubmit={(event) => { event.preventDefault(); onSave(values); }}>
-        <label><span>{t("expenses.payer")}</span><select autoFocus value={values.payerEmail} onChange={(event) => setValues({ ...values, payerEmail: event.target.value })} required>
+        <label><FormFieldLabel required>{t("expenses.payer")}</FormFieldLabel><select autoFocus value={values.payerEmail} onChange={(event) => setValues({ ...values, payerEmail: event.target.value })} required>
           {payers.map((payer) => <option key={payer.email} value={payer.email}>{payer.displayName}</option>)}
         </select></label>
-        <label><span>{t("expenses.amount")} · {currency}</span><input type="number" inputMode="decimal" min={currency === "USD" ? "0.01" : "1"} step={currency === "USD" ? "0.01" : "1"} value={values.amount} onChange={(event) => setValues({ ...values, amount: event.target.value })} required /></label>
+        <label><FormFieldLabel required>{t("expenses.amount")} · {currency}</FormFieldLabel><input type="number" inputMode="decimal" min={currency === "USD" ? "0.01" : "1"} step={currency === "USD" ? "0.01" : "1"} value={values.amount} onChange={(event) => setValues({ ...values, amount: event.target.value })} required /></label>
         {error && <p className={styles.error} role="alert">{error}</p>}
         <div className={styles.dialogActions}><Button type="button" variant="ghost" disabled={busy} onClick={onClose}>{t("common.cancel")}</Button><Button variant="primary" disabled={busy}>{busy ? t("common.saving") : t("common.save")}</Button></div>
       </form>

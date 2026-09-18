@@ -95,6 +95,7 @@ test("expense controls remain usable on the canonical public and admin viewports
       await page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ }).click();
       await page.getByRole("button", { name: "Thêm khoản chi", exact: true }).click();
       const dialog = page.getByRole("dialog", { name: "Thêm khoản chi" });
+      await expect(dialog.locator('[title="Bắt buộc"]')).toHaveCount(2);
       await dialog.getByLabel("Người chi").selectOption({ label: f.people.member.name });
       await dialog.getByLabel(/Số tiền/).fill("125");
       await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();

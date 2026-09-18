@@ -19,6 +19,8 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
 
     await page.getByRole("button", { name: "Thêm hoạt động", exact: true }).click();
     const activityForm = page.locator(".schedule-create-editor");
+    await expect(activityForm.locator('[title="Bắt buộc"]')).toHaveCount(7);
+    await expect(activityForm.getByText("Không bắt buộc", { exact: true })).toHaveCount(3);
     await activityForm.getByLabel("Bắt đầu", { exact: true }).fill("23:50");
     await activityForm.getByLabel("Kết thúc", { exact: true }).fill("23:55");
     for (const [type, icon] of [["Reservation", "📞"], ["Show", "🎭"], ["Festival", "🎉"], ["Relax", "🌿"], ["Break", "🪑"], ["Meet", "🤝"]]) {
@@ -41,6 +43,7 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
 
     await page.getByRole("button", { name: "Thêm nguồn", exact: true }).click();
     const createSourceForm = page.locator(".source-form");
+    await expect(createSourceForm.locator('[title="Bắt buộc"]')).toHaveCount(2);
     await createSourceForm.getByLabel("Tên nguồn").fill(sourceTitle);
     await createSourceForm.getByLabel("URL").fill(`https://example.com/source-${runId}`);
     await createSourceForm.getByRole("button", { name: "Thêm nguồn" }).click();
@@ -104,13 +107,19 @@ for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) test(`adm
 
     await places.getByRole("button", { name: "Thêm địa điểm" }).click();
     const createForm = places.getByRole("form", { name: "Thêm địa điểm" });
+    await expect(createForm.locator('[title="Bắt buộc"]')).toHaveCount(1);
+    await expect(createForm.getByText("Không bắt buộc", { exact: true })).toHaveCount(4);
+    await expect(createForm.getByLabel("Vĩ độ")).toHaveCount(0);
+    await expect(createForm.getByLabel("Kinh độ")).toHaveCount(0);
     await createForm.getByLabel("Tên địa điểm").fill(createdPlaceName);
-    await createForm.getByLabel("Địa chỉ").fill("Gion, Kyoto");
+    await expect(createForm.getByLabel("Địa chỉ")).not.toHaveAttribute("required");
+    await createForm.getByLabel("Liên kết Google Maps").fill("https://maps.app.goo.gl/example-place");
     await createForm.getByRole("button", { name: "Thêm địa điểm" }).click();
     await expect(places.getByRole("heading", { name: createdPlaceName })).toBeVisible();
+    await expect(places.getByRole("link", { name: "Google Maps" })).toHaveAttribute("href", "https://maps.app.goo.gl/example-place");
 
     const plan = await (await request.get(`/api/trips/${encodeURIComponent(slug)}`)).json();
-    expect(plan.places).toEqual([expect.objectContaining({ name: createdPlaceName, address: "Gion, Kyoto" })]);
+    expect(plan.places).toEqual([expect.objectContaining({ name: createdPlaceName, address: "", googleMapsUrl: "https://maps.app.goo.gl/example-place" })]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
   } finally {
     await request.delete(`/api/trips/${slug}`);

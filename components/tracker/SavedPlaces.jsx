@@ -20,7 +20,7 @@ export default function SavedPlaces({ places = [], activities = [] }) {
                 <span className={styles["saved-place-number"]} aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
                 <div className={styles["saved-place-identity"]}>
                   <h3>{place.name}</h3>
-                  <address>{place.address}</address>
+                  {place.address && <address>{place.address}</address>}
                 </div>
                 <div className={styles["saved-place-detail"]}>
                   {place.notes && <p>{place.notes}</p>}
@@ -34,7 +34,7 @@ export default function SavedPlaces({ places = [], activities = [] }) {
                 </div>
                 <div className={styles["saved-place-actions"]}>
                   {place.website && <a href={place.website} target="_blank" rel="noreferrer">{t("trackerExtra.website")}</a>}
-                  {place.googlePlaceId && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${encodeURIComponent(place.googlePlaceId)}`} target="_blank" rel="noreferrer">{t("trackerExtra.maps")}</a>}
+                  {(place.googleMapsUrl || place.googlePlaceId) && <a href={place.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${encodeURIComponent(place.googlePlaceId)}`} target="_blank" rel="noreferrer">{t("trackerExtra.maps")}</a>}
                 </div>
               </article>
             </li>

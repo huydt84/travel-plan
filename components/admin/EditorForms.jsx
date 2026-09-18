@@ -4,6 +4,7 @@ import scheduleEditorStyles from "../../src/styles/schedule-editor.module.css";
 import adminShellStyles from "../../src/styles/admin-shell.module.css";
 
 import Button from "../ui/Button";
+import FormFieldLabel from "../ui/FormFieldLabel";
 import { useId, useRef, useState } from "react";
 import { calendarDayDifference } from "../../lib/trip-dates.mjs";
 import { normalizeScheduleRefs } from "../../lib/schedule-editor-state.mjs";
@@ -12,7 +13,7 @@ import { ActionIcon } from "../Icons";
 import { requestJson as api } from "../../lib/request-json.mjs";
 
 const emptySource = { title: "", url: "" };
-const emptyPlace = { name: "", address: "", latitude: "", longitude: "", website: "", googlePlaceId: "", notes: "" };
+const emptyPlace = { name: "", address: "", latitude: "", longitude: "", website: "", googleMapsUrl: "", googlePlaceId: "", notes: "" };
 const openTimePicker = (event) => {
   try {
     event.currentTarget.showPicker?.();
@@ -276,13 +277,13 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-date-field"]}`}
         >
-          {t("adminExtra.message168")}{" "}
+          <FormFieldLabel required>{t("adminExtra.message168")}</FormFieldLabel>
           <input type="date" {...field("startDate")} required />
         </label>
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-time-field"]}`}
         >
-          {t("adminExtra.message203")}{" "}
+          <FormFieldLabel required>{t("adminExtra.message203")}</FormFieldLabel>
           <input
             type="time"
             {...field("start")}
@@ -293,7 +294,7 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-date-field"]}`}
         >
-          {t("adminExtra.message169")}{" "}
+          <FormFieldLabel required>{t("adminExtra.message169")}</FormFieldLabel>
           <input
             type="date"
             {...field("endDate")}
@@ -304,7 +305,7 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-time-field"]}`}
         >
-          {t("adminExtra.message204")}{" "}
+          <FormFieldLabel required>{t("adminExtra.message204")}</FormFieldLabel>
           <input
             type="time"
             {...field("end")}
@@ -315,7 +316,7 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-display-field"]}`}
         >
-          {t("adminExtra.message205")}{" "}
+          <FormFieldLabel>{t("adminExtra.message205")}</FormFieldLabel>
           <input
             {...field("displayEnd")}
             placeholder={t("adminExtra.message206")}
@@ -324,7 +325,7 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-type-field"]}`}
         >
-          {t("adminExtra.message207")}{" "}
+          <FormFieldLabel required>{t("adminExtra.message207")}</FormFieldLabel>
           <select value={values.type || ""} onChange={changeType} required>
             {typeOptions.map((option) => (
               <option value={option.value} key={option.value}>
@@ -336,7 +337,7 @@ export function ScheduleForm({
         <label
           className={`${scheduleEditorStyles["schedule-field"]} ${scheduleEditorStyles["schedule-icon-field"]}`}
         >
-          {t("adminExtra.message208")}{" "}
+          <FormFieldLabel required>{t("adminExtra.message208")}</FormFieldLabel>
           <select {...field("icon")} required>
             {iconOptions.map((option) => (
               <option value={option.value} key={option.value}>
@@ -348,17 +349,13 @@ export function ScheduleForm({
         <label
           className={`wide ${scheduleEditorStyles["schedule-field"]} schedule-title-field`}
         >
-          {t("adminExtra.message209")} <input {...field("title")} required />
+          <FormFieldLabel required>{t("adminExtra.message209")}</FormFieldLabel>
+          <input {...field("title")} required />
         </label>
         <label
           className={`wide ${scheduleEditorStyles["schedule-field"]} schedule-detail-field`}
         >
-          <span>
-            {t("adminExtra.message210")}{" "}
-            <small className={scheduleEditorStyles["field-optional"]}>
-              {t("adminExtra.message160")}
-            </small>
-          </span>
+          <FormFieldLabel>{t("adminExtra.message210")}</FormFieldLabel>
           <textarea {...field("detail")} rows="3" />
         </label>
       </div>
@@ -430,7 +427,7 @@ function SourcePicker({ sources, selectedRefs, onChange, onCreateSource }) {
   };
   return (
     <fieldset className={scheduleEditorStyles["source-picker"]}>
-      <legend>{t("adminExtra.message214")}</legend>
+      <legend><FormFieldLabel>{t("adminExtra.message214")}</FormFieldLabel></legend>
       <div className={scheduleEditorStyles["source-picker-frame"]}>
         <div className={scheduleEditorStyles["source-picker-head"]}>
           <p>
@@ -552,16 +549,16 @@ export function SourceForm({
       ref={fieldsRef}
     >
       <label className={compact ? "" : "wide"}>
-        {t("adminExtra.message221")}{" "}
+        <FormFieldLabel required>{t("adminExtra.message221")}</FormFieldLabel>
         <input
           {...field("title")}
           maxLength={300}
           placeholder={t("adminExtra.message222")}
-          required={!compact}
+          required
         />
       </label>
       <label className={compact ? "" : "wide"}>
-        {t("adminExtra.message223")}{" "}
+        <FormFieldLabel required>{t("adminExtra.message223")}</FormFieldLabel>
         <input
           type={compact ? "text" : "url"}
           inputMode="url"
@@ -571,7 +568,7 @@ export function SourceForm({
           maxLength={2000}
           placeholder="https://example.com/dia-diem"
           aria-describedby={hintId}
-          required={!compact}
+          required
         />
         <small id={hintId}>{t("adminExtra.message224")}</small>
       </label>
@@ -649,6 +646,7 @@ export function PlaceForm({ place = null, onSave, onCancel }) {
     latitude: place.latitude ?? "",
     longitude: place.longitude ?? "",
     website: place.website || "",
+    googleMapsUrl: place.googleMapsUrl || "",
     googlePlaceId: place.googlePlaceId || "",
     notes: place.notes || "",
   } : emptyPlace);
@@ -673,13 +671,27 @@ export function PlaceForm({ place = null, onSave, onCancel }) {
       <Button type="button" variant="ghost" onClick={onCancel}>{t("adminPlaces.cancel")}</Button>
     </div>
     <div className={scheduleEditorStyles["form-grid"]}>
-      <label>{t("adminPlaces.name")} <input {...field("name")} maxLength={240} required /></label>
-      <label>{t("adminPlaces.address")} <input {...field("address")} maxLength={1000} required /></label>
-      <label>{t("adminPlaces.latitude")} <input {...field("latitude")} type="number" inputMode="decimal" min="-90" max="90" step="any" /></label>
-      <label>{t("adminPlaces.longitude")} <input {...field("longitude")} type="number" inputMode="decimal" min="-180" max="180" step="any" /></label>
-      <label className="wide">{t("adminPlaces.website")} <input {...field("website")} type="url" inputMode="url" maxLength={2000} /></label>
-      <label className="wide">{t("adminPlaces.googlePlaceId")} <input {...field("googlePlaceId")} maxLength={500} /></label>
-      <label className="wide">{t("adminPlaces.notes")} <textarea {...field("notes")} rows={3} maxLength={2000} /></label>
+      <label>
+        <FormFieldLabel required>{t("adminPlaces.name")}</FormFieldLabel>
+        <input {...field("name")} maxLength={240} required />
+      </label>
+      <label>
+        <FormFieldLabel>{t("adminPlaces.address")}</FormFieldLabel>
+        <input {...field("address")} maxLength={1000} />
+      </label>
+      <label className="wide">
+        <FormFieldLabel>{t("adminPlaces.googleMapsUrl")}</FormFieldLabel>
+        <input {...field("googleMapsUrl")} type="url" inputMode="url" autoCapitalize="none" spellCheck={false} maxLength={2000} placeholder="https://maps.app.goo.gl/..." />
+        <small>{t("adminPlaces.googleMapsUrlHint")}</small>
+      </label>
+      <label className="wide">
+        <FormFieldLabel>{t("adminPlaces.website")}</FormFieldLabel>
+        <input {...field("website")} type="url" inputMode="url" maxLength={2000} />
+      </label>
+      <label className="wide">
+        <FormFieldLabel>{t("adminPlaces.notes")}</FormFieldLabel>
+        <textarea {...field("notes")} rows={3} maxLength={2000} />
+      </label>
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}
     <Button variant="primary" disabled={busy}>{busy ? t("adminPlaces.saving") : place ? t("adminPlaces.save") : t("adminPlaces.add")}</Button>

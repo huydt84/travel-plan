@@ -1014,12 +1014,12 @@ function Dashboard({
                       : <article className={scheduleEditorStyles["admin-place-item"]}>
                         <div className={scheduleEditorStyles["admin-place-copy"]}>
                           <h3>{place.name}</h3>
-                          <p>{place.address}</p>
+                          {place.address && <p>{place.address}</p>}
                           {place.notes && <p>{place.notes}</p>}
                           {place.latitude != null && <small>{t("adminPlaces.coordinates", { latitude: place.latitude, longitude: place.longitude })}</small>}
                           <div className={scheduleEditorStyles["admin-place-links"]}>
                             {place.website && <a href={place.website} target="_blank" rel="noreferrer">{t("adminPlaces.website")}</a>}
-                            {place.googlePlaceId && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${encodeURIComponent(place.googlePlaceId)}`} target="_blank" rel="noreferrer">Google Maps</a>}
+                            {(place.googleMapsUrl || place.googlePlaceId) && <a href={place.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${encodeURIComponent(place.googlePlaceId)}`} target="_blank" rel="noreferrer">Google Maps</a>}
                           </div>
                         </div>
                         <div className={scheduleEditorStyles["admin-row-actions"]}>
