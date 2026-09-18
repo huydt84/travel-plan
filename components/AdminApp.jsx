@@ -20,7 +20,7 @@ import InvitationDialog from "./InvitationDialog";
 import { useLocale } from "./LocaleProvider";
 import { adminErrorMessage } from "../lib/i18n-admin.mjs";
 import { translateActivityType } from "../lib/i18n.mjs";
-import { ExpenseDashboard, useExpenseLedger } from "./tracker/Expenses";
+import { ActivityExpenses, ExpenseSummary, useExpenseLedger } from "./tracker/Expenses";
 import {
   activityInstants,
   calendarDayDifference,
@@ -893,10 +893,7 @@ function Dashboard({
                 onExpensePermission={setMemberExpensePermission}
                 onInvite={() => setInvitationOpen(true)} />
 
-              <ExpenseDashboard ledger={expenseLedger} activities={[
-                ...(plan.backbone || plan.itinerary || []),
-                ...(plan.branchGroups || []).flatMap((group) => group.branches.flatMap((branch) => branch.itinerary)),
-              ]} />
+              <ExpenseSummary ledger={expenseLedger} placement="admin" />
 
               <section
                 className={scheduleEditorStyles["admin-sources"]}
@@ -1173,6 +1170,7 @@ function Dashboard({
                   <BranchGroupAdmin
                     group={startBranchGroup}
                     startsTrip
+                    expenseLedger={expenseLedger}
                     busy={busy}
                     scheduleEditor={scheduleEditor}
                     scheduleError={scheduleError}
@@ -1257,6 +1255,7 @@ function Dashboard({
                       )}
                       <ScheduleRow
                         item={item}
+                        expenseLedger={expenseLedger}
                         busy={busy}
                         scheduleEditor={scheduleEditor}
                         scheduleError={scheduleError}
@@ -1303,6 +1302,7 @@ function Dashboard({
                       {group && (
                         <BranchGroupAdmin
                           group={group}
+                          expenseLedger={expenseLedger}
                           busy={busy}
                           scheduleEditor={scheduleEditor}
                           scheduleError={scheduleError}
@@ -1628,6 +1628,7 @@ function AdminSuggestionMenu({ suggestion, busy, onDelete }) {
 
 function ScheduleRow({
   item,
+  expenseLedger,
   busy,
   scheduleEditor,
   scheduleError,
@@ -1682,6 +1683,7 @@ function ScheduleRow({
           {t("adminExtra.message033")}
         </Button>
       </div>
+      <ActivityExpenses activity={item} ledger={expenseLedger} placement="schedule" />
       {isEditing && (
         <ScheduleForm
           key={scheduleEditor.key}
@@ -1816,6 +1818,7 @@ function BranchCreateForm({ anchor, following, busy, onCancel, onSave }) {
 function BranchGroupAdmin({
   group,
   startsTrip = false,
+  expenseLedger,
   busy,
   scheduleEditor,
   scheduleError,
@@ -1924,6 +1927,7 @@ function BranchGroupAdmin({
             group={group}
             branch={branch}
             selected={branch.id === group.selectedBranchId}
+            expenseLedger={expenseLedger}
             busy={busy}
             scheduleEditor={scheduleEditor}
             scheduleError={scheduleError}
@@ -1966,6 +1970,7 @@ function BranchOptionAdmin({
   group,
   branch,
   selected,
+  expenseLedger,
   busy,
   scheduleEditor,
   scheduleError,
@@ -2083,6 +2088,7 @@ function BranchOptionAdmin({
           <ScheduleRow
             key={item.id}
             item={item}
+            expenseLedger={expenseLedger}
             busy={busy}
             scheduleEditor={scheduleEditor}
             scheduleError={scheduleError}

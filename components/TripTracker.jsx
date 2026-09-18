@@ -1112,7 +1112,6 @@ export default function TripTracker({
                 anchorItems={false}
                 {...suggestionListProps}
               />
-              {stationSuggestionActivityId && <ActivityExpenses activity={state.current} ledger={expenseLedger} />}
             </section>
 
             {stationNext && (

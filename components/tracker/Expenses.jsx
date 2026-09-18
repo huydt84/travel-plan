@@ -52,12 +52,15 @@ export function useExpenseLedger(tripSlug) {
   return useMemo(() => ({ data, loading, error, refresh, save, remove }), [data, loading, error, refresh, save, remove]);
 }
 
-export function ExpenseSummary({ ledger }) {
+export function ExpenseSummary({ ledger, placement = "default" }) {
   const { t, intlLocale } = useLocale();
   if (ledger.loading) return <p className={styles.status}>{t("expenses.loading")}</p>;
   if (!ledger.data) return <p className={styles.error} role="alert">{t("expenses.loadError")}</p>;
   const { summary, currency } = ledger.data;
-  return <section className={styles.summary} aria-labelledby="expense-summary-title">
+  const summaryClassName = placement === "admin"
+    ? `${styles.summary} ${styles.adminSummary}`
+    : styles.summary;
+  return <section className={summaryClassName} aria-labelledby="expense-summary-title">
     <header><div><h2 id="expense-summary-title">{t("expenses.summary")}</h2><p>{currency} · {t("expenses.people", { count: summary.participantCount })}</p></div></header>
     <div className={styles.totals}>
       <div><span>{t("expenses.total")}</span><strong>{money(summary.totalAmount, currency, intlLocale)}</strong></div>
@@ -72,9 +75,10 @@ export function ExpenseSummary({ ledger }) {
   </section>;
 }
 
-export function ActivityExpenses({ activity, ledger, defaultOpen = false }) {
+export function ActivityExpenses({ activity, ledger, defaultOpen = false, placement = "default" }) {
   const { t, intlLocale } = useLocale();
   const headingId = useId();
+  const bodyId = useId();
   const addButtonRef = useRef(null);
   const dialogTriggerRef = useRef(null);
   const [open, setOpen] = useState(defaultOpen);
@@ -82,22 +86,27 @@ export function ActivityExpenses({ activity, ledger, defaultOpen = false }) {
   const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   if (!ledger.data) return null;
   const { currency, canManage, payers, summary } = ledger.data;
   const expenses = ledger.data.expenses.filter((expense) => expense.activityId === String(activity.id));
   const total = summary.activityTotals[String(activity.id)] || "0";
+  if (!canManage && !expenses.length) return null;
   const restoreDialogFocus = () => requestAnimationFrame(() => dialogTriggerRef.current?.focus());
   const startCreate = (event) => {
-    setError("");
+    setError(""); setNotice("");
     dialogTriggerRef.current = event.currentTarget;
     setEditor({ expenseId: null, payerEmail: payers[0]?.email || "", amount: "" });
   };
-  return <section className={styles.activity} aria-labelledby={headingId}>
-    <button className={styles.activityToggle} type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} aria-label={t("expenses.openFor", { title: activity.title })}>
+  const activityClassName = placement === "schedule"
+    ? `${styles.activity} ${styles.scheduleActivity}`
+    : styles.activity;
+  return <section className={activityClassName} aria-labelledby={headingId}>
+    <button className={styles.activityToggle} type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((value) => !value)} aria-label={t("expenses.openFor", { title: activity.title })}>
       <span><strong id={headingId}>{t("expenses.title")}</strong><small>{expenses.length ? t("expenses.activityTotal", { amount: money(total, currency, intlLocale) }) : t("expenses.empty")}</small></span>
       <span aria-hidden="true">{open ? "−" : "+"}</span>
     </button>
-    {open && <div className={styles.activityBody}>
+    {open && <div className={styles.activityBody} id={bodyId}>
       {expenses.map((expense) => <article className={styles.expenseRow} key={expense.id}>
         <div><strong>{expense.payer.displayName}</strong><small>{t("expenses.recordedBy", { name: expense.createdBy.displayName })} · <time dateTime={expense.createdAt}>{new Intl.DateTimeFormat(intlLocale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(expense.createdAt))}</time></small></div>
         <strong>{money(expense.amount, currency, intlLocale)}</strong>
@@ -106,7 +115,6 @@ export function ActivityExpenses({ activity, ledger, defaultOpen = false }) {
           <button type="button" onClick={() => { setError(""); setDeleting(expense); }}>{t("common.delete")}</button>
         </div>}
       </article>)}
-      {!expenses.length && <p className={styles.empty}>{t("expenses.empty")}</p>}
       {canManage && <Button ref={addButtonRef} type="button" variant="ghost" onClick={startCreate}>{t("expenses.add")}</Button>}
       {error && <p className={styles.error} role="alert">{error}</p>}
     </div>}
@@ -114,7 +122,7 @@ export function ActivityExpenses({ activity, ledger, defaultOpen = false }) {
       onClose={() => { if (!busy) { setEditor(null); setError(""); restoreDialogFocus(); } }}
       onSave={async (values) => {
         setBusy(true); setError("");
-        try { await ledger.save({ activityId: activity.id, ...values, expenseId: editor.expenseId }); setEditor(null); setOpen(true); restoreDialogFocus(); }
+        try { await ledger.save({ activityId: activity.id, ...values, expenseId: editor.expenseId }); setEditor(null); setOpen(true); setNotice(t("expenses.saved")); restoreDialogFocus(); }
         catch (requestError) { setError(requestError.message || t("expenses.saveError")); }
         finally { setBusy(false); }
       }} />}
@@ -122,10 +130,11 @@ export function ActivityExpenses({ activity, ledger, defaultOpen = false }) {
       preview={`${deleting.payer.displayName} · ${money(deleting.amount, currency, intlLocale)}`} confirmLabel={t("common.delete")} pendingLabel={t("common.loading")} pending={busy} error={error}
       onCancel={() => { if (!busy) { setDeleting(null); setError(""); } }} onConfirm={async () => {
         setBusy(true); setError("");
-        try { await ledger.remove(deleting.id); setDeleting(null); }
+        try { await ledger.remove(deleting.id); setDeleting(null); setNotice(t("expenses.deleted")); }
         catch (requestError) { setError(requestError.message || t("expenses.deleteError")); }
         finally { setBusy(false); }
       }} />}
+    {notice && <p className={styles.notice} role="status">{notice}</p>}
   </section>;
 }
 
@@ -145,13 +154,4 @@ function ExpenseDialog({ editor, payers, currency, busy, error, onClose, onSave 
       </form>
     </Dialog.Content></Dialog.Portal>
   </Dialog.Root>;
-}
-
-export function ExpenseDashboard({ activities, ledger }) {
-  const { t } = useLocale();
-  return <div className={styles.dashboard}><ExpenseSummary ledger={ledger} />
-    <section className={styles.activityIndex} aria-labelledby="expense-activities-title"><h2 id="expense-activities-title">{t("expenses.allActivities")}</h2>
-      {activities.map((activity) => <ActivityExpenses key={activity.id} activity={activity} ledger={ledger} />)}
-    </section>
-  </div>;
 }

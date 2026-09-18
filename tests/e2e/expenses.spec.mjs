@@ -90,9 +90,10 @@ test("expense controls remain usable on the canonical public and admin viewports
     await page.goto(`/?trip=${f.slug}`);
     await expect(page.getByRole("heading", { name: "Tổng quan chi tiêu" })).toBeVisible();
     await expect(page.getByText(/0.*¥|¥.*0/).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ })).toHaveCount(1);
     if (viewport.width === 320) {
-      await page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ }).first().click();
-      await page.getByRole("button", { name: "Thêm khoản chi", exact: true }).first().click();
+      await page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ }).click();
+      await page.getByRole("button", { name: "Thêm khoản chi", exact: true }).click();
       const dialog = page.getByRole("dialog", { name: "Thêm khoản chi" });
       await dialog.getByLabel("Người chi").selectOption({ label: f.people.member.name });
       await dialog.getByLabel(/Số tiền/).fill("125");
@@ -107,7 +108,12 @@ test("expense controls remain usable on the canonical public and admin viewports
   const page = await context.newPage();
   await page.goto(`/admin/trips?trip=${f.slug}`);
   await expect(page.getByRole("heading", { name: "Tổng quan chi tiêu" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Chi tiêu theo hoạt động" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Chi tiêu theo hoạt động" })).toHaveCount(0);
+  const adminExpenseToggle = page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ });
+  await expect(adminExpenseToggle).toHaveCount(1);
+  const adminActivity = adminExpenseToggle.locator("xpath=ancestor::article[1]");
+  await expect(adminActivity.getByRole("heading", { name: "Matrix start" })).toBeVisible();
+  await expect(adminActivity.getByText(/125.*¥|¥.*125/)).toBeVisible();
   await expect(page.getByText("Quản lý chi tiêu", { exact: true })).toBeVisible();
   await context.close();
 });
