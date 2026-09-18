@@ -111,6 +111,33 @@ for (const viewport of viewports) {
           }));
           expect(splitDates, "dates must not split their year across lines").toEqual([]);
         }
+        if (surface.name === "admin trips") {
+          const memberDelete = page.getByRole("button", { name: "Xóa", exact: true });
+          await expect(memberDelete).toBeVisible();
+          const memberLayout = await memberDelete.evaluate((button) => {
+            const row = button.closest("li");
+            const actions = button.closest('[class*="member-actions"]');
+            const permission = row?.querySelector('[class*="member-expense-permission"]');
+            if (!row || !actions || !permission) return null;
+            const rowRect = row.getBoundingClientRect();
+            const actionRect = actions.getBoundingClientRect();
+            const permissionRect = permission.getBoundingClientRect();
+            return {
+              row: { left: rowRect.left, right: rowRect.right, bottom: rowRect.bottom },
+              actions: { left: actionRect.left, right: actionRect.right, top: actionRect.top, bottom: actionRect.bottom },
+              permission: { right: permissionRect.right, bottom: permissionRect.bottom },
+            };
+          });
+          expect(memberLayout, "member controls must share one member row").not.toBeNull();
+          expect(memberLayout.actions.left).toBeGreaterThanOrEqual(memberLayout.row.left);
+          expect(memberLayout.actions.right).toBeLessThanOrEqual(memberLayout.row.right + 1);
+          expect(memberLayout.actions.bottom).toBeLessThanOrEqual(memberLayout.row.bottom + 1);
+          if (viewport.touch) {
+            expect(memberLayout.actions.top).toBeGreaterThanOrEqual(memberLayout.permission.bottom - 1);
+          } else {
+            expect(memberLayout.actions.left).toBeGreaterThanOrEqual(memberLayout.permission.right - 1);
+          }
+        }
         if (["trip companion", "agentic assistant"].includes(surface.name)) {
           const shell = page.getByRole("region", { name: "Trợ lý hành trình", exact: true });
           const header = await shell.locator("header").first().boundingBox();

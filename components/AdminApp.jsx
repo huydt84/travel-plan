@@ -1523,17 +1523,20 @@ function MemberManager({ members, email, busy, error, onEmailChange, onAdd, onRe
     <section className={adminShellStyles["member-section"]} aria-labelledby="trip-members-title">
       <div className={adminShellStyles["admin-section-head"]}>
         <div><h2 id="trip-members-title">{t("visibility.members")}</h2><p>{t("visibility.memberHelp")}</p></div>
-        <button className={adminShellStyles["member-email-action"]} type="button" onClick={onInvite}>{t("visibility.emailMembers")}</button>
+        <button className={adminShellStyles["member-email-action"]} type="button" onClick={onInvite}>
+          <ActionIcon name="invite" />
+          <span>{t("visibility.emailMembers")}</span>
+        </button>
       </div>
       <form className={adminShellStyles["member-add"]} onSubmit={onAdd}>
         <label><span>{t("visibility.registeredEmail")}</span><input type="email" value={email} onChange={(event) => onEmailChange(event.target.value)} required placeholder="friend@example.com" /></label>
         <Button variant="primary" disabled={busy}>{busy ? t("common.loading") : t("visibility.addMember")}</Button>
       </form>
       {error && <p className={adminShellStyles["member-error"]} role="alert">{error}</p>}
-      <div className={adminShellStyles["member-list"]}>
+      <ul className={adminShellStyles["member-list"]}>
         {members.map((member) => (
-          <div className={adminShellStyles["member-row"]} key={member.email || `${member.displayName}-${member.role}`}>
-            <span className={adminShellStyles["member-time"]}>{new Intl.DateTimeFormat(intlLocale, { month: "short", day: "2-digit" }).format(new Date(member.joinedAt))}</span>
+          <li className={adminShellStyles["member-row"]} key={member.email || `${member.displayName}-${member.role}`}>
+            <time className={adminShellStyles["member-time"]} dateTime={member.joinedAt}>{new Intl.DateTimeFormat(intlLocale, { month: "short", day: "2-digit" }).format(new Date(member.joinedAt))}</time>
             <span className={adminShellStyles["member-stop"]} aria-hidden="true" />
             <span className={adminShellStyles["member-identity"]}><strong>{member.displayName}</strong><small>{member.email}</small></span>
             <strong className={adminShellStyles["member-role"]}>{member.role === "leader" ? t("visibility.leader") : t("visibility.member")}</strong>
@@ -1543,12 +1546,12 @@ function MemberManager({ members, email, busy, error, onEmailChange, onAdd, onRe
               <span><strong>{t("expenses.permission")}</strong><small>{t("expenses.permissionHelp")}</small></span>
             </label>}
             {member.role !== "leader" && <span className={adminShellStyles["member-actions"]}>
-              <button type="button" disabled={busy} onClick={() => onTransfer(member.email)}>{t("visibility.makeLeader")}</button>
-              <button type="button" disabled={busy} onClick={() => onRemove(member.email)}>{t("common.delete")}</button>
+              <Button type="button" variant="ghost" disabled={busy} onClick={() => onTransfer(member.email)}>{t("visibility.makeLeader")}</Button>
+              <Button type="button" variant="danger" disabled={busy} onClick={() => onRemove(member.email)}>{t("common.delete")}</Button>
             </span>}
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }
