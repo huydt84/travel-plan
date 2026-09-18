@@ -290,6 +290,7 @@ export default function NotificationCenter() {
               <button
                 type="button"
                 disabled={!unreadCount || markingAll}
+                aria-busy={markingAll}
                 onClick={markAllRead}
               >
                 {markingAll ? t("notifications.marking") : t("notifications.markAllRead")}
@@ -391,6 +392,7 @@ export default function NotificationCenter() {
                 <button
                   type="button"
                   disabled={loadingMore}
+                  aria-busy={loadingMore}
                   onClick={() =>
                     loadNotifications({ cursor: nextCursor, append: true })
                   }

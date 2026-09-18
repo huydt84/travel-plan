@@ -145,6 +145,10 @@
 .notification-panel-tools button:disabled,
 .notification-panel-footer button:disabled {
   opacity: 0.5;
+  cursor: not-allowed;
+}
+.notification-panel-tools button[aria-busy="true"],
+.notification-panel-footer button[aria-busy="true"] {
   cursor: wait;
 }
 .notification-panel-body {

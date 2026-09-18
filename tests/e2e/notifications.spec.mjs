@@ -229,6 +229,9 @@ test("empty notification panel closes with Escape and restores trigger focus", a
     const bell = page.getByRole("button", { name: "Mở thông báo" });
     await bell.click();
     await expect(page.getByText("Chưa có cập nhật", { exact: true })).toBeVisible();
+    const readAllButton = page.getByRole("button", { name: "Đánh dấu tất cả đã đọc" });
+    await expect(readAllButton).toBeDisabled();
+    await expect(readAllButton).toHaveCSS("cursor", "not-allowed");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("heading", { name: "Thông báo" })).toHaveCount(0);
     await expect(bell).toBeFocused();
