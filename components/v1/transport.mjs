@@ -1,3 +1,9 @@
+export const ASSISTANT_RUNS_CHANGED_EVENT = "assistant-runs-changed";
+
+export function notifyAssistantRunsChanged() {
+  window.dispatchEvent(new Event(ASSISTANT_RUNS_CHANGED_EVENT));
+}
+
 export async function apiJson(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { accept: "application/json", ...(options.body ? { "content-type": "application/json" } : {}), ...options.headers } });
   const data = await response.json().catch(() => ({}));

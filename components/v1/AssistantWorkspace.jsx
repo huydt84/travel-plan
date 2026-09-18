@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Dialog, { DialogTitle } from "../ui/Dialog";
 import { useAssistantNavigation } from "./AssistantProvider";
 import { useConversation } from "./useConversation";
-import { apiJson } from "./transport.mjs";
+import { apiJson, notifyAssistantRunsChanged } from "./transport.mjs";
 import BatchReview from "./BatchReview";
 import QuestionPrompt from "./QuestionPrompt";
 import MessageContent from "./MessageContent";
@@ -116,7 +116,7 @@ export default function AssistantWorkspace({ initialWorkspace, viewer, tripSlug,
     setApplying(true); chat.setError("");
     try {
       await apiJson(`/api/v1/assistant/actions/${action.id}/${decision}`, { method: "POST", body: JSON.stringify(decision === "approve" ? { confirmationToken: action.confirmationToken } : {}) });
-      window.dispatchEvent(new Event("assistant-completed"));
+      notifyAssistantRunsChanged();
       window.dispatchEvent(new Event("assistant-resources-changed"));
       await chat.refreshConversation(conversationId);
     } catch (failure) {

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale } from "../LocaleProvider";
 import { localizeAssistantMessage } from "../../lib/i18n-assistant.mjs";
-import { apiJson, observeRun } from "./transport.mjs";
+import { apiJson, ASSISTANT_RUNS_CHANGED_EVENT, notifyAssistantRunsChanged, observeRun } from "./transport.mjs";
 
 // A refresh cannot make a locally expired immutable approval actionable again.
 const currentTurn = (turn) => ({ ...turn, actions: turn.actions?.map((action) =>
@@ -36,8 +36,8 @@ export function useConversation({ initialWorkspace, viewer }) {
       } catch { /* Request acceptance remains authoritative during a lost connection. */ }
     };
     const timer=setInterval(refresh,15000);
-    window.addEventListener("assistant-completed",refresh);window.addEventListener("focus",refresh);
-    return () => { controller.abort();clearInterval(timer);window.removeEventListener("assistant-completed",refresh);window.removeEventListener("focus",refresh); };
+    window.addEventListener(ASSISTANT_RUNS_CHANGED_EVENT,refresh);window.addEventListener("focus",refresh);
+    return () => { controller.abort();clearInterval(timer);window.removeEventListener(ASSISTANT_RUNS_CHANGED_EVENT,refresh);window.removeEventListener("focus",refresh); };
   }, []);
   const historyGeneration = useRef(0);
   useEffect(() => {
@@ -116,7 +116,7 @@ export function useConversation({ initialWorkspace, viewer }) {
       if (event.turn) {
         setTurns((items) => items.map((item) => item.id === turn.id ? event.turn : item));
         setProgress("");
-        window.dispatchEvent(new Event("assistant-completed"));
+        notifyAssistantRunsChanged();
       }
     }, controller.signal).catch((failure) => { if (generation.current === token && !controller.signal.aborted) { setDisconnected({ turnId: turn.id, status: failure.status }); setProgress(""); } });
   }, []);
@@ -277,7 +277,7 @@ export function useConversation({ initialWorkspace, viewer }) {
       });
       if (turn?.status === "running") { setProgress("assistantExtra.progress.waiting"); observe(turn, token); }
       else setProgress("");
-      window.dispatchEvent(new Event("assistant-completed"));
+      notifyAssistantRunsChanged();
     } catch (failure) {
       if (generation.current === token) setSubmissionFailure({ body, trip, status: failure.status, code: failure.code,
         message: failure.status && failure.status < 500 ? failure.message : "assistantExtra.answerStartFailed" });
@@ -316,6 +316,7 @@ export function useConversation({ initialWorkspace, viewer }) {
       setTurns((items) => items.map((item) => item.id === turn.id ? replacement : item));
       if (replacement.status === "running") { setProgress("assistantExtra.progress.waiting"); observe(replacement, token); }
       else setProgress("");
+      notifyAssistantRunsChanged();
       return true;
     } catch (failure) {
       if (generation.current === token) setError(failure.message);
@@ -346,7 +347,7 @@ export function useConversation({ initialWorkspace, viewer }) {
       const result = await apiJson(`/api/v1/assistant/runs/${turn.id}`, { method: "POST" });
       if (generation.current !== token) return;
       streamController.current?.abort(); setProgress(""); setTurns((items) => items.map((item) => item.id === turn.id ? result : item));
-      window.dispatchEvent(new Event("assistant-completed"));
+      notifyAssistantRunsChanged();
     } catch (failure) { if (generation.current === token) setError(failure.message); }
   };
   const history = async (more = false) => {

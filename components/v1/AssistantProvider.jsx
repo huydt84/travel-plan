@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import Dialog, { DialogTitle } from "../ui/Dialog";
 import { useCompanionWidth } from "./useCompanionWidth";
-import { apiJson } from "./transport.mjs";
+import { apiJson, ASSISTANT_RUNS_CHANGED_EVENT } from "./transport.mjs";
 import styles from "./companion.module.css";
 import { useLocale } from "../LocaleProvider";
 function WorkspaceLoading() {
@@ -13,6 +13,8 @@ function WorkspaceLoading() {
 }
 const Workspace = dynamic(() => import("./AssistantWorkspace"), { loading: WorkspaceLoading });
 const AssistantContext = createContext(null);
+const ACTIVE_RUN_POLL_INTERVAL_MS = 5_000;
+const REFRESH_RETRY_DELAYS_MS = [5_000, 15_000, 30_000];
 export const useAssistantNavigation = () => useContext(AssistantContext);
 // Isolate URL suspension from the existing page. The tracker must never be
 // duplicated or hidden while Next resolves the assistant's query parameters.
@@ -62,11 +64,31 @@ export default function AssistantProvider({ viewer, children }) {
   useEffect(() => {
     if (!enabled) return;
     let active = true;
+    let timer = null;
+    let inFlight = false;
+    let refreshQueued = false;
+    let failureCount = 0;
     const controller = new AbortController();
+    const canRefresh = () => document.visibilityState === "visible" && navigator.onLine !== false;
+    const clearTimer = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      timer = null;
+    };
+    const schedule = (delay) => {
+      clearTimer();
+      if (!active || !canRefresh()) return;
+      timer = window.setTimeout(() => { timer = null; void refresh(); }, delay);
+    };
     const refresh = async () => {
+      if (!active || !canRefresh()) return;
+      if (inFlight) return;
+      inFlight = true;
+      clearTimer();
       try {
         const runs = await apiJson("/api/v1/assistant/runs", { signal: controller.signal });
         if (!active) return;
+        if (!Array.isArray(runs)) throw new Error("Invalid assistant run summary response");
+        failureCount = 0;
         window.dispatchEvent(new CustomEvent("assistant-runs", { detail: runs }));
         const key = `assistant:${viewer.email}:seen`;
         let seen = [];
@@ -78,11 +100,52 @@ export default function AssistantProvider({ viewer, children }) {
           try { localStorage.setItem(key, JSON.stringify(seen)); } catch { /* No notification permission needed. */ }
         }
         setCount(completed.filter((run) => !seen.includes(run.id)).length);
-      } catch { /* Background badges never interrupt the main trip. */ }
+        if (runs.some((run) => run.status === "running")) schedule(ACTIVE_RUN_POLL_INTERVAL_MS);
+      } catch {
+        if (!active || controller.signal.aborted) return;
+        const delay = REFRESH_RETRY_DELAYS_MS[failureCount++];
+        if (delay !== undefined) schedule(delay);
+      } finally {
+        inFlight = false;
+        if (refreshQueued) {
+          refreshQueued = false;
+          if (active && canRefresh()) void refresh();
+        }
+      }
     };
-    void refresh(); const timer = setInterval(refresh, 5000);
-    window.addEventListener("assistant-completed", refresh);
-    return () => { active = false; controller.abort(); clearInterval(timer); window.removeEventListener("assistant-completed", refresh); };
+    const refreshNow = () => {
+      failureCount = 0;
+      clearTimer();
+      if (!inFlight) void refresh();
+    };
+    const invalidate = () => {
+      failureCount = 0;
+      clearTimer();
+      if (inFlight) refreshQueued = true;
+      else void refresh();
+    };
+    const visibilityChanged = () => {
+      if (canRefresh()) refreshNow();
+      else clearTimer();
+    };
+    const wentOffline = () => clearTimer();
+    void refresh();
+    window.addEventListener(ASSISTANT_RUNS_CHANGED_EVENT, invalidate);
+    window.addEventListener("focus", refreshNow);
+    window.addEventListener("online", refreshNow);
+    window.addEventListener("offline", wentOffline);
+    document.addEventListener("visibilitychange", visibilityChanged);
+    return () => {
+      active = false;
+      refreshQueued = false;
+      controller.abort();
+      clearTimer();
+      window.removeEventListener(ASSISTANT_RUNS_CHANGED_EVENT, invalidate);
+      window.removeEventListener("focus", refreshNow);
+      window.removeEventListener("online", refreshNow);
+      window.removeEventListener("offline", wentOffline);
+      document.removeEventListener("visibilitychange", visibilityChanged);
+    };
   }, [enabled, viewer?.email, visible, pathname]);
   const open = (trip) => {
     setClosing(false);
