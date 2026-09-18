@@ -7,6 +7,7 @@ import Button from "../ui/Button";
 import { useId, useRef, useState } from "react";
 import { calendarDayDifference } from "../../lib/trip-dates.mjs";
 import { normalizeScheduleRefs } from "../../lib/schedule-editor-state.mjs";
+import { EDITOR_ACTIVITY_TYPES } from "../../lib/activity-types.mjs";
 import { ActionIcon } from "../Icons";
 import { requestJson as api } from "../../lib/request-json.mjs";
 
@@ -179,29 +180,26 @@ export function ScheduleForm({
   onCancel,
 }) {
   const { t } = useLocale();
-  const ACTIVITY_TYPES = [
-    { value: "Transit", label: t("adminExtra.message175"), icon: "🚆" },
-    { value: "Walk", label: t("adminExtra.message176"), icon: "🚶" },
-    { value: "Visit", label: t("adminExtra.message234"), icon: "📍" },
-    { value: "Film", label: t("adminExtra.message177"), icon: "🎬📷" },
-    { value: "Buffer", label: t("adminExtra.message178"), icon: "🧊" },
-    { value: "Rest", label: t("adminExtra.message179"), icon: "☕" },
-    { value: "Cafe", label: t("adminExtra.message180"), icon: "☕" },
-    { value: "Lunch", label: t("adminExtra.message181"), icon: "🍜" },
-    { value: "Dinner", label: t("adminExtra.message182"), icon: "🍽️" },
-    { value: "Picnic", label: t("adminExtra.message183"), icon: "🧺" },
-    { value: "Indoor", label: t("adminExtra.message184"), icon: "🏠" },
-  ];
+  const ACTIVITY_TYPES = EDITOR_ACTIVITY_TYPES.map((option) => ({
+    ...option,
+    label: t(option.labelKey),
+  }));
   const ACTIVITY_ICONS = [
     { value: "🚆", label: t("adminExtra.message185") },
     { value: "🚃", label: t("adminExtra.message186") },
     { value: "🚶", label: t("adminExtra.message176") },
     { value: "📍", label: t("adminExtra.message171") },
+    { value: "🤝", label: t("adminExtra.message242") },
+    { value: "🎭", label: t("adminExtra.message236") },
+    { value: "🎉", label: t("adminExtra.message239") },
     { value: "🎬📷", label: t("adminExtra.message177") },
+    { value: "🌿", label: t("adminExtra.message240") },
+    { value: "🪑", label: t("adminExtra.message241") },
     { value: "🧊", label: t("adminExtra.message178") },
     { value: "☕", label: t("adminExtra.message187") },
     { value: "🍜", label: t("adminExtra.message188") },
     { value: "🍽️", label: t("adminExtra.message189") },
+    { value: "📞", label: t("adminExtra.message235") },
     { value: "🧺", label: t("adminExtra.message190") },
     { value: "🏠", label: t("adminExtra.message184") },
     { value: "⛩️", label: t("adminExtra.message191") },

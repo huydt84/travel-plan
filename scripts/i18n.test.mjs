@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { getIntlLocale, localeMessages, normalizeLocale, translate, translateActivityType } from "../lib/i18n.mjs";
+import { EDITOR_ACTIVITY_TYPES } from "../lib/activity-types.mjs";
 import { formatDateLabel } from "../lib/trip-dates.mjs";
 import { relativeTripDateLabel } from "../lib/trip-date-label.mjs";
 
@@ -76,7 +77,7 @@ test("interpolation preserves placeholder-like and dollar text in authored value
 });
 
 test("all editor activity types have Japanese labels and custom types stay unchanged", () => {
-  for (const type of ["Transit", "Walk", "Visit", "Film", "Buffer", "Rest", "Cafe", "Lunch", "Dinner", "Picnic", "Indoor"]) {
+  for (const { value: type } of EDITOR_ACTIVITY_TYPES) {
     assert.notEqual(translateActivityType("ja", type), type);
   }
   assert.equal(translateActivityType("ja", "My custom type"), "My custom type");

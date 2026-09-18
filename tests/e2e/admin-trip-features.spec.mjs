@@ -21,6 +21,10 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
     const activityForm = page.locator(".schedule-create-editor");
     await activityForm.getByLabel("Bắt đầu", { exact: true }).fill("23:50");
     await activityForm.getByLabel("Kết thúc", { exact: true }).fill("23:55");
+    for (const [type, icon] of [["Reservation", "📞"], ["Show", "🎭"], ["Festival", "🎉"], ["Relax", "🌿"], ["Break", "🪑"], ["Meet", "🤝"]]) {
+      await activityForm.getByLabel("Loại").selectOption(type);
+      await expect(activityForm.getByLabel("Icon")).toHaveValue(icon);
+    }
     await activityForm.getByLabel("Loại").selectOption("Picnic");
     await expect(activityForm.getByLabel("Icon")).toHaveValue("🧺");
     await activityForm.getByLabel("Tiêu đề").fill(activityTitle);
