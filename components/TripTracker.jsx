@@ -152,8 +152,8 @@ export default function TripTracker({
   );
 
   const refreshItinerary = useCallback(
-    () =>
-      fetch(`/api/itinerary?slug=${encodeURIComponent(initialData.trip.slug)}`)
+    (signal) =>
+      fetch(`/api/itinerary?slug=${encodeURIComponent(initialData.trip.slug)}`, { signal })
         .then((response) =>
           response.ok
             ? response.json()
@@ -292,15 +292,35 @@ export default function TripTracker({
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
-    const poll = window.setInterval(() => {
-      if (document.visibilityState === "visible") refreshItinerary();
-    }, 30_000);
-    refreshItinerary();
-    window.addEventListener("assistant-resources-changed", refreshItinerary);
+    let active = true, inFlight = false, refreshQueued = false;
+    const controller = new AbortController();
+    const canRefresh = () => document.visibilityState === "visible" && navigator.onLine !== false;
+    const refresh = async (queueIfBusy = false) => {
+      if (!active || !canRefresh()) return;
+      if (inFlight) { if (queueIfBusy) refreshQueued = true; return; }
+      inFlight = true;
+      try { await refreshItinerary(controller.signal); }
+      finally {
+        inFlight = false;
+        if (refreshQueued) { refreshQueued = false; if (active && canRefresh()) void refresh(); }
+      }
+    };
+    const refreshNow = () => { void refresh(); };
+    const refreshAfterLocalChange = () => { void refresh(true); };
+    const refreshWhenVisible = () => { if (canRefresh()) refreshNow(); };
+    window.addEventListener("assistant-resources-changed", refreshAfterLocalChange);
+    window.addEventListener("focus", refreshNow);
+    window.addEventListener("online", refreshNow);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
-      window.removeEventListener("assistant-resources-changed", refreshItinerary);
+      active = false;
+      refreshQueued = false;
+      controller.abort();
+      window.removeEventListener("assistant-resources-changed", refreshAfterLocalChange);
+      window.removeEventListener("focus", refreshNow);
+      window.removeEventListener("online", refreshNow);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
       window.clearInterval(timer);
-      window.clearInterval(poll);
     };
   }, [initialData.trip.slug, refreshItinerary]);
 

@@ -10,7 +10,6 @@ import Dialog, { DialogTitle } from "./ui/Dialog";
 import { useLocale } from "./LocaleProvider";
 
 const PANEL_ID = "viewer-notification-panel";
-const POLL_INTERVAL = 45_000;
 const NOTIFICATION_NAVIGATION_EVENT = "travel-plan:notification-navigation";
 
 const relativeTime = (value, locale) => {
@@ -91,15 +90,17 @@ export default function NotificationCenter() {
   const triggerRef = useRef(null);
   const restoreFocusRef = useRef(true);
   const headingRef = useRef(null);
+  const passiveRefreshRef = useRef(() => {});
 
   const loadNotifications = useCallback(
-    async ({ cursor = null, append = false, quiet = false } = {}) => {
+    async ({ cursor = null, append = false, quiet = false, signal } = {}) => {
       if (!quiet) append ? setLoadingMore(true) : setLoading(true);
       try {
         const query = new URLSearchParams({ limit: "30" });
         if (cursor) query.set("cursor", cursor);
         const response = await fetch(`/api/notifications?${query}`, {
           cache: "no-store",
+          signal,
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok)
@@ -119,6 +120,7 @@ export default function NotificationCenter() {
         setNextCursor(result.nextCursor);
         setError("");
       } catch (loadError) {
+        if (signal?.aborted) return;
         if (!quiet) setError(loadError.message);
       } finally {
         if (!quiet) {
@@ -131,22 +133,33 @@ export default function NotificationCenter() {
   );
 
   useEffect(() => {
-    const initialLoad = window.setTimeout(() => loadNotifications(), 0);
-    return () => window.clearTimeout(initialLoad);
-  }, [loadNotifications]);
-
-  useEffect(() => {
-    const refresh = () => {
-      if (document.visibilityState === "visible")
-        loadNotifications({ quiet: true });
+    let active = true, inFlight = false, hasLoaded = false;
+    const controller = new AbortController();
+    const canRefresh = () => document.visibilityState === "visible" && navigator.onLine !== false;
+    const refresh = async (quiet = true) => {
+      if (!active || !canRefresh() || inFlight) return;
+      inFlight = true;
+      try { await loadNotifications({ quiet, signal: controller.signal }); }
+      finally {
+        inFlight = false;
+        if (active) hasLoaded = true;
+      }
     };
-    const timer = window.setInterval(refresh, POLL_INTERVAL);
-    document.addEventListener("visibilitychange", refresh);
-    window.addEventListener("focus", refresh);
+    const refreshLatest = () => { void refresh(hasLoaded); };
+    const refreshWhenVisible = () => { if (canRefresh()) refreshLatest(); };
+    passiveRefreshRef.current = refreshLatest;
+    const initialLoad = window.setTimeout(() => { void refresh(false); }, 0);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshLatest);
+    window.addEventListener("online", refreshLatest);
     return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", refresh);
-      window.removeEventListener("focus", refresh);
+      active = false;
+      controller.abort();
+      window.clearTimeout(initialLoad);
+      passiveRefreshRef.current = () => {};
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshLatest);
+      window.removeEventListener("online", refreshLatest);
     };
   }, [loadNotifications]);
 
@@ -241,6 +254,7 @@ export default function NotificationCenter() {
         }
         onClick={() => {
           restoreFocusRef.current = true;
+          if (!open && !error) passiveRefreshRef.current();
           setOpen((current) => !current);
         }}
       >
