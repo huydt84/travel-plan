@@ -28,3 +28,19 @@ test("source updates accept partial title or URL changes", () => {
   });
   assert.throws(() => parseSourceInput({}, { partial: true }), /At least one source field is required/);
 });
+
+test("reservation contact rows accept optional phone and link fields", () => {
+  const input = parseScheduleInput({
+    startDate: "2030-01-01", start: "09:00", endDate: "2030-01-01", end: "10:00",
+    type: "Reservation", icon: "📞", title: "Book dinner", detail: "", refs: [],
+    reservationContacts: [
+      { name: "Restaurant", phone: "03-1234-5678", link: "https://example.com/book" },
+      { name: "Hotel", phone: "", link: "" },
+    ],
+  });
+  assert.deepEqual(input.reservationContacts, [
+    { name: "Restaurant", phone: "03-1234-5678", link: "https://example.com/book" },
+    { name: "Hotel", phone: "", link: "" },
+  ]);
+  assert.throws(() => parseScheduleInput({ ...input, reservationContacts: [{ name: "Restaurant", link: "javascript:alert(1)" }] }), /valid HTTP or HTTPS URL/);
+});

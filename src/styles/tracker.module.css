@@ -475,14 +475,17 @@
 .contact-directory {
   composes: contact-directory from global;
   display: grid;
-  grid-template-columns: minmax(112px, 1fr) auto 42px;
-  max-width: 560px;
+  grid-template-columns: minmax(112px, 1fr) auto auto 42px;
+  max-width: 680px;
   border: 1px solid var(--navy);
   background: var(--paper-bright);
 }
 .contact-directory-station {
   composes: contact-directory-station from global;
   margin: 30px 0 0 76px;
+}
+.now-detail + .contact-directory-station {
+  margin-top: 14px;
 }
 .contact-directory-row {
   composes: contact-directory-row from global;
@@ -522,6 +525,36 @@
 .contact-directory-phone:hover {
   color: var(--navy);
   background: var(--yellow-soft);
+}
+.contact-directory-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 13px;
+  border-left: 1px solid var(--line);
+  color: var(--green-dark);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+.contact-directory-link:hover {
+  color: var(--navy);
+  background: var(--yellow-soft);
+}
+.contact-directory-link :global(.action-icon) {
+  width: 14px;
+  height: 14px;
+}
+.contact-directory-empty {
+  min-width: 0;
+  border-left: 1px solid var(--line);
+}
+.contact-directory-empty-action {
+  min-width: 42px;
+  border-left: 1px solid var(--line);
 }
 .contact-directory-row button {
   display: grid;
@@ -1525,6 +1558,9 @@
     font-size: 11px;
     line-height: 1.55;
   }
+  .mobile-foldout-detail + .contact-directory-mobile {
+    margin-top: 12px;
+  }
   .contact-directory {
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -1534,12 +1570,31 @@
     font-size: 15px;
   }
   .contact-directory-phone {
+    grid-column: 1;
     min-height: 44px;
     padding: 8px;
     border-left: 0;
     font-size: 14px;
   }
+  .contact-directory-link {
+    grid-column: 1;
+    min-height: 44px;
+    padding: 8px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+  .contact-directory-empty {
+    display: none;
+  }
+  .contact-directory-empty-action {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+    min-width: 44px;
+    border-left: 1px solid var(--line);
+  }
   .contact-directory-row button {
+    grid-column: 2;
+    grid-row: 2 / span 2;
     min-width: 44px;
     min-height: 44px;
   }

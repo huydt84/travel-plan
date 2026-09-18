@@ -23,6 +23,14 @@ test("rejects backwards same-day and multi-day activity intervals", () => {
   assert.throws(() => validateActivityInterval({ startDate: "2030-01-01", start: "09:00", endDate: "2030-01-03", end: "10:00" }));
 });
 
+test("allows booking activities outside the trip while keeping ordinary activities in range", () => {
+  const trip = { startDate: "2030-04-10", endDate: "2030-04-12" };
+  const outside = { startDate: "2030-04-01", start: "09:00", endDate: "2030-04-01", end: "09:30" };
+  assert.equal(validateActivityInterval({ ...outside, type: "Reservation" }, { trip }), true);
+  assert.equal(validateActivityInterval({ ...outside, type: "FlightBooking" }, { trip }), true);
+  assert.throws(() => validateActivityInterval({ ...outside, type: "Visit" }, { trip }), /trip date range/);
+});
+
 test("rejects nonexistent DST wall times", () => {
   assert.throws(() => zonedDateTime("2030-03-10", "02:30", "America/New_York"), /does not exist/);
 });

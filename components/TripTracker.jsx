@@ -836,6 +836,7 @@ export default function TripTracker({
         data.trip.endDate,
         locale,
       );
+  const activeReservationContacts = state.current?.reservationContacts || [];
   const isAfter = state.mode === "after";
   const isPreview = state.mode === "preview";
   const showCountdown = !isAfter && !isPreview;
@@ -1077,7 +1078,9 @@ export default function TripTracker({
                   </div>
                 )}
               </div>
-              {detail && <ActivityDetail detail={detail} placement="station" />}
+              {(detail || activeReservationContacts.length > 0) && (
+                <ActivityDetail detail={detail} contacts={activeReservationContacts} placement="station" />
+              )}
               {!isAfter && state.current.refs.length > 0 && (
                 <div className={trackerStyles["citations"]}>
                   {state.current.refs.map((ref) => (
@@ -1214,8 +1217,8 @@ export default function TripTracker({
                           <small>{countdown.unit}</small>
                         </div>
                       )}
-                      {detail && (
-                        <ActivityDetail detail={detail} placement="mobile" />
+                      {(detail || item.reservationContacts?.length > 0) && (
+                        <ActivityDetail detail={detail} contacts={item.reservationContacts} placement="mobile" />
                       )}
                       {!isAfter && item.refs.length > 0 && (
                         <div className={trackerStyles["citations"]}>
@@ -1447,9 +1450,10 @@ export default function TripTracker({
                       </div>
                     </div>
                     <h3>{item.title}</h3>
-                    {item.detail && (
+                    {(item.detail || item.reservationContacts?.length > 0) && (
                       <ActivityDetail
                         detail={item.detail}
+                        contacts={item.reservationContacts}
                         placement="timeline"
                       />
                     )}
@@ -1674,9 +1678,10 @@ function BranchJunction({
                             {translateActivityType(locale, item.type)}
                           </span>
                           <h4>{item.title}</h4>
-                          {item.detail && (
+                          {(item.detail || item.reservationContacts?.length > 0) && (
                             <ActivityDetail
                               detail={item.detail}
+                              contacts={item.reservationContacts}
                               placement="branch"
                             />
                           )}
@@ -1727,21 +1732,25 @@ function BranchJunction({
   );
 }
 
-function ActivityDetail({ detail, placement }) {
-  const contacts = parseContactDirectory(detail);
+function ActivityDetail({ detail, contacts: structuredContacts, placement }) {
+  const hasStructuredContacts = structuredContacts?.length > 0;
+  const contacts = hasStructuredContacts ? structuredContacts : parseContactDirectory(detail);
+  const className =
+    placement === "station"
+      ? trackerStyles["now-detail"]
+      : placement === "mobile"
+        ? trackerStyles["mobile-foldout-detail"]
+        : undefined;
   if (!contacts) {
-    const className =
-      placement === "station"
-        ? trackerStyles["now-detail"]
-        : placement === "mobile"
-          ? trackerStyles["mobile-foldout-detail"]
-          : undefined;
-    return <p className={className}>{detail}</p>;
+    return detail ? <p className={className}>{detail}</p> : null;
   }
-  return <ContactDirectory contacts={contacts} placement={placement} />;
+  return <>
+    {hasStructuredContacts && detail ? <p className={className}>{detail}</p> : null}
+    <ContactDirectory contacts={contacts} placement={placement} structured={hasStructuredContacts} />
+  </>;
 }
 
-function ContactDirectory({ contacts, placement }) {
+function ContactDirectory({ contacts, placement, structured = false }) {
   const { t } = useLocale();
   const [copyState, setCopyState] = useState({ phone: null, status: "idle" });
   const resetTimerRef = useRef(null);
@@ -1767,7 +1776,7 @@ function ContactDirectory({ contacts, placement }) {
   return (
     <div
       className={`${trackerStyles["contact-directory"]} ${trackerStyles[`contact-directory-${placement}`]}`}
-      aria-label={t("trackerExtra.phones")}
+      aria-label={t(structured ? "trackerExtra.reservationContacts" : "trackerExtra.phones")}
     >
       {contacts.map((contact) => {
         const state =
@@ -1781,19 +1790,27 @@ function ContactDirectory({ contacts, placement }) {
         return (
           <div
             className={trackerStyles["contact-directory-row"]}
-            key={`${contact.name}-${contact.phone}`}
+            key={`${contact.name}-${contact.phone || ""}-${contact.link || ""}`}
           >
             <span className={trackerStyles["contact-directory-name"]}>
               {contact.name}
             </span>
-            <a
+            {contact.phone ? <a
               className={trackerStyles["contact-directory-phone"]}
-              href={`tel:${contact.dial}`}
+              href={`tel:${contact.dial || contact.phone.replace(/(?!^)\+/g, "").replace(/[^\d+]/g, "")}`}
               aria-label={t("trackerExtra.call", { name: contact.name, phone: contact.phone })}
+            >{contact.phone}</a> : <span className={trackerStyles["contact-directory-empty"]} />}
+            {contact.link ? <a
+              className={trackerStyles["contact-directory-link"]}
+              href={contact.link}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={t("trackerExtra.openReservationLink", { name: contact.name })}
             >
-              {contact.phone}
-            </a>
-            <button
+              {t("trackerExtra.reservationLink")}
+              <ActionIcon name="external" />
+            </a> : <span className={trackerStyles["contact-directory-empty"]} />}
+            {contact.phone ? <button
               className={
                 state === "copied"
                   ? "is-copied"
@@ -1807,7 +1824,7 @@ function ContactDirectory({ contacts, placement }) {
               onClick={() => copyPhone(contact)}
             >
               <ActionIcon name={state === "copied" ? "check" : "copy"} />
-            </button>
+            </button> : <span className={trackerStyles["contact-directory-empty-action"]} />}
           </div>
         );
       })}

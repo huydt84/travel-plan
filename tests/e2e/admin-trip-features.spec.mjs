@@ -74,6 +74,65 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
   }
 });
 
+test("booking activities can live outside the trip and reservation contacts remain editable", async ({ page, request }) => {
+  const runId = Date.now();
+  const slug = `booking-features-${runId}`;
+  let reservationId;
+
+  try {
+    expect((await request.post("/api/trips", { data: { slug, title: "Booking features", startDate: "2030-04-10", endDate: "2030-04-12", timezone: "Asia/Tokyo", location: "Tokyo" } })).status()).toBe(201);
+    const reservationResponse = await request.post(`/api/trips/${slug}/schedule`, { data: {
+      startDate: "2030-04-01", start: "09:00", endDate: "2030-04-01", end: "09:30",
+      title: "Reserve dinner", type: "Reservation", icon: "📞", detail: "", refs: [],
+      reservationContacts: [{ name: "Long restaurant name for responsive layout", phone: "03-1234-5678", link: "https://example.com/book" }],
+    } });
+    expect(reservationResponse.status()).toBe(201);
+    reservationId = (await reservationResponse.json()).id;
+    expect((await request.post(`/api/trips/${slug}/schedule`, { data: {
+      startDate: "2030-03-20", start: "10:00", endDate: "2030-03-20", end: "10:15",
+      title: "Book flight", type: "FlightBooking", icon: "✈️", detail: "", refs: [], reservationContacts: [],
+    } })).status()).toBe(201);
+    expect((await request.post(`/api/trips/${slug}/schedule`, { data: {
+      startDate: "2030-04-01", start: "12:00", endDate: "2030-04-01", end: "13:00",
+      title: "Outside visit", type: "Visit", icon: "📍", detail: "", refs: [], reservationContacts: [],
+    } })).status()).toBe(400);
+    expect((await request.patch(`/api/trips/${slug}`, { data: {
+      startDate: "2030-05-10", endDate: "2030-05-12",
+    } })).status()).toBe(200);
+
+    await gotoHealthy(page, `/admin/trips?trip=${slug}`);
+    const row = page.locator(".admin-schedule-item", { has: page.getByRole("heading", { name: "Reserve dinner" }) });
+    await row.getByRole("button", { name: "Sửa" }).click();
+    const form = row.locator(".schedule-inline-editor");
+    await expect(form.getByText("Mục đặt chỗ và đặt vé máy bay có thể nằm ngoài ngày của chuyến đi.")).toBeVisible();
+    await expect(form.getByLabel("Tên")).toHaveValue("Long restaurant name for responsive layout");
+    await expect(form.getByLabel("Số điện thoại (không bắt buộc)")).toHaveValue("03-1234-5678");
+    await expect(form.getByLabel("Liên kết (không bắt buộc)")).toHaveValue("https://example.com/book");
+
+    for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+      await page.setViewportSize(viewport);
+      await form.scrollIntoViewIfNeeded();
+      const bounds = await form.locator("fieldset").filter({ hasText: "Thông tin đặt chỗ" }).evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, width: window.innerWidth };
+      });
+      expect(bounds.left).toBeGreaterThanOrEqual(0);
+      expect(bounds.right).toBeLessThanOrEqual(bounds.width);
+    }
+
+    await form.getByLabel("Số điện thoại (không bắt buộc)").fill("050-9999-0000");
+    await form.getByLabel("Liên kết (không bắt buộc)").fill("https://example.org/updated");
+    await form.getByRole("button", { name: "Lưu thay đổi" }).click();
+    await expect(page.getByRole("status")).toContainText("Đã lưu thay đổi hoạt động");
+    const plan = await (await request.get(`/api/trips/${slug}`)).json();
+    expect(plan.backbone.find((item) => item.id === reservationId)?.reservationContacts).toEqual([
+      { name: "Long restaurant name for responsive layout", phone: "050-9999-0000", link: "https://example.org/updated" },
+    ]);
+  } finally {
+    await request.delete(`/api/trips/${slug}`);
+  }
+});
+
 for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) test(`admin can see and CRUD assistant-saved places at ${width}`, async ({ page, request }, testInfo) => {
   const runId = Date.now();
   const slug = `admin-places-${runId}`;

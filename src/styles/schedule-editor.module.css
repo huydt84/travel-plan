@@ -697,6 +697,11 @@
 .schedule-editor > .schedule-form-grid {
   grid-column: 1;
 }
+.schedule-editor > .booking-date-hint,
+.schedule-editor > .reservation-contacts,
+.schedule-editor > .overnight-note {
+  grid-column: 1;
+}
 .schedule-editor > .source-picker {
   grid-column: 2;
   grid-row: 2;
@@ -782,6 +787,100 @@
 .schedule-time-field input {
   cursor: pointer;
   font-variant-numeric: tabular-nums;
+}
+.booking-date-hint {
+  margin: -5px 0 0;
+  color: var(--green-dark);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.reservation-contacts {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--navy);
+  background: var(--paper-bright);
+}
+.reservation-contacts > legend {
+  padding-inline: 5px;
+  color: var(--navy);
+  font: 700 14px/1.2 var(--body);
+}
+.reservation-contacts > p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.reservation-contact-table {
+  margin-bottom: 10px;
+  border-top: 1px solid var(--navy);
+  border-inline: 1px solid var(--navy);
+}
+.reservation-contact-header,
+.reservation-contact-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(140px, 0.8fr) minmax(160px, 1.2fr) 44px;
+  min-width: 0;
+  border-bottom: 1px solid var(--navy);
+}
+.reservation-contact-header {
+  color: var(--navy);
+  background: var(--paper-deep);
+  font-size: 9px;
+  font-weight: 700;
+}
+.reservation-contact-header > span {
+  min-width: 0;
+  padding: 8px 9px;
+  overflow-wrap: anywhere;
+  border-inline-end: 1px solid var(--line);
+}
+.reservation-contact-row > label {
+  display: grid;
+  min-width: 0;
+  border-inline-end: 1px solid var(--line);
+}
+.reservation-contact-row > label > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.reservation-contact-row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  color: var(--navy);
+  background: white;
+  font-size: 12px;
+}
+.reservation-contact-row input:focus {
+  box-shadow: inset 0 0 0 2px var(--green);
+}
+.reservation-contact-row > button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  border: 0;
+  color: var(--red);
+  background: var(--red-soft);
+}
+.reservation-contact-row > button:hover {
+  color: var(--paper-bright);
+  background: var(--red);
+}
+.reservation-contact-row > button :global(.action-icon) {
+  width: 16px;
+  height: 16px;
 }
 .form-grid label small {
   color: var(--muted);
@@ -1246,7 +1345,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .schedule-editor > .schedule-form-grid,
-  .schedule-editor > .source-picker {
+  .schedule-editor > .source-picker,
+  .schedule-editor > .booking-date-hint,
+  .schedule-editor > .reservation-contacts,
+  .schedule-editor > .overnight-note {
     grid-column: 1;
     grid-row: auto;
   }
@@ -1448,6 +1550,39 @@
   }
   .source-picker-head {
     display: grid;
+  }
+  .reservation-contact-header {
+    display: none;
+  }
+  .reservation-contact-row {
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 0;
+  }
+  .reservation-contact-row > label {
+    grid-column: 1;
+    border-inline-end: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .reservation-contact-row > label > span {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: 7px 10px 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    color: var(--muted);
+    background: white;
+    font-size: 9px;
+    white-space: normal;
+  }
+  .reservation-contact-row input {
+    font-size: 16px;
+  }
+  .reservation-contact-row > button {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    height: 100%;
   }
   .source-picker-head :global(.admin-ghost) {
     justify-self: start;

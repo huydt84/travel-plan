@@ -62,6 +62,25 @@
   },
   "schedule": [
     {
+      "key": "restaurant-reservation",
+      "startDate": "2030-01-10",
+      "start": "10:00",
+      "endDate": "2030-01-10",
+      "end": "10:15",
+      "type": "Reservation",
+      "icon": "📞",
+      "title": "Confirm restaurant reservation",
+      "detail": "Call before the trip if online confirmation has not arrived.",
+      "reservationContacts": [
+        {
+          "name": "Sample restaurant",
+          "phone": "+81 3-1234-5678",
+          "link": "https://example.com/reservation"
+        }
+      ],
+      "refs": [1]
+    },
+    {
       "key": "lunch",
       "startDate": "2030-01-15",
       "start": "12:00",

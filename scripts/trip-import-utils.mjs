@@ -77,10 +77,28 @@ export function normalizeTripImport(raw) {
     const startDate = item.startDate ? text(item.startDate, `${field}.startDate`, 10) : (singleDayTrip ? trip.startDate : null);
     const endDate = item.endDate ? text(item.endDate, `${field}.endDate`, 10) : (singleDayTrip ? trip.endDate : null);
     if (!startDate || !endDate) fail(`${field} must include startDate and endDate for a multi-day trip`);
-    try { validateActivityInterval({ startDate, start, endDate, end }, { trip }); }
+    const type = text(item.type, `${field}.type`, 40);
+    try { validateActivityInterval({ startDate, start, endDate, end, type }, { trip }); }
     catch (error) { fail(`${field}: ${error.message}`); }
     const refs = item.refs == null ? [] : item.refs;
     if (!Array.isArray(refs) || refs.some((ref) => !Number.isInteger(ref) || !sourceNumbers.has(ref))) fail(`${field}.refs must only contain source numbers declared in sources`);
+    const rawReservationContacts = item.reservationContacts ?? [];
+    if (!Array.isArray(rawReservationContacts) || rawReservationContacts.length > 50) fail(`${field}.reservationContacts must be an array with at most 50 entries`);
+    const reservationContacts = rawReservationContacts.map((value, index) => {
+      const contact = object(value, `${field}.reservationContacts[${index}]`);
+      const link = contact.link == null || contact.link === "" ? "" : text(contact.link, `${field}.reservationContacts[${index}].link`, 2000);
+      if (link) {
+        try {
+          const url = new URL(link);
+          if (!["http:", "https:"].includes(url.protocol)) throw new Error();
+        } catch { fail(`${field}.reservationContacts[${index}].link must be a valid HTTP or HTTPS URL`); }
+      }
+      return {
+        name: text(contact.name, `${field}.reservationContacts[${index}].name`, 160),
+        phone: contact.phone == null || contact.phone === "" ? "" : text(contact.phone, `${field}.reservationContacts[${index}].phone`, 80),
+        link,
+      };
+    });
     return {
       key: item.key ? text(item.key, `${field}.key`, 120) : null,
       startDate,
@@ -88,10 +106,11 @@ export function normalizeTripImport(raw) {
       endDate,
       end,
       displayEnd: item.displayEnd == null ? null : text(item.displayEnd, `${field}.displayEnd`, 20),
-      type: text(item.type, `${field}.type`, 40),
+      type,
       icon: text(item.icon, `${field}.icon`, 16),
       title: text(item.title, `${field}.title`, 240),
       detail: text(item.detail, `${field}.detail`, 2000),
+      reservationContacts,
       refs: [...new Set(refs)],
       branchGroup: allowBranch && item.branchGroup ? parseBranchGroup(item.branchGroup, `${field}.branchGroup`) : null,
     };

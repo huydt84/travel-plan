@@ -33,6 +33,7 @@ const existing = await sql`
     a.detail,
     a.icon,
     a.display_end,
+    a.reservation_contacts,
     branch_group.item_key AS branch_group_key,
     branch.item_key AS branch_key
   FROM trips t
@@ -65,6 +66,7 @@ const existingItems = existing.filter((row) => row.id).map((row) => ({
   detail: row.detail,
   icon: row.icon,
   displayEnd: row.display_end,
+  reservationContacts: row.reservation_contacts || [],
   branchGroupKey: row.branch_group_key,
   branchKey: row.branch_key,
 }));
@@ -75,7 +77,8 @@ const removed = existingItems.filter((item) => !after.has(item.key));
 const updated = importActivities.filter((item) => {
   const old = before.get(item.key);
   if (!old) return false;
-  return ["startDate", "start", "endDate", "end", "type", "title", "detail", "icon", "displayEnd", "branchGroupKey", "branchKey"].some((field) => (old[field] ?? null) !== (item[field] ?? null));
+  return ["startDate", "start", "endDate", "end", "type", "title", "detail", "icon", "displayEnd", "branchGroupKey", "branchKey"].some((field) => (old[field] ?? null) !== (item[field] ?? null))
+    || JSON.stringify(old.reservationContacts || []) !== JSON.stringify(item.reservationContacts || []);
 });
 
 const affectedSuggestions = removed.length ? await sql`

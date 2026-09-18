@@ -48,6 +48,7 @@ const emptySchedule = {
   icon: "📍",
   title: "",
   detail: "",
+  reservationContacts: [],
   refs: [],
 };
 const TRIP_START_BRANCH_ANCHOR = "trip-start";

@@ -201,6 +201,7 @@ export function ScheduleForm({
     { value: "🍜", label: t("adminExtra.message188") },
     { value: "🍽️", label: t("adminExtra.message189") },
     { value: "📞", label: t("adminExtra.message235") },
+    { value: "✈️", label: t("adminExtra.flightBooking") },
     { value: "🧺", label: t("adminExtra.message190") },
     { value: "🏠", label: t("adminExtra.message184") },
     { value: "⛩️", label: t("adminExtra.message191") },
@@ -237,6 +238,12 @@ export function ScheduleForm({
     onChange({
       ...values,
       type: nextType,
+      reservationContacts:
+        nextType === "Reservation" && !values.reservationContacts?.length
+          ? [{ name: "", phone: "", link: "" }]
+          : nextType === "Reservation"
+            ? values.reservationContacts
+            : [],
       icon:
         !values.icon || values.icon === currentDefaultIcon
           ? nextDefaultIcon
@@ -359,6 +366,17 @@ export function ScheduleForm({
           <textarea {...field("detail")} rows="3" />
         </label>
       </div>
+      {["Reservation", "FlightBooking"].includes(values.type) && (
+        <p className={scheduleEditorStyles["booking-date-hint"]}>
+          {t("adminExtra.bookingDateHint")}
+        </p>
+      )}
+      {values.type === "Reservation" && (
+        <ReservationContactsEditor
+          contacts={values.reservationContacts || []}
+          onChange={(reservationContacts) => onChange({ ...values, reservationContacts })}
+        />
+      )}
       {values.startDate &&
         values.endDate &&
         values.endDate !== values.startDate && (
@@ -398,6 +416,50 @@ export function ScheduleForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function ReservationContactsEditor({ contacts, onChange }) {
+  const { t } = useLocale();
+  const update = (index, field, value) => onChange(contacts.map((contact, rowIndex) =>
+    rowIndex === index ? { ...contact, [field]: value } : contact));
+  return (
+    <fieldset className={scheduleEditorStyles["reservation-contacts"]}>
+      <legend>{t("adminExtra.reservationContacts")}</legend>
+      <p>{t("adminExtra.reservationContactsHelp")}</p>
+      <div className={scheduleEditorStyles["reservation-contact-table"]}>
+        {contacts.length > 0 && (
+          <div className={scheduleEditorStyles["reservation-contact-header"]} aria-hidden="true">
+            <span>{t("adminExtra.reservationName")}</span>
+            <span>{t("adminExtra.reservationPhone")}</span>
+            <span>{t("adminExtra.reservationLink")}</span>
+            <span />
+          </div>
+        )}
+        {contacts.map((contact, index) => (
+          <div className={scheduleEditorStyles["reservation-contact-row"]} key={index}>
+            <label>
+              <span>{t("adminExtra.reservationName")}</span>
+              <input value={contact.name} maxLength={160} required onChange={(event) => update(index, "name", event.target.value)} />
+            </label>
+            <label>
+              <span>{t("adminExtra.reservationPhone")}</span>
+              <input type="tel" value={contact.phone} maxLength={80} onChange={(event) => update(index, "phone", event.target.value)} />
+            </label>
+            <label>
+              <span>{t("adminExtra.reservationLink")}</span>
+              <input type="url" value={contact.link} maxLength={2000} placeholder="https://" onChange={(event) => update(index, "link", event.target.value)} />
+            </label>
+            <button type="button" onClick={() => onChange(contacts.filter((_, rowIndex) => rowIndex !== index))} aria-label={t("adminExtra.removeReservationContact", { number: index + 1 })}>
+              <ActionIcon name="close" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="ghost" onClick={() => onChange([...contacts, { name: "", phone: "", link: "" }])}>
+        {t("adminExtra.addReservationContact")}
+      </Button>
+    </fieldset>
   );
 }
 
