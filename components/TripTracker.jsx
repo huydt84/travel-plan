@@ -31,6 +31,7 @@ import {
 import { getTripPageTitle } from "../lib/trip-page-title.mjs";
 import { getTripTrackerState } from "../lib/trip-tracker-state.mjs";
 import {
+  addCalendarDays,
   activityInstants,
   enumerateTripDays,
   formatDateLabel,
@@ -51,6 +52,15 @@ import { requestJson as api } from "../lib/request-json.mjs";
 import { normalizeScheduleRefs } from "../lib/schedule-editor-state.mjs";
 
 const NOTIFICATION_NAVIGATION_EVENT = "travel-plan:notification-navigation";
+const PREPARATION_SECTION = "preparation";
+const POST_TRIP_SECTION = "post-trip";
+
+const scheduleSectionForDate = (date, startDate, endDate) => {
+  if (date < startDate) return PREPARATION_SECTION;
+  if (date > endDate) return POST_TRIP_SECTION;
+  return date;
+};
+
 const EMPTY_SCHEDULE = {
   startDate: "",
   start: "",
@@ -205,15 +215,32 @@ export default function TripTracker({
     return source;
   };
 
-  const openNewScheduleEditor = (trigger) =>
+  const openNewScheduleEditor = (trigger) => {
+    const selectedDates = itinerary
+      .filter(
+        (item) =>
+          scheduleSectionForDate(
+            item.startDate,
+            data.trip.startDate,
+            data.trip.endDate,
+          ) === selectedDay,
+      )
+      .map((item) => item.startDate);
+    const date =
+      selectedDay === PREPARATION_SECTION
+        ? selectedDates.at(-1) || addCalendarDays(data.trip.startDate, -1)
+        : selectedDay === POST_TRIP_SECTION
+          ? selectedDates[0] || addCalendarDays(data.trip.endDate, 1)
+          : selectedDay;
     activateScheduleEditor(
       {
         ...EMPTY_SCHEDULE,
-        startDate: selectedDay,
-        endDate: selectedDay,
+        startDate: date,
+        endDate: date,
       },
       trigger,
     );
+  };
 
   const selectTripDay = (date, trigger) =>
     guardScheduleDraft(
@@ -310,7 +337,15 @@ export default function TripTracker({
         data.itinerary.find(
           (item) => String(item.id) === String(contribution.activityId),
         );
-      if (activity?.startDate) setSelectedDay(activity.startDate);
+      if (activity?.startDate) {
+        setSelectedDay(
+          scheduleSectionForDate(
+            activity.startDate,
+            data.trip.startDate,
+            data.trip.endDate,
+          ),
+        );
+      }
       let attempts = 0;
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
@@ -344,7 +379,13 @@ export default function TripTracker({
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
     };
-  }, [data.itinerary, data.trip.slug, suggestions]);
+  }, [
+    data.itinerary,
+    data.trip.endDate,
+    data.trip.slug,
+    data.trip.startDate,
+    suggestions,
+  ]);
   const sourceMap = useMemo(
     () => new Map(data.sources.map((source) => [source.number, source])),
     [data.sources],
@@ -360,7 +401,11 @@ export default function TripTracker({
   const resolvedState = itinerary.length
     ? getTripTrackerState(now, itinerary)
     : null;
-  const liveDay = resolvedState?.anchor?.startDate || data.trip.startDate;
+  const liveDay = scheduleSectionForDate(
+    resolvedState?.anchor?.startDate || data.trip.startDate,
+    data.trip.startDate,
+    data.trip.endDate,
+  );
   useEffect(() => {
     setSelectedDay((current) =>
       current === previousLiveDayRef.current ? liveDay : current,
@@ -382,9 +427,54 @@ export default function TripTracker({
     () => enumerateTripDays(data.trip.startDate, data.trip.endDate),
     [data.trip.endDate, data.trip.startDate],
   );
+  const scheduleSections = useMemo(() => {
+    const preparationCount = itinerary.filter(
+      (item) => item.startDate < data.trip.startDate,
+    ).length;
+    const postTripCount = itinerary.filter(
+      (item) => item.startDate > data.trip.endDate,
+    ).length;
+    return [
+      ...(preparationCount
+        ? [{
+            key: PREPARATION_SECTION,
+            kicker: t("tracker.beforeTrip"),
+            label: t("tracker.preparation"),
+            count: preparationCount,
+          }]
+        : []),
+      ...tripDays.map((date, index) => ({
+        key: date,
+        kicker: t("tracker.day", { number: index + 1 }),
+        label: formatDateLabel(
+          date,
+          data.trip.timezone,
+          { weekday: "short", day: "2-digit", month: "2-digit" },
+          intlLocale,
+        ),
+        count: itinerary.filter((item) => item.startDate === date).length,
+      })),
+      ...(postTripCount
+        ? [{
+            key: POST_TRIP_SECTION,
+            kicker: t("tracker.afterTrip"),
+            label: t("tracker.postTrip"),
+            count: postTripCount,
+          }]
+        : []),
+    ];
+  }, [data.trip, intlLocale, itinerary, t, tripDays]);
   const selectedItinerary = useMemo(
-    () => itinerary.filter((item) => item.startDate === selectedDay),
-    [itinerary, selectedDay],
+    () =>
+      itinerary.filter(
+        (item) =>
+          scheduleSectionForDate(
+            item.startDate,
+            data.trip.startDate,
+            data.trip.endDate,
+          ) === selectedDay,
+      ),
+    [data.trip, itinerary, selectedDay],
   );
   const browsingDay = selectedDay !== liveDay;
   const previewItem = selectedItinerary[0] || null;
@@ -791,7 +881,12 @@ export default function TripTracker({
 
   if (state.mode === "preview") {
     status = t("tracker.previewing");
-    kicker = t("tracker.day", { number: tripDays.indexOf(selectedDay) + 1 });
+    kicker =
+      selectedDay === PREPARATION_SECTION
+        ? t("tracker.preparation")
+        : selectedDay === POST_TRIP_SECTION
+          ? t("tracker.postTrip")
+          : t("tracker.day", { number: tripDays.indexOf(selectedDay) + 1 });
     title = state.current.title;
     detail = state.current.detail;
     range = `${state.current.start} — ${state.current.endDate !== state.current.startDate ? `${formatDateLabel(state.current.endDate, data.trip.timezone, { weekday: "short", day: "2-digit", month: "2-digit" }, intlLocale)} · ` : ""}${state.current.displayEnd || state.current.end}`;
@@ -828,7 +923,11 @@ export default function TripTracker({
   }
 
   const scheduleHeading = browsingDay
-      ? `${t("tracker.day", { number: tripDays.indexOf(selectedDay) + 1 })} · ${formatDateLabel(selectedDay, data.trip.timezone, { weekday: "long", day: "2-digit", month: "2-digit" }, intlLocale)}`
+    ? selectedDay === PREPARATION_SECTION
+      ? t("tracker.preparation")
+      : selectedDay === POST_TRIP_SECTION
+        ? t("tracker.postTrip")
+        : `${t("tracker.day", { number: tripDays.indexOf(selectedDay) + 1 })} · ${formatDateLabel(selectedDay, data.trip.timezone, { weekday: "long", day: "2-digit", month: "2-digit" }, intlLocale)}`
     : formatScheduleHeading(
         data.trip.startDate,
         data.trip.timezone,
@@ -920,7 +1019,13 @@ export default function TripTracker({
       : null);
   const navigateToActivity = (item) => {
     if (!item) return;
-    setSelectedDay(item.startDate);
+    setSelectedDay(
+      scheduleSectionForDate(
+        item.startDate,
+        data.trip.startDate,
+        data.trip.endDate,
+      ),
+    );
     requestAnimationFrame(() =>
       document
         .getElementById(item.id)
@@ -937,27 +1042,20 @@ export default function TripTracker({
         aria-label={t("tracker.chooseDay")}
         ref={daySelectorRef}
       >
-        {tripDays.map((date, index) => {
-          const count = itinerary.filter(
-            (item) => item.startDate === date,
-          ).length;
+        {scheduleSections.map((section) => {
           return (
             <button
-              key={date}
+              key={section.key}
               type="button"
-              data-trip-day={date}
-              aria-current={selectedDay === date ? "date" : undefined}
-              onClick={(event) => selectTripDay(date, event.currentTarget)}
+              data-trip-day={section.key}
+              aria-current={selectedDay === section.key ? "date" : undefined}
+              onClick={(event) =>
+                selectTripDay(section.key, event.currentTarget)
+              }
             >
-              <span>{t("tracker.day", { number: index + 1 })}</span>
-              <strong>
-                {formatDateLabel(date, data.trip.timezone, {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "2-digit",
-                }, intlLocale)}
-              </strong>
-              <small>{count ? t("tracker.activities", { count }) : t("tracker.noSchedule")}</small>
+              <span>{section.kicker}</span>
+              <strong>{section.label}</strong>
+              <small>{section.count ? t("tracker.activities", { count: section.count }) : t("tracker.noSchedule")}</small>
             </button>
           );
         })}
@@ -1364,7 +1462,14 @@ export default function TripTracker({
       {selectedItinerary.length > 0 && (
         <section
           className={trackerStyles["timeline"]}
-          aria-label={t("trackerExtra.detailSchedule", { date: selectedDay })}
+          aria-label={t("trackerExtra.detailSchedule", {
+            date:
+              selectedDay === PREPARATION_SECTION
+                ? t("tracker.preparation")
+                : selectedDay === POST_TRIP_SECTION
+                  ? t("tracker.postTrip")
+                  : selectedDay,
+          })}
         >
           {selectedDay === data.trip.startDate && startBranchGroup && (
             <div className={trackerStyles["trip-start-junction"]}>

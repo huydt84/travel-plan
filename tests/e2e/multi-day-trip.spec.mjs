@@ -65,6 +65,65 @@ test("creates and browses a multi-day route with an empty day and overnight stop
   }
 });
 
+test("groups activities outside the trip range into preparation and post-trip day tabs", async ({ page, request }) => {
+  const slug = `trip-boundary-tabs-${Date.now()}`;
+  const trip = {
+    slug,
+    title: "Chuyến đi có việc trước và sau",
+    startDate: "2032-04-10",
+    endDate: "2032-04-12",
+    timezone: "Asia/Tokyo",
+    location: "Tokyo",
+  };
+
+  expect((await request.post("/api/trips", { data: trip })).status()).toBe(201);
+  try {
+    for (const item of [
+      {
+        startDate: "2032-04-09", start: "12:00", endDate: "2032-04-09", end: "12:15",
+        type: "Reservation", icon: "📞", title: "Gọi đặt bàn", detail: "Chuẩn bị trước chuyến", refs: [],
+      },
+      {
+        startDate: "2032-04-10", start: "09:00", endDate: "2032-04-10", end: "10:00",
+        type: "Visit", icon: "📍", title: "Ngày đầu", detail: "Hoạt động trong chuyến", refs: [],
+      },
+      {
+        startDate: "2032-04-13", start: "09:00", endDate: "2032-04-13", end: "09:15",
+        type: "Reservation", icon: "📞", title: "Gửi lời cảm ơn", detail: "Việc sau chuyến", refs: [],
+      },
+    ]) {
+      expect((await request.post(`/api/trips/${slug}/schedule`, { data: item })).status()).toBe(201);
+    }
+
+    for (const viewport of [
+      { width: 320, height: 760 },
+      { width: 1440, height: 900 },
+      { width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await gotoHealthy(page, `/?trip=${slug}`);
+      const days = page.getByRole("navigation", { name: "Chọn ngày trong chuyến đi" });
+      const preparation = days.getByRole("button", { name: /Chuẩn bị/ });
+      const postTrip = days.getByRole("button", { name: /Sau chuyến đi/ });
+
+      await expect(days.getByRole("button")).toHaveCount(5);
+      await expect(preparation).toHaveAttribute("aria-current", "date");
+      await expect(page.getByRole("heading", { name: "Gọi đặt bàn", exact: true }).last()).toBeVisible();
+
+      await days.getByRole("button", { name: /Ngày 2/ }).click();
+      await preparation.click();
+      await expect(preparation).toHaveAttribute("aria-current", "date");
+      await expect(page.getByRole("heading", { name: "Gọi đặt bàn", exact: true }).last()).toBeVisible();
+
+      await postTrip.click();
+      await expect(postTrip).toHaveAttribute("aria-current", "date");
+      await expect(page.getByRole("heading", { name: "Gửi lời cảm ơn", exact: true }).last()).toBeVisible();
+    }
+  } finally {
+    await request.delete(`/api/trips/${slug}`);
+  }
+});
+
 test("admin trip form exposes a date range", async ({ page }) => {
   await gotoHealthy(page, "/admin/trips");
   await page.getByRole("complementary").getByRole("button", { name: "Thêm", exact: true }).click();
