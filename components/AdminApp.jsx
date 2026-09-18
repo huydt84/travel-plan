@@ -52,6 +52,13 @@ const emptySchedule = {
   refs: [],
 };
 const TRIP_START_BRANCH_ANCHOR = "trip-start";
+const pushSelectedTripUrl = (slug) => {
+  const url = new URL(window.location.href);
+  url.searchParams.set("trip", slug);
+  url.searchParams.delete("create");
+  window.history.pushState(null, "", `${url.pathname}${url.search}${url.hash}`);
+};
+
 const hasTripStarted = (plan) => {
   const firstActivity = plan?.itinerary?.[0];
   if (!firstActivity?.startDate || !firstActivity?.start) return false;
@@ -272,6 +279,7 @@ function Dashboard({
         setSourceEditor(null);
         setPlaceEditor(null);
         setSelectedSlug(slug);
+        pushSelectedTripUrl(slug);
         setError("");
         setNotice("");
         setScheduleError("");
