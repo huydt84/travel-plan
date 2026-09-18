@@ -7,6 +7,7 @@ import { useLocale } from "../LocaleProvider";
 import Button from "../ui/Button";
 import FormFieldLabel from "../ui/FormFieldLabel";
 import ConfirmDialog from "../ConfirmDialog";
+import { ActionIcon } from "../Icons";
 import styles from "../../src/styles/expenses.module.css";
 
 const money = (amount, currency, locale) => new Intl.NumberFormat(locale, {
@@ -80,7 +81,6 @@ export function ActivityExpenses({ activity, ledger, defaultOpen = false, placem
   const { t, intlLocale } = useLocale();
   const headingId = useId();
   const bodyId = useId();
-  const addButtonRef = useRef(null);
   const dialogTriggerRef = useRef(null);
   const [open, setOpen] = useState(defaultOpen);
   const [editor, setEditor] = useState(null);
@@ -103,20 +103,26 @@ export function ActivityExpenses({ activity, ledger, defaultOpen = false, placem
     ? `${styles.activity} ${styles.scheduleActivity}`
     : styles.activity;
   return <section className={activityClassName} aria-labelledby={headingId}>
-    <button className={styles.activityToggle} type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((value) => !value)} aria-label={t("expenses.openFor", { title: activity.title })}>
-      <span><strong id={headingId}>{t("expenses.title")}</strong><small>{expenses.length ? t("expenses.activityTotal", { amount: money(total, currency, intlLocale) }) : t("expenses.empty")}</small></span>
-      <span aria-hidden="true">{open ? "−" : "+"}</span>
-    </button>
+    <header className={styles.activityHeader}>
+      {expenses.length ? <button className={styles.activityToggle} type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen((value) => !value)} aria-label={t(open ? "expenses.closeFor" : "expenses.openFor", { title: activity.title })}>
+        <span><strong id={headingId}>{t("expenses.title")}</strong><small>{t("expenses.activityTotal", { amount: money(total, currency, intlLocale) })}</small></span>
+        <ActionIcon name="down" />
+      </button> : <div className={styles.activitySummary}>
+        <strong id={headingId}>{t("expenses.title")}</strong><small>{t("expenses.empty")}</small>
+      </div>}
+      {canManage && <button className={styles.addExpense} type="button" onClick={startCreate} aria-label={t("expenses.addFor", { title: activity.title })}>
+        <ActionIcon name="add" /><span>{t("expenses.add")}</span>
+      </button>}
+    </header>
     {open && <div className={styles.activityBody} id={bodyId}>
       {expenses.map((expense) => <article className={styles.expenseRow} key={expense.id}>
         <div><strong>{expense.payer.displayName}</strong><small>{t("expenses.recordedBy", { name: expense.createdBy.displayName })} · <time dateTime={expense.createdAt}>{new Intl.DateTimeFormat(intlLocale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(expense.createdAt))}</time></small></div>
         <strong>{money(expense.amount, currency, intlLocale)}</strong>
         {canManage && <div className={styles.rowActions}>
-          <button type="button" onClick={(event) => { setError(""); dialogTriggerRef.current = event.currentTarget; setEditor({ expenseId: expense.id, payerEmail: expense.payer.email, amount: expense.amount }); }}>{t("common.edit")}</button>
-          <button type="button" onClick={() => { setError(""); setDeleting(expense); }}>{t("common.delete")}</button>
+          <button type="button" aria-label={t("expenses.editFor", { name: expense.payer.displayName })} title={t("common.edit")} onClick={(event) => { setError(""); dialogTriggerRef.current = event.currentTarget; setEditor({ expenseId: expense.id, payerEmail: expense.payer.email, amount: expense.amount }); }}><ActionIcon name="edit" /></button>
+          <button type="button" aria-label={t("expenses.deleteFor", { name: expense.payer.displayName })} title={t("common.delete")} onClick={(event) => { setError(""); dialogTriggerRef.current = event.currentTarget; setDeleting(expense); }}><ActionIcon name="delete" /></button>
         </div>}
       </article>)}
-      {canManage && <Button ref={addButtonRef} type="button" variant="ghost" onClick={startCreate}>{t("expenses.add")}</Button>}
       {error && <p className={styles.error} role="alert">{error}</p>}
     </div>}
     {editor && <ExpenseDialog editor={editor} payers={payers} currency={currency} busy={busy} error={error}

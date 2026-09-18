@@ -83,24 +83,39 @@ test("expense ledger enforces permissions, identity, totals, audit and deletion 
   expect((await request.post(endpoint, { headers: f.headers.member, data: payload })).status()).toBe(403);
 });
 
-test("expense controls remain usable on the canonical public and admin viewports", async ({ browser, permissionFixture: f }) => {
+test("expense controls remain usable on the canonical public and admin viewports", async ({ browser, permissionFixture: f }, testInfo) => {
   for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
     const context = await browser.newContext({ viewport, extraHTTPHeaders: f.headers.leader });
     const page = await context.newPage();
     await page.goto(`/?trip=${f.slug}`);
     await expect(page.getByRole("heading", { name: "Tổng quan chi tiêu" })).toBeVisible();
     await expect(page.getByText(/0.*¥|¥.*0/).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ })).toHaveCount(1);
     if (viewport.width === 320) {
-      await page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ }).click();
-      await page.getByRole("button", { name: "Thêm khoản chi", exact: true }).click();
+      await expect(page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ })).toHaveCount(0);
+      await page.getByRole("button", { name: "Thêm khoản chi cho Matrix start" }).click();
       const dialog = page.getByRole("dialog", { name: "Thêm khoản chi" });
       await expect(dialog.locator('[title="Bắt buộc"]')).toHaveCount(2);
       await dialog.getByLabel("Người chi").selectOption({ label: f.people.member.name });
       await dialog.getByLabel(/Số tiền/).fill("125");
       await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
       await expect(page.locator("small:visible").filter({ hasText: /125.*¥|¥.*125/ }).first()).toBeVisible();
+      const expenseActions = [
+        page.getByRole("button", { name: `Sửa khoản chi của ${f.people.member.name}` }),
+        page.getByRole("button", { name: `Xóa khoản chi của ${f.people.member.name}` }),
+      ];
+      for (const action of expenseActions) {
+        await expect(action).toBeVisible();
+        const box = await action.boundingBox();
+        expect(box?.width).toBe(44);
+        expect(box?.height).toBe(44);
+      }
+    } else {
+      const expenseToggle = page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ });
+      await expect(expenseToggle).toHaveCount(1);
+      await expect(expenseToggle.locator("svg")).toHaveCount(1);
+      await expenseToggle.click();
     }
+    await page.screenshot({ path: testInfo.outputPath(`public-expenses-${viewport.width}.png`), fullPage: false });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
     await context.close();
   }
@@ -112,9 +127,11 @@ test("expense controls remain usable on the canonical public and admin viewports
   await expect(page.getByRole("heading", { name: "Chi tiêu theo hoạt động" })).toHaveCount(0);
   const adminExpenseToggle = page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ });
   await expect(adminExpenseToggle).toHaveCount(1);
-  const adminActivity = adminExpenseToggle.locator("xpath=ancestor::article[1]");
+  const adminActivity = page.getByRole("heading", { name: "Matrix start" }).locator("xpath=ancestor::article[1]");
+  await adminExpenseToggle.click();
   await expect(adminActivity.getByRole("heading", { name: "Matrix start" })).toBeVisible();
-  await expect(adminActivity.getByText(/125.*¥|¥.*125/)).toBeVisible();
+  await expect(adminActivity.getByText(/125.*¥|¥.*125/).last()).toBeVisible();
   await expect(page.getByText("Quản lý chi tiêu", { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("admin-expenses-1440.png"), fullPage: false });
   await context.close();
 });
