@@ -31,7 +31,13 @@ test("public tracker renders its primary controls", async ({ page }) => {
 
   await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Rủ bạn đi cùng", exact: true })).toBeVisible();
-  await expect(page.getByText("Local admin", { exact: true })).toBeVisible();
+  const accountMenuButton = page.getByRole("button", {
+    name: "Mở menu tài khoản của Local admin",
+  });
+
+  await expect(accountMenuButton).toBeVisible();
+  await accountMenuButton.click();
+  await expect(page.getByRole("group", { name: "Tài khoản" })).toContainText("Local admin");
 });
 
 test("public tracker title reflects the current trip state", async ({ page, tripSlug }) => {
