@@ -303,7 +303,9 @@
   composes: mobile-manage-link from global;
   display: none;
 }
-@media (max-width: 900px) {
+/* Browser zoom reduces the effective CSS viewport before the page reaches the
+   phone layout. Reflow the control band as soon as its full labels stop fitting. */
+@media (max-width: 1280px) {
   .trip-bar {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
