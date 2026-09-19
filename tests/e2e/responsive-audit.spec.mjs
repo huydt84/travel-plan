@@ -145,6 +145,27 @@ for (const viewport of viewports) {
           expect(tripControls.shareInHeader).toBe(false);
           if (!viewport.touch) expect(tripControls.selectWidth).toBeGreaterThan(tripControls.selectedTextWidth + 90);
         }
+        if (surface.name === "public invitation") {
+          const dialog = page.getByRole("dialog", { name: /Rủ bạn đi/ });
+          await expect(dialog.getByRole("combobox", { name: "Ngôn ngữ" })).toHaveCount(0);
+          const dialogGeometry = await dialog.evaluate((element) => {
+            const dialogBox = element.getBoundingClientRect();
+            const closeBox = element.querySelector('button[aria-label="Đóng lời rủ"]')?.getBoundingClientRect();
+            return closeBox
+              ? {
+                  dialogRight: dialogBox.right,
+                  dialogTop: dialogBox.top,
+                  closeRight: closeBox.right,
+                  closeTop: closeBox.top,
+                  closeHeight: closeBox.height,
+                }
+              : null;
+          });
+          expect(dialogGeometry).not.toBeNull();
+          expect(dialogGeometry.closeRight).toBeGreaterThanOrEqual(dialogGeometry.dialogRight - 76);
+          expect(dialogGeometry.closeTop).toBeLessThanOrEqual(dialogGeometry.dialogTop + 96);
+          expect(dialogGeometry.closeHeight).toBeGreaterThanOrEqual(44);
+        }
         if (surface.name === "admin users" && viewport.touch) {
           const splitDates = await page.locator(".admin-users-table time").evaluateAll((times) => times.flatMap((time) => {
             const text = [...time.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());

@@ -11,7 +11,6 @@ import {
   formatInvitationTripDate,
 } from "../lib/invitation-draft.mjs";
 import { ActionIcon } from "./Icons";
-import LanguageSwitcher from "./LanguageSwitcher";
 import { useLocale } from "./LocaleProvider";
 import { invitationErrorText } from "../lib/i18n-invitations.mjs";
 
@@ -727,7 +726,6 @@ export default function InvitationDialog({
           >
             <ActionIcon name="close" />
           </button>
-          <LanguageSwitcher />
         </header>
         {!isOwner && (
           <ol
