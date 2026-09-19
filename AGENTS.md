@@ -14,7 +14,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Keep a schedule item's optional `key` stable across later edits. If omitted, the importer derives it from the title.
 - Run `pnpm run trip:import <file>` first and review the preview. Run the same command with `--apply` only when the user has asked to make the schedule change.
 - The importer reads `.env`, validates all fields and citation references, and commits the whole import in one Neon transaction. Do not read or print secret values.
-- Schedule data changes in Neon appear on the live site without a Vercel redeploy.
+- Schedule data changes in Neon appear on the live site without a Vercel redeploy only when the deployed code already supports the changed data shape and presentation.
+
+## Reporting change status
+
+- In the final response, distinguish what changed in the database, what changed in the local code, and what is actually visible on the production website. Never describe a database-only classification as a completed user-visible UI change.
+- A new data type, label, or UI behavior requires deployment before it can appear on production. State clearly when that deployment has not happened, even if the database migration has already run.
+- Say “verified on production” only after checking the deployed behavior. If the user reports that they deployed it, acknowledge that separately from any verification Codex performed.
+- For mixed database-and-code changes, summarize the remaining deployment or verification step explicitly instead of saying only that the change is done.
 
 ## Environment file safety
 
