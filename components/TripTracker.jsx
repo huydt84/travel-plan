@@ -627,6 +627,18 @@ export default function TripTracker({
           <TypeIcon type="Transit" />
           <span>{t("app.title")}</span>
         </a>
+        <div className={navigationStyles["application-tools"]}>
+        <nav className={navigationStyles["application-actions"]} aria-label={t("app.title")}>
+          <AssistantLauncher tripSlug={data.trip.slug} />
+          {access?.canManage && (
+            <Link
+              className={navigationStyles["admin-link"]}
+              href={`/trips/manage?trip=${encodeURIComponent(data.trip.slug)}`}
+            >
+              {t("common.manage")}
+            </Link>
+          )}
+        </nav>
         <div className={navigationStyles["viewer-utilities"]}>
           <LanguageSwitcher />
           {viewer && <NotificationCenter />}
@@ -642,8 +654,10 @@ export default function TripTracker({
             </button>
           )}
         </div>
+        </div>
       </header>
       <section className={navigationStyles["trip-context"]} aria-label={t("nav.selectTrip")}>
+        <div className={navigationStyles["trip-picker-group"]}>
           <label className={navigationStyles["trip-picker"]}>
             <span className={navigationStyles["trip-picker-label"]}>{t("nav.selectTrip")}</span>
             <span className={navigationStyles["trip-picker-control"]}>
@@ -686,10 +700,11 @@ export default function TripTracker({
                 <ActionIcon name="down" />
               </span>
             </span>
-            <small>
-              {tripDateLabel} · {data.trip.location}
-            </small>
           </label>
+        </div>
+        <div className={navigationStyles["trip-metadata"]}>
+          <small>{tripDateLabel} · {data.trip.location}</small>
+        </div>
           <div
             className={trackerStyles["live-clock"]}
             aria-label={t("nav.currentTimeAt", { timezone: data.trip.timezone })}
@@ -718,15 +733,6 @@ export default function TripTracker({
               <ActionIcon name="invite" />
               <span>{t("visibility.members")}</span>
             </button>
-            <AssistantLauncher tripSlug={data.trip.slug} className={navigationStyles["trip-action"]} />
-            {access?.canManage && (
-              <Link
-                className={`${navigationStyles["admin-link"]} ${navigationStyles["trip-action"]} ${trackerStyles["desktop-manage-link"]}`}
-                href={`/trips/manage?trip=${encodeURIComponent(data.trip.slug)}`}
-              >
-                {t("common.manage")}
-              </Link>
-            )}
           </div>
       </section>
     </>

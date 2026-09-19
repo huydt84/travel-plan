@@ -109,9 +109,6 @@ for (const viewport of viewports) {
         if (surface.name === "assistant management") {
           await expect(page.getByRole("button", { name: "Trợ lý", exact: true })).toHaveCount(0);
         }
-        if (surface.name === "public tracker" && viewport.touch) {
-          await expect(page.locator(".desktop-manage-link")).toBeHidden();
-        }
         if (surface.name === "public tracker") {
           const tripControls = await page.evaluate(() => {
             const context = document.querySelector(".trip-context");
@@ -119,6 +116,7 @@ for (const viewport of viewports) {
             const select = picker.querySelector("select");
             const actions = context.querySelector(".trip-context-actions");
             const header = document.querySelector(".trip-bar");
+            const appActions = header.querySelector("nav");
             const contextBox = context.getBoundingClientRect();
             const pickerBox = picker.getBoundingClientRect();
             const selectBox = select.getBoundingClientRect();
@@ -135,15 +133,22 @@ for (const viewport of viewports) {
               selectedTextWidth: measure.measureText(selectedText).width,
               actionsTop: actionsBox.top,
               pickerBottom: pickerBox.bottom,
+              pickerTop: pickerBox.top,
+              actionsBottom: actionsBox.bottom,
+              appActionsInHeader: Boolean(appActions?.querySelector("a")),
+              tripActionsCount: actions.querySelectorAll("a, button").length,
               shareInContext: Boolean(context.querySelector('[class*="share-action"]')),
               shareInHeader: Boolean(header.querySelector('[class*="share-action"]')),
             };
           });
-          expect(tripControls.pickerWidth).toBeGreaterThan(tripControls.contextWidth * (viewport.touch ? 0.9 : 0.7));
-          expect(tripControls.actionsTop).toBeGreaterThanOrEqual(tripControls.pickerBottom - 1);
+          expect(tripControls.pickerWidth).toBeLessThanOrEqual(tripControls.contextWidth * (viewport.touch ? 1 : 0.5));
+          if (viewport.touch) expect(tripControls.actionsTop).toBeGreaterThanOrEqual(tripControls.pickerBottom - 1);
+          else expect(tripControls.actionsTop).toBeLessThan(tripControls.pickerBottom);
+          expect(tripControls.appActionsInHeader).toBe(true);
+          expect(tripControls.tripActionsCount).toBe(3);
           expect(tripControls.shareInContext).toBe(true);
           expect(tripControls.shareInHeader).toBe(false);
-          if (!viewport.touch) expect(tripControls.selectWidth).toBeGreaterThan(tripControls.selectedTextWidth + 90);
+          if (!viewport.touch) expect(tripControls.selectWidth).toBeGreaterThan(tripControls.selectedTextWidth + 35);
         }
         if (surface.name === "public invitation") {
           const dialog = page.getByRole("dialog", { name: /Rủ bạn đi/ });

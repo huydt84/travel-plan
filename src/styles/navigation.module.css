@@ -1,11 +1,11 @@
 .trip-bar {
   composes: trip-bar from global;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: stretch;
-  min-height: 66px;
-  margin-bottom: 10px;
-  border: 2px solid var(--navy);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 60px;
+  padding: 7px 18px;
   background: var(--paper-bright);
 }
 .product-mark {
@@ -13,7 +13,6 @@
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 12px 18px;
   font: 700 23px/1 var(--display);
   letter-spacing: 0.015em;
   text-decoration: none;
@@ -25,23 +24,48 @@
   color: var(--green);
   stroke-width: 2;
 }
+.application-tools {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+}
+.application-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.application-actions :global(button),
+.application-actions .admin-link {
+  min-height: 44px;
+  white-space: nowrap;
+}
 .trip-context {
   composes: trip-context from global;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "picker clock" "actions actions";
+  grid-template-areas: "picker actions" "metadata clock";
+  align-items: center;
+  column-gap: 20px;
+  row-gap: 5px;
   min-width: 0;
   margin-bottom: 18px;
-  border: 2px solid var(--navy);
+  padding: 10px 18px;
+  border-top: 1px solid var(--line);
   background: var(--paper-bright);
+}
+.trip-picker-group {
+  grid-area: picker;
+  display: grid;
+  min-width: 0;
+  max-width: 560px;
 }
 .trip-picker {
   composes: trip-picker from global;
-  grid-area: picker;
   display: grid;
   align-content: center;
   min-width: 0;
-  padding: 12px 18px;
 }
 .trip-picker-label {
   margin-bottom: 5px;
@@ -54,7 +78,8 @@
   composes: trip-picker-control from global;
   position: relative;
   display: grid;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--navy);
@@ -81,7 +106,8 @@
   position: relative;
   z-index: 1;
   grid-area: 1 / 1;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   min-width: 0;
   padding: 8px 76px 8px 11px;
   overflow: hidden;
@@ -123,8 +149,15 @@
 .trip-picker-control:active .trip-picker-affordance {
   background: var(--navy);
 }
-.trip-picker small {
-  margin-top: 4px;
+.trip-metadata {
+  grid-area: metadata;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  min-width: 0;
+}
+.trip-metadata small {
   overflow: hidden;
   color: var(--muted);
   font-size: 10px;
@@ -133,8 +166,21 @@
 }
 .trip-context :global(.live-clock) {
   grid-area: clock;
-  align-self: stretch;
-  border-left: 1px solid var(--navy);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 0;
+  justify-self: end;
+  padding: 0;
+  border: 0;
+}
+.trip-context :global(.live-clock) :global(.live-dot) {
+  width: 6px;
+  height: 6px;
+}
+.trip-context :global(.live-clock) span:last-child {
+  font-size: 12px;
 }
 .trip-context-actions {
   composes: trip-context-actions from global;
@@ -142,11 +188,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
-  min-width: 0;
-  padding: 8px 10px;
-  border-top: 1px solid var(--navy);
-  background: var(--paper-deep);
 }
 .trip-context-actions .trip-action {
   min-height: 44px;
@@ -178,7 +221,6 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  padding: 8px 12px;
 }
 .language-switcher {
   position: relative;
@@ -357,34 +399,37 @@
 }
 @media (max-width: 680px) {
   .trip-bar {
+    display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    margin-bottom: 10px;
+    grid-template-areas: "brand utilities" "app-actions app-actions";
+    gap: 4px 8px;
+    padding: 7px 12px;
   }
   .product-mark {
+    grid-area: brand;
     min-width: 0;
-    padding: 10px 12px;
     font-size: 18px;
   }
   .product-mark :global(.type-icon) { flex: none; }
   .product-mark span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .application-tools { display: contents; }
+  .application-actions { grid-area: app-actions; }
   .trip-context {
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "picker clock" "actions actions";
+    grid-template-areas: "picker picker" "actions actions" "metadata clock";
+    padding: 9px 12px 12px;
   }
-  .trip-picker { padding: 10px; }
+  .trip-picker-group { width: 100%; max-width: 100%; }
+  .trip-picker-control { width: 100%; }
+  .trip-picker select { width: 100%; }
   .trip-context-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
-    padding: 6px;
+    justify-content: flex-start;
+    gap: 6px;
   }
   .trip-context-actions > button,
   .trip-context-actions > a {
-    width: 100%;
     min-width: 0;
     white-space: normal;
-    justify-content: center;
-    text-align: center;
   }
   .trip-picker select {
     padding-right: 44px;
@@ -396,14 +441,13 @@
   .trip-picker-affordance > span {
     display: none;
   }
-  .trip-picker small {
+  .trip-metadata small {
     font-size: 9px;
   }
-  .trip-context .trip-action { padding-inline: 6px; }
-  .trip-context .trip-action :global(.action-icon) { display: none; }
   .viewer-utilities {
+    grid-area: utilities;
     gap: 2px;
-    padding: 5px;
+    padding: 0;
   }
   .mobile-manage-link {
     display: flex;
@@ -431,8 +475,6 @@
 }
 @media (max-width: 400px) {
   .product-mark span { display: none; }
-  .trip-context { grid-template-areas: "picker picker" "clock clock" "actions actions"; }
-  .trip-context :global(.live-clock) { border-top: 1px solid var(--navy); border-left: 0; }
 }
 
 .user-link {

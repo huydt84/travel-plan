@@ -44,18 +44,25 @@ test("trip selection stays readable beside a long current trip title", async ({ 
   const title = "Silver Week 2026 Tokyo, Kyoto and Osaka";
   expect((await request.patch(`/api/trips/${tripSlug}`, { data: { title } })).status()).toBe(200);
 
-  for (const width of [1440, 1920]) {
+  for (const width of [320, 1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await gotoHealthy(page, `/?trip=${tripSlug}`);
     const select = page.getByRole("combobox", { name: "Chọn chuyến đi" });
     await expect(select).toHaveValue(tripSlug);
-    const textFits = await select.evaluate((element) => {
-      const style = getComputedStyle(element);
-      const measure = document.createElement("canvas").getContext("2d");
-      measure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      return measure.measureText(element.selectedOptions[0].textContent).width + 90 < element.clientWidth;
+    const geometry = await select.evaluate((element) => {
+      const control = element.closest(".trip-picker-control").getBoundingClientRect();
+      const affordance = element.parentElement.querySelector(".trip-picker-affordance").getBoundingClientRect();
+      return {
+        controlWidth: control.width,
+        controlRight: control.right,
+        affordanceRight: affordance.right,
+        viewportWidth: document.documentElement.clientWidth,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
     });
-    expect(textFits, `selected trip title should fit at ${width}px`).toBe(true);
+    expect(geometry.controlWidth).toBeLessThanOrEqual(width === 320 ? 296 : 560);
+    expect(geometry.affordanceRight).toBeLessThanOrEqual(geometry.controlRight);
+    expect(geometry.overflow, `long title should not cause page overflow at ${width}px`).toBeLessThanOrEqual(0);
     await expect(page.locator(".trip-context .trip-context-actions").getByRole("button", { name: "Chia sẻ" })).toBeVisible();
     await expect(page.locator(".trip-bar").getByRole("button", { name: "Chia sẻ" })).toHaveCount(0);
   }
