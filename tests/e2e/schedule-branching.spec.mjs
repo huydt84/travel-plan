@@ -156,6 +156,7 @@ async function openBranchFixture(page) {
   for (let i=0;i<3;i++) expect((await page.request.post(`/api/trips/${slug}/schedule`, { data: { startDate: "2030-01-01", start: `${String(9+i).padStart(2,"0")}:00`, endDate: "2030-01-01", end: `${String(10+i).padStart(2,"0")}:00`, type: "Visit", icon: "pin", title: `Branch stop ${i}`, detail: "", refs: [] } })).status()).toBe(201);
   await gotoHealthy(page, "/admin/trips");
   await page.getByRole("button", { name: new RegExp(`^${title}`) }).click();
+  await expect(page.locator(".admin-branch-entry")).toHaveCount(2);
   return async () => { expect((await page.request.delete(`/api/trips/${slug}`)).status()).toBe(204); };
 }
 
@@ -308,7 +309,10 @@ for (const viewport of [
       const railDisplays = segments.map((segment) => getComputedStyle(segment.querySelector(".timeline-rail"), "::after").display);
       const platforms = document.querySelector(".branch-platforms");
       const platformStyle = getComputedStyle(platforms);
-      const simpleItem = [...document.querySelectorAll(".timeline-item")].find((item) => !item.querySelector(".citations"));
+      // Other E2E cases append notes to the first activity on this shared trip.
+      // Measure the short transfer buffer instead so this remains a layout check.
+      const simpleItem = [...document.querySelectorAll(".timeline-item")]
+        .find((item) => item.querySelector("h3")?.textContent === "JR Kamakura → Enoden Kamakura EN15");
       return {
         nonFinalRails: railDisplays.slice(0, -1),
         finalRail: railDisplays.at(-1),
@@ -324,7 +328,8 @@ for (const viewport of [
     expect(layout.finalRail).toBe("none");
     expect(layout.platformDisplay).toBe("grid");
     expect(layout.platformColumns).toBeGreaterThanOrEqual(2);
-    expect(layout.simpleItemHeight).toBeLessThan(190);
+    // The owner-facing expense controls add one compact row to this card.
+    expect(layout.simpleItemHeight).toBeLessThan(260);
     expect(layout.suggestionHeight).toBeLessThan(44);
     expect(layout.branchButtonHeight).toBeLessThan(44);
 

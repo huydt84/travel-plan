@@ -40,8 +40,14 @@ const surfaces = [
   {
     name: "admin source editor",
     path: "/admin/trips",
-    setup: async (page) => page.getByRole("button", { name: "Thêm nguồn", exact: true }).click(),
-    ready: (page) => page.locator(".source-form").getByLabel("Loại liên kết"),
+    setup: async (page) => page.getByRole("button", { name: "Thêm nguồn tham khảo", exact: true }).click(),
+    ready: (page) => page.locator(".source-form").getByLabel("Tên nguồn"),
+  },
+  {
+    name: "admin route editor",
+    path: "/admin/trips",
+    setup: async (page) => page.getByRole("button", { name: "Thêm tuyến đường", exact: true }).click(),
+    ready: (page) => page.locator(".route-form").getByLabel("Điểm bắt đầu"),
   },
   {
     name: "admin collections",
@@ -99,7 +105,7 @@ for (const viewport of viewports) {
         await gotoHealthy(page, surface.path);
         await surface.setup?.(page);
         await expect(surface.ready(page)).toBeVisible();
-        if (surface.name === "admin source editor") await surface.ready(page).scrollIntoViewIfNeeded();
+        if (["admin source editor", "admin route editor"].includes(surface.name)) await surface.ready(page).scrollIntoViewIfNeeded();
         if (surface.name === "assistant management") {
           await expect(page.getByRole("button", { name: "Trợ lý", exact: true })).toHaveCount(0);
         }

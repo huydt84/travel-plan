@@ -1,6 +1,7 @@
 import { validateBranchTimeline } from "../lib/schedule-branching.mjs";
 import { slugify } from "../lib/schedule-keys.mjs";
 import { compareActivityDateTime, isIsoDate, validateActivityInterval } from "../lib/trip-dates.mjs";
+import { isGoogleMapsUrl } from "../lib/source-fields.mjs";
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -53,24 +54,30 @@ export function normalizeTripImport(raw) {
   const sourceNumbers = new Set();
   const sources = rawSources.map((value, index) => {
     const source = object(value, `sources[${index}]`);
+    if (source.kind != null && !["reference", "route"].includes(source.kind)) fail(`sources[${index}].kind must be reference or route`);
     if (!Number.isInteger(source.number) || source.number <= 0 || sourceNumbers.has(source.number)) fail(`sources[${index}].number must be a unique positive integer`);
     sourceNumbers.add(source.number);
     const url = text(source.url, `sources[${index}].url`, 2000);
+    if (source.kind === "route" && !isGoogleMapsUrl(url)) fail(`sources[${index}].url must be a Google Maps URL`);
     let inferredHost;
     try { inferredHost = new URL(url).hostname.replace(/^www\./, ""); }
     catch { fail(`sources[${index}].url must be a valid URL`); }
+    const routeStart = source.kind === "route" ? text(source.routeStart, `sources[${index}].routeStart`, 160) : null;
+    const routeEnd = source.kind === "route" ? text(source.routeEnd, `sources[${index}].routeEnd`, 160) : null;
+    const title = source.kind === "route" && (source.title == null || (typeof source.title === "string" && !source.title.trim()))
+      ? `${routeStart} → ${routeEnd}`
+      : text(source.title, `sources[${index}].title`, 300);
+    if (title.length > 300) fail(`sources[${index}].title must be at most 300 characters`);
     return {
       number: source.number,
       kind: source.kind ?? null,
-      title: text(source.title, `sources[${index}].title`, 300),
+      routeStart,
+      routeEnd,
+      title,
       host: source.host ? text(source.host, `sources[${index}].host`, 200) : inferredHost,
       url,
     };
   });
-  for (const [index, source] of sources.entries()) {
-    if (source.kind != null && !["reference", "route"].includes(source.kind)) fail(`sources[${index}].kind must be reference or route`);
-  }
-
   const parseActivity = (value, field, { allowBranch = true } = {}) => {
     const item = object(value, field);
     if (!allowBranch && item.branchGroup != null) fail(`${field}.branchGroup cannot be nested`);

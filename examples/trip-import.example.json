@@ -15,51 +15,6 @@
       "url": "https://example.com/place"
     }
   ],
-  "startBranchGroup": {
-    "key": "morning-weather",
-    "title": "Phương án từ đầu chuyến",
-    "defaultBranchKey": "dry-start",
-    "branches": [
-      {
-        "key": "dry-start",
-        "label": "Không mưa",
-        "condition": "Khi thời tiết khô ráo",
-        "schedule": [
-          {
-            "key": "morning-park",
-            "startDate": "2030-01-15",
-            "start": "09:00",
-            "endDate": "2030-01-15",
-            "end": "11:30",
-            "type": "Walk",
-            "icon": "🚶",
-            "title": "Đi bộ trong công viên",
-            "detail": "Bắt đầu ngoài trời trước khi hội nhập vào lịch chung.",
-            "refs": [1]
-          }
-        ]
-      },
-      {
-        "key": "rain-start",
-        "label": "Có mưa",
-        "condition": "Khi trời mưa từ đầu ngày",
-        "schedule": [
-          {
-            "key": "morning-museum",
-            "startDate": "2030-01-15",
-            "start": "09:00",
-            "endDate": "2030-01-15",
-            "end": "11:30",
-            "type": "Indoor",
-            "icon": "🏛️",
-            "title": "Tham quan bảo tàng",
-            "detail": "Thay toàn bộ hoạt động đầu tiên bằng một điểm trong nhà.",
-            "refs": [1]
-          }
-        ]
-      }
-    ]
-  },
   "schedule": [
     {
       "key": "restaurant-reservation",
@@ -90,7 +45,7 @@
       "icon": "🍜",
       "title": "Ăn trưa",
       "detail": "Nghỉ và ăn gần ga.",
-      "refs": [],
+      "refs": [1],
       "branchGroup": {
         "key": "afternoon-weather",
         "title": "Phương án buổi chiều",

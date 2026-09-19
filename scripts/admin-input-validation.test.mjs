@@ -27,7 +27,11 @@ test("source updates accept partial title or URL changes", () => {
     url: "https://www.example.com/place",
   });
   assert.throws(() => parseSourceInput({}, { partial: true }), /At least one source field is required/);
-  assert.deepEqual(parseSourceInput({ kind: "route" }, { partial: true }), { title: undefined, kind: "route" });
+  assert.deepEqual(parseSourceInput({ kind: "route", title: "", routeStart: "Hotel", routeEnd: "Beach", url: "https://maps.app.goo.gl/test" }, { partial: true }), {
+    title: "Hotel → Beach", kind: "route", routeStart: "Hotel", routeEnd: "Beach", host: "maps.app.goo.gl", url: "https://maps.app.goo.gl/test",
+  });
+  assert.throws(() => parseSourceInput({ kind: "route", routeStart: "Hotel", routeEnd: "Beach", url: "https://example.com/dir" }), /Google Maps URL/);
+  assert.throws(() => parseSourceInput({ kind: "route", routeStart: "Hotel", url: "https://maps.app.goo.gl/test" }), /routeEnd/);
   assert.throws(() => parseSourceInput({ kind: "place" }, { partial: true }), /kind must be reference or route/);
 });
 

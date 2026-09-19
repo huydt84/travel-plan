@@ -16,6 +16,7 @@ import { PlaceForm, TripForm, ScheduleForm, SourceForm } from "./admin/EditorFor
 import AdminNav from "./AdminNav";
 import ConfirmDialog from "./ConfirmDialog";
 import LanguageSwitcher from "./LanguageSwitcher";
+import ShareTripButton from "./ShareTripButton";
 import InvitationDialog from "./InvitationDialog";
 import { useLocale } from "./LocaleProvider";
 import { adminErrorMessage } from "../lib/i18n-admin.mjs";
@@ -538,17 +539,9 @@ function Dashboard({
       );
     }
     setSourceEditor(null);
-    setNotice(
-      sourceNumber == null
-        ? t("adminExtra.message016", {
-            value0: source.number,
-            value1: source.title,
-          })
-        : t("adminExtra.message017", {
-            value0: source.number,
-            value1: source.title,
-          }),
-    );
+    setNotice(source.kind === "route"
+      ? t(sourceNumber == null ? "adminRoutes.added" : "adminRoutes.saved", { number: source.number, title: source.title })
+      : t(sourceNumber == null ? "adminExtra.message016" : "adminExtra.message017", { value0: source.number, value1: source.title }));
     return source;
   };
 
@@ -857,6 +850,7 @@ function Dashboard({
                   </p>
                 </div>
                 <div className={scheduleEditorStyles["admin-actions"]}>
+                  <ShareTripButton key={plan.trip.slug} slug={plan.trip.slug} />
                   <Button
                     variant="ghost"
                     onClick={() =>
@@ -904,104 +898,73 @@ function Dashboard({
 
               <ExpenseSummary ledger={expenseLedger} placement="admin" />
 
-              <section
-                className={scheduleEditorStyles["admin-sources"]}
-                aria-labelledby="admin-sources-title"
-              >
-                <div
-                  className={`${adminShellStyles["admin-section-head"]} ${scheduleEditorStyles["source-heading"]}`}
-                >
-                  <div>
-                    <h2 id="admin-sources-title">
-                      {plan.sources.length} {t("adminExtra.message034")}
-                    </h2>
-                  </div>
-                  <Button
-                    variant="primary"
-                    type="button"
-                    onClick={() =>
-                      setSourceEditor((current) =>
-                        current ? null : { source: null },
-                      )
-                    }
-                    aria-expanded={Boolean(sourceEditor)}
-                  >
-                    {sourceEditor
-                      ? t("adminExtra.message035")
-                      : t("adminExtra.message036")}
-                  </Button>
-                </div>
-                {sourceEditor && (
-                  <SourceForm
-                    key={sourceEditor.source?.number || "new"}
-                    source={sourceEditor.source}
-                    onSave={(values) =>
-                      saveSource(values, sourceEditor.source?.number)
-                    }
-                    onCancel={() => setSourceEditor(null)}
-                  />
-                )}
-                {[["route", "adminSources.route"], ["reference", "adminSources.reference"]].map(([kind, label]) => {
-                  const sources = plan.sources.filter((source) => (source.kind ?? "reference") === kind);
-                  if (!sources.length) return null;
-                  return <div key={kind}>
-                    <h3 className={scheduleEditorStyles["source-group-title"]}>{sources.length} {t(label)}</h3>
-                    <div className={scheduleEditorStyles["admin-source-list"]}>
-                  {sources.map((source) => (
-                    <article
-                      className={`${scheduleEditorStyles["admin-source-item"]}${sourceEditor?.source?.number === source.number ? " is-editing" : ""}`}
-                      key={source.number}
-                    >
-                      <span
-                        className={scheduleEditorStyles["admin-source-number"]}
+              {["route", "reference"].map((kind) => {
+                const sources = plan.sources.filter((source) => (source.kind ?? "reference") === kind);
+                const isRoute = kind === "route";
+                const editing = sourceEditor?.kind === kind;
+                const headingId = isRoute ? "admin-routes-title" : "admin-references-title";
+                return (
+                  <section className={scheduleEditorStyles["admin-sources"]} aria-labelledby={headingId} key={kind}>
+                    <div className={`${adminShellStyles["admin-section-head"]} ${scheduleEditorStyles["source-heading"]}`}>
+                      <h2 id={headingId}>{sources.length} {t(isRoute ? "adminSources.route" : "adminSources.reference")}</h2>
+                      <Button
+                        variant="primary"
+                        type="button"
+                        onClick={() => setSourceEditor((current) => current?.kind === kind && !current.source ? null : { kind, source: null })}
+                        aria-expanded={editing}
                       >
-                        {String(source.number).padStart(2, "0")}
-                      </span>
-                      <a
-                        className={scheduleEditorStyles["admin-source-link"]}
-                        href={source.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <span
-                          className={scheduleEditorStyles["admin-source-copy"]}
-                        >
-                          <strong>{source.title}</strong>
-                          <small>{source.host}</small>
-                        </span>
-                        <ActionIcon name="external" />
-                      </a>
-                      <span
-                        className={scheduleEditorStyles["admin-source-actions"]}
-                      >
-                        <Button
-                          variant="ghost"
-                          type="button"
-                          onClick={() => setSourceEditor({ source })}
-                          disabled={busy}
-                        >
-                          {t("adminExtra.message037")}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          type="button"
-                          onClick={() => removeSourceForPlan(source)}
-                          disabled={busy}
-                        >
-                          {t("adminExtra.message033")}
-                        </Button>
-                      </span>
-                    </article>
-                  ))}
+                        {editing && !sourceEditor.source
+                          ? t("adminExtra.message035")
+                          : t(isRoute ? "adminRoutes.add" : "adminSources.addReference")}
+                      </Button>
                     </div>
-                  </div>;
-                })}
-                  {!plan.sources.length && (
-                    <p className={scheduleEditorStyles["admin-empty"]}>
-                      {t("adminExtra.message038")}
-                    </p>
-                  )}
-              </section>
+                    {editing && (
+                      <SourceForm
+                        key={sourceEditor.source?.number ?? `new-${kind}`}
+                        kind={kind}
+                        source={sourceEditor.source}
+                        onSave={(values) => saveSource(values, sourceEditor.source?.number)}
+                        onCancel={() => setSourceEditor(null)}
+                      />
+                    )}
+                    {sources.length ? (
+                      <div className={scheduleEditorStyles["admin-source-list"]}>
+                        {sources.map((source) => (
+                          <article
+                            className={`${scheduleEditorStyles["admin-source-item"]}${sourceEditor?.source?.number === source.number ? " is-editing" : ""}`}
+                            key={source.number}
+                          >
+                            <span className={scheduleEditorStyles["admin-source-number"]}>
+                              {String(source.number).padStart(2, "0")}
+                            </span>
+                            <a className={scheduleEditorStyles["admin-source-link"]} href={source.url} target="_blank" rel="noreferrer">
+                              <span className={scheduleEditorStyles["admin-source-copy"]}>
+                                <strong>{source.title}</strong>
+                                <small>{isRoute && source.routeStart && source.routeEnd && source.title !== `${source.routeStart} → ${source.routeEnd}`
+                                  ? `${source.routeStart} → ${source.routeEnd}`
+                                  : source.host}</small>
+                              </span>
+                              <ActionIcon name="external" />
+                            </a>
+                            <span className={scheduleEditorStyles["admin-source-actions"]}>
+                              <Button variant="ghost" type="button" onClick={() => setSourceEditor({ kind, source })} disabled={busy}>
+                                {t("adminExtra.message037")}
+                              </Button>
+                              <Button variant="danger" type="button" onClick={() => removeSourceForPlan(source)} disabled={busy}>
+                                {t("adminExtra.message033")}
+                              </Button>
+                            </span>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className={scheduleEditorStyles["admin-empty"]}>
+                        {t(isRoute ? "adminRoutes.empty" : "adminSources.emptyReferences")}
+                      </p>
+                    )}
+                  </section>
+                );
+              })}
 
               <section
                 className={scheduleEditorStyles["admin-places"]}

@@ -45,6 +45,7 @@ import NotificationCenter from "./NotificationCenter";
 import ViewerMenu from "./ViewerMenu";
 import TripMembersPanel from "./TripMembersPanel";
 import LanguageSwitcher from "./LanguageSwitcher";
+import ShareTripButton from "./ShareTripButton";
 import { useLocale } from "./LocaleProvider";
 import { translateActivityType } from "../lib/i18n.mjs";
 import { adminErrorMessage } from "../lib/i18n-admin.mjs";
@@ -675,6 +676,7 @@ export default function TripTracker({
           </label>
           <div className={navigationStyles["trip-context-actions"]}>
             <AssistantLauncher tripSlug={data.trip.slug} />
+            {access?.canManage && <ShareTripButton key={data.trip.slug} slug={data.trip.slug} className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`} />}
             {access?.canManageMembers && <button
               className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`}
               type="button"

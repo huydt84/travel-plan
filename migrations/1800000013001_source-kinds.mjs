@@ -5,6 +5,7 @@ export const down = false;
 export async function up(pgm) {
   const sql = migrationSql(pgm);
   await sql`ALTER TABLE sources ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'reference'`;
+  await sql`ALTER TABLE sources DROP CONSTRAINT IF EXISTS sources_kind_check`;
   await sql`ALTER TABLE sources ADD CONSTRAINT sources_kind_check CHECK (kind IN ('reference', 'route'))`;
   await sql`
     UPDATE sources AS source

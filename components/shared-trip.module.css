@@ -1,0 +1,46 @@
+.shell { min-height: 100vh; padding: 0 max(20px, calc((100vw - 1120px) / 2)); color: var(--navy); background: var(--paper); }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 76px; border-bottom: 2px solid var(--navy); }
+.brand { font: 700 18px/1 var(--font-display); letter-spacing: .06em; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 28px; align-items: end; padding: 54px 0 40px; border-bottom: 6px solid var(--green); }
+.kicker { color: var(--green-dark); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.hero h1, .unavailable h1 { max-width: 850px; margin: 14px 0 18px; font: 700 clamp(44px, 7vw, 86px)/.94 var(--font-display); overflow-wrap: anywhere; }
+.hero p { margin: 0; color: var(--muted); font-size: clamp(14px, 1.4vw, 17px); }
+.hero aside { display: grid; gap: 7px; padding: 15px; border: 1px solid var(--navy); background: var(--paper-bright); }
+.hero aside strong { font: 700 30px/1 var(--font-display); color: var(--green-dark); }
+.hero aside span { font-size: 12px; line-height: 1.4; }
+.actions { display: flex; align-items: center; gap: 14px; min-height: 92px; }
+.actions button { min-height: 44px; padding: 12px 20px; border: 0; color: white; background: var(--navy); font-weight: 700; cursor: pointer; }
+.actions button:hover { background: var(--green-dark); }
+.actions button:focus-visible, .refs a:focus-visible, .sourceIndex a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+.actions span { font-size: 13px; }
+.schedule { padding-bottom: 20px; }
+.day { margin-bottom: 36px; border: 1px solid var(--navy); background: var(--paper-bright); }
+.dayHeading { display: flex; align-items: center; gap: 18px; padding: 14px 20px; color: white; background: var(--navy); }
+.dayHeading span { color: var(--yellow); font: 700 28px/1 var(--font-display); }
+.dayHeading h2 { margin: 0; font: 700 clamp(24px, 3vw, 34px)/1 var(--font-display); }
+.day ol, .sourceIndex ol { margin: 0; padding: 0; list-style: none; }
+.activity { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 22px; padding: 20px; border-top: 1px solid var(--line); }
+.activity:first-child { border-top: 0; }
+.activity time { font: 700 27px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.activity time small { display: block; margin-top: 6px; color: var(--muted); font: 600 13px/1.2 var(--font-body); }
+.activity h3 { margin: 0 0 8px; font: 700 clamp(23px, 2.5vw, 30px)/1.05 var(--font-display); }
+.activity p { max-width: 75ch; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
+.refs { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; font-size: 12px; }
+.refs a, .sourceIndex a { color: var(--green-dark); overflow-wrap: anywhere; text-underline-offset: 3px; }
+.sourceIndex { padding: 8px 0 70px; }
+.sourceIndex h2 { margin: 0 0 15px; font: 700 31px/1 var(--font-display); }
+.sourceIndex li { display: flex; gap: 14px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.sourceIndex li span { flex: none; font-weight: 700; }
+.empty { padding: 30px; border: 1px solid var(--navy); background: var(--paper-bright); }
+.unavailable { max-width: 650px; padding: 18vh 0 50px; }
+.unavailable p { max-width: 48ch; font-size: 17px; line-height: 1.6; }
+@media (max-width: 600px) {
+  .topbar { min-height: 62px; }
+  .brand { font-size: 14px; }
+  .hero { grid-template-columns: 1fr; gap: 26px; padding: 34px 0 30px; }
+  .hero aside { width: fit-content; max-width: 100%; }
+  .actions { align-items: flex-start; flex-direction: column; justify-content: center; padding: 20px 0; }
+  .activity { grid-template-columns: 74px minmax(0, 1fr); gap: 12px; padding: 16px 12px; }
+  .activity time { font-size: 23px; }
+  .dayHeading { gap: 12px; padding: 12px; }
+}

@@ -1,5 +1,15 @@
 import { withWorkflow } from "workflow/next";
 const nextConfig = {
+  async headers() {
+    return [{
+      source: "/share/:token",
+      headers: [
+        { key: "Cache-Control", value: "private, no-store" },
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "X-Robots-Tag", value: "noindex, nofollow" },
+      ],
+    }];
+  },
   experimental: {
     // Bound production-build and analysis fan-out on developer machines. Four
     // workers preserve useful parallelism without launching one per CPU core.

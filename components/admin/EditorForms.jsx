@@ -12,7 +12,7 @@ import { EDITOR_ACTIVITY_TYPES } from "../../lib/activity-types.mjs";
 import { ActionIcon } from "../Icons";
 import { requestJson as api } from "../../lib/request-json.mjs";
 
-const emptySource = { kind: "reference", title: "", url: "" };
+const emptySource = { title: "", routeStart: "", routeEnd: "", url: "" };
 const emptyPlace = { name: "", address: "", latitude: "", longitude: "", website: "", googleMapsUrl: "", googlePlaceId: "", notes: "" };
 const openTimePicker = (event) => {
   try {
@@ -558,18 +558,28 @@ function SourcePicker({ sources, selectedRefs, onChange, onCreateSource }) {
 
 export function SourceForm({
   compact = false,
+  kind = "reference",
   source = null,
   onSave,
   onCancel,
 }) {
   const { t, locale } = useLocale();
+  const isRoute = kind === "route";
   const [values, setValues] = useState(
-    source ? { kind: source.kind ?? "reference", title: source.title, url: source.url } : emptySource,
+    source
+      ? {
+          title: isRoute && source.title === `${source.routeStart} → ${source.routeEnd}` ? "" : source.title,
+          routeStart: source.routeStart ?? "",
+          routeEnd: source.routeEnd ?? "",
+          url: source.url,
+        }
+      : emptySource,
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fieldsRef = useRef(null);
   const hintId = useId();
+  const titleHintId = useId();
   const field = (name) => ({
     value: values[name],
     onChange: (event) => setValues({ ...values, [name]: event.target.value }),
@@ -594,7 +604,7 @@ export function SourceForm({
     setBusy(true);
     setError("");
     try {
-      await onSave(values);
+      await onSave({ ...values, kind });
     } catch (requestError) {
       setError(adminErrorMessage(requestError, t, locale));
     } finally {
@@ -610,24 +620,33 @@ export function SourceForm({
       }
       ref={fieldsRef}
     >
+      {isRoute && <>
+        <label>
+          <FormFieldLabel required>{t("adminRoutes.start")}</FormFieldLabel>
+          <input {...field("routeStart")} maxLength={160} placeholder={t("adminRoutes.startPlaceholder")} required />
+        </label>
+        <label>
+          <FormFieldLabel required>{t("adminRoutes.end")}</FormFieldLabel>
+          <input {...field("routeEnd")} maxLength={160} placeholder={t("adminRoutes.endPlaceholder")} required />
+        </label>
+      </>}
       <label className={compact ? "" : "wide"}>
-        <FormFieldLabel>{t("adminSources.kind")}</FormFieldLabel>
-        <select {...field("kind")}>
-          <option value="reference">{t("adminSources.reference")}</option>
-          <option value="route">{t("adminSources.route")}</option>
-        </select>
-      </label>
-      <label className={compact ? "" : "wide"}>
-        <FormFieldLabel required>{t("adminExtra.message221")}</FormFieldLabel>
+        <FormFieldLabel required={!isRoute}>{isRoute ? t("adminRoutes.title") : t("adminExtra.message221")}</FormFieldLabel>
         <input
           {...field("title")}
           maxLength={300}
-          placeholder={t("adminExtra.message222")}
-          required
+          placeholder={isRoute
+            ? (values.routeStart.trim() && values.routeEnd.trim()
+              ? `${values.routeStart.trim()} → ${values.routeEnd.trim()}`
+              : t("adminRoutes.titlePlaceholder"))
+            : t("adminExtra.message222")}
+          aria-describedby={isRoute ? titleHintId : undefined}
+          required={!isRoute}
         />
+        {isRoute && <small id={titleHintId}>{t("adminRoutes.titleHint")}</small>}
       </label>
       <label className={compact ? "" : "wide"}>
-        <FormFieldLabel required>{t("adminExtra.message223")}</FormFieldLabel>
+        <FormFieldLabel required>{isRoute ? t("adminRoutes.mapsUrl") : t("adminExtra.message223")}</FormFieldLabel>
         <input
           type={compact ? "text" : "url"}
           inputMode="url"
@@ -635,11 +654,11 @@ export function SourceForm({
           spellCheck={false}
           {...field("url")}
           maxLength={2000}
-          placeholder="https://example.com/lien-ket"
+          placeholder={isRoute ? "https://maps.app.goo.gl/…" : "https://example.com/lien-ket"}
           aria-describedby={hintId}
           required
         />
-        <small id={hintId}>{t("adminExtra.message224")}</small>
+        <small id={hintId}>{isRoute ? t("adminRoutes.urlHint") : t("adminExtra.message224")}</small>
       </label>
     </div>
   );
@@ -653,7 +672,7 @@ export function SourceForm({
         }}
       >
         <div className={scheduleEditorStyles["source-inline-head"]}>
-          <strong>{t("adminExtra.message217")}</strong>
+          <strong>{isRoute ? t("adminRoutes.new") : t("adminExtra.message217")}</strong>
           <Button type="button" variant="ghost" onClick={onCancel}>
             {t("adminExtra.message082")}
           </Button>
@@ -670,21 +689,21 @@ export function SourceForm({
           onClick={submitSource}
           disabled={busy}
         >
-          {busy ? t("adminExtra.message225") : t("adminExtra.message226")}
+          {busy ? t("adminExtra.message225") : isRoute ? t("adminRoutes.add") : t("adminExtra.message226")}
         </Button>
       </section>
     );
   }
   return (
     <form
-      className={`${scheduleEditorStyles["admin-editor"]} ${scheduleEditorStyles["admin-form"]} ${scheduleEditorStyles["source-form"]}`}
+      className={`${scheduleEditorStyles["admin-editor"]} ${scheduleEditorStyles["admin-form"]} ${scheduleEditorStyles[isRoute ? "route-form" : "source-form"]}`}
       onSubmit={submitSource}
     >
       <div className={adminShellStyles["admin-section-head"]}>
         <h2>
-          {source
-            ? t("adminExtra.message227", { value0: source.number })
-            : t("adminExtra.message228")}
+          {isRoute
+            ? (source ? t("adminRoutes.edit", { number: source.number }) : t("adminRoutes.new"))
+            : (source ? t("adminExtra.message227", { value0: source.number }) : t("adminExtra.message228"))}
         </h2>
         <Button type="button" variant="ghost" onClick={onCancel}>
           {t("adminExtra.message082")}
@@ -699,9 +718,11 @@ export function SourceForm({
       <Button variant="primary" disabled={busy}>
         {busy
           ? t("adminExtra.message198")
-          : source
-            ? t("adminExtra.message229")
-            : t("adminExtra.message036")}
+          : isRoute
+            ? (source ? t("adminRoutes.save") : t("adminRoutes.add"))
+            : source
+              ? t("adminExtra.message229")
+              : t("adminExtra.message036")}
       </Button>
     </form>
   );

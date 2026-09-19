@@ -41,10 +41,9 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
     expect(activityId).toBeTruthy();
     expect(plan.backbone.find((item) => item.id === activityId)).toMatchObject({ type: "Picnic", icon: "🧺", detail: "" });
 
-    await page.getByRole("button", { name: "Thêm nguồn", exact: true }).click();
+    await page.getByRole("button", { name: "Thêm nguồn tham khảo", exact: true }).click();
     const createSourceForm = page.locator(".source-form");
     await expect(createSourceForm.locator('[title="Bắt buộc"]')).toHaveCount(2);
-    await createSourceForm.getByLabel("Loại liên kết").selectOption("route");
     await createSourceForm.getByLabel("Tên nguồn").fill(sourceTitle);
     await createSourceForm.getByLabel("URL").fill(`https://example.com/source-${runId}`);
     await createSourceForm.getByRole("button", { name: "Thêm nguồn" }).click();
@@ -54,10 +53,10 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
     plan = await planResponse.json();
     sourceNumber = plan.sources.find((source) => source.title === sourceTitle)?.number;
     expect(sourceNumber).toBeTruthy();
-    expect(plan.sources.find((source) => source.number === sourceNumber)?.kind).toBe("route");
-    await expect(page.getByRole("heading", { name: "1 Tuyến đường" })).toBeVisible();
+    expect(plan.sources.find((source) => source.number === sourceNumber)?.kind).toBe("reference");
+    await expect(page.getByRole("heading", { name: "1 Nguồn tham khảo" })).toBeVisible();
     await gotoHealthy(page, `/?trip=${slug}`);
-    await expect(page.getByRole("heading", { name: "Tuyến đường" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Nguồn tham khảo" })).toBeVisible();
     await expect(page.getByRole("link", { name: new RegExp(sourceTitle) })).toHaveAttribute("href", `https://example.com/source-${runId}`);
     await gotoHealthy(page, `/admin/trips?trip=${slug}`);
 
@@ -66,7 +65,6 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
     const editSourceForm = page.locator(".source-form");
     await expect(editSourceForm.getByRole("heading", { name: `Sửa nguồn ${sourceNumber}` })).toBeVisible();
     await editSourceForm.getByLabel("Tên nguồn").fill(updatedSourceTitle);
-    await editSourceForm.getByLabel("Loại liên kết").selectOption("reference");
     await editSourceForm.getByLabel("URL").fill(`https://example.org/source-${runId}`);
     await editSourceForm.getByRole("button", { name: "Lưu nguồn" }).click();
     await expect(page.locator(".admin-source-item", { hasText: updatedSourceTitle })).toContainText("example.org");
@@ -79,6 +77,50 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
   } finally {
     if (sourceNumber && slug) await request.delete(`/api/trips/${encodeURIComponent(slug)}/sources/${sourceNumber}`);
     if (activityId && slug) await request.delete(`/api/trips/${encodeURIComponent(slug)}/schedule/${activityId}`);
+    await request.delete(`/api/trips/${slug}`);
+  }
+});
+
+test("routes have a separate editor and derive their title from endpoints", async ({ page, request }) => {
+  const runId = Date.now();
+  const slug = `route-features-${runId}`;
+  let routeNumber;
+
+  try {
+    expect((await request.post("/api/trips", { data: { slug, title: "Route features", startDate: "2030-05-01", endDate: "2030-05-01", timezone: "Asia/Tokyo", location: "Kyoto" } })).status()).toBe(201);
+    await gotoHealthy(page, `/admin/trips?trip=${slug}`);
+    await expect(page.getByRole("button", { name: "Thêm tuyến đường", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Thêm nguồn tham khảo", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Thêm tuyến đường", exact: true }).click();
+    const routeForm = page.locator(".route-form");
+    await routeForm.getByLabel("Điểm bắt đầu").fill("Khách sạn");
+    await routeForm.getByLabel("Điểm kết thúc").fill("Shirahama Beach");
+    await expect(routeForm.getByLabel("Tiêu đề")).toHaveAttribute("placeholder", "Khách sạn → Shirahama Beach");
+    await expect(routeForm.getByLabel("Tiêu đề")).toHaveValue("");
+    await routeForm.getByLabel("Google Maps URL").fill(`https://maps.app.goo.gl/route-${runId}`);
+    await routeForm.getByRole("button", { name: "Thêm tuyến đường" }).click();
+    await expect(page.getByRole("heading", { name: "1 Tuyến đường" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "0 Nguồn tham khảo" })).toBeVisible();
+
+    let plan = await (await request.get(`/api/trips/${slug}`)).json();
+    const route = plan.sources.find((source) => source.kind === "route");
+    routeNumber = route?.number;
+    expect(route).toMatchObject({ title: "Khách sạn → Shirahama Beach", routeStart: "Khách sạn", routeEnd: "Shirahama Beach" });
+    await gotoHealthy(page, `/?trip=${slug}`);
+    await expect(page.getByRole("heading", { name: "Tuyến đường" })).toBeVisible();
+    await gotoHealthy(page, `/admin/trips?trip=${slug}`);
+
+    await page.locator(".admin-source-item", { hasText: "Khách sạn → Shirahama Beach" }).getByRole("button", { name: "Sửa" }).click();
+    const editForm = page.locator(".route-form");
+    await expect(editForm.getByLabel("Tiêu đề")).toHaveValue("");
+    await editForm.getByLabel("Điểm kết thúc").fill("Núi Omuro");
+    await expect(editForm.getByLabel("Tiêu đề")).toHaveAttribute("placeholder", "Khách sạn → Núi Omuro");
+    await editForm.getByRole("button", { name: "Lưu tuyến đường" }).click();
+    await expect(page.locator(".admin-source-item", { hasText: "Khách sạn → Núi Omuro" })).toBeVisible();
+    plan = await (await request.get(`/api/trips/${slug}`)).json();
+    expect(plan.sources.find((source) => source.number === routeNumber)).toMatchObject({ title: "Khách sạn → Núi Omuro", routeEnd: "Núi Omuro" });
+  } finally {
+    if (routeNumber) await request.delete(`/api/trips/${slug}/sources/${routeNumber}`);
     await request.delete(`/api/trips/${slug}`);
   }
 });
