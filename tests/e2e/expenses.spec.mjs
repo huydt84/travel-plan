@@ -89,29 +89,45 @@ test("expense controls remain usable on the canonical public and admin viewports
     const page = await context.newPage();
     await page.goto(`/?trip=${f.slug}`);
     await expect(page.getByRole("heading", { name: "Tổng quan chi tiêu" })).toBeVisible();
-    await expect(page.getByText(/0.*¥|¥.*0/).first()).toBeVisible();
+    const expenseToggle = page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ });
+    await expect(expenseToggle).toHaveAttribute("aria-expanded", "false");
+    const section = page.getByRole("button", { name: "Thêm khoản chi cho Matrix start" }).locator("xpath=ancestor::section[1]");
+    const sectionBox = await section.boundingBox();
+    const titleBox = await section.locator("xpath=preceding-sibling::h3[1]").boundingBox();
+    expect(Math.abs(sectionBox.x - titleBox.x)).toBeLessThan(1);
+    expect(sectionBox.height).toBeLessThanOrEqual(52);
+    expect(await section.evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe("0px");
+    const innerWidth = await section.evaluate((element) => {
+      const parent = element.parentElement;
+      const style = getComputedStyle(parent);
+      return parent.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
+    expect(Math.abs(sectionBox.width - innerWidth)).toBeLessThan(1);
     if (viewport.width === 320) {
-      await expect(page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ })).toHaveCount(0);
       await page.getByRole("button", { name: "Thêm khoản chi cho Matrix start" }).click();
       const dialog = page.getByRole("dialog", { name: "Thêm khoản chi" });
       await expect(dialog.locator('[title="Bắt buộc"]')).toHaveCount(2);
       await dialog.getByLabel("Người chi").selectOption({ label: f.people.member.name });
       await dialog.getByLabel(/Số tiền/).fill("125");
       await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
-      await expect(page.locator("small:visible").filter({ hasText: /125.*¥|¥.*125/ }).first()).toBeVisible();
-      const expenseActions = [
-        page.getByRole("button", { name: `Sửa khoản chi của ${f.people.member.name}` }),
-        page.getByRole("button", { name: `Xóa khoản chi của ${f.people.member.name}` }),
-      ];
-      for (const action of expenseActions) {
-        await expect(action).toBeVisible();
-        const box = await action.boundingBox();
-        expect(box?.width).toBe(44);
-        expect(box?.height).toBe(44);
-      }
+      await expect(page.getByRole("status", { name: "" }).filter({ hasText: "Đã lưu khoản chi." })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Thu gọn chi tiêu của Matrix start/ })).toContainText(/125.*¥|¥.*125/);
+      const more = page.getByRole("button", { name: `Thêm thao tác với Chi tiêu của ${f.people.member.name}` });
+      await expect(more).toBeVisible();
+      const box = await more.boundingBox();
+      expect(box?.width).toBe(44);
+      expect(box?.height).toBe(44);
+      await more.focus();
+      await page.keyboard.press("ArrowDown");
+      await expect(page.getByRole("menuitem", { name: "Sửa" })).toBeFocused();
+      await page.keyboard.press("ArrowDown");
+      await expect(page.getByRole("menuitem", { name: "Xóa" })).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(more).toBeFocused();
+      await expect(page.getByRole("menu")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: /Thu gọn chi tiêu của Matrix start/ })).toHaveAttribute("aria-expanded", "true");
+      await more.evaluate((button) => button.blur());
     } else {
-      const expenseToggle = page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ });
-      await expect(expenseToggle).toHaveCount(1);
       await expect(expenseToggle.locator("svg")).toHaveCount(1);
       await expenseToggle.click();
     }
@@ -133,5 +149,60 @@ test("expense controls remain usable on the canonical public and admin viewports
   await expect(adminActivity.getByText(/125.*¥|¥.*125/).last()).toBeVisible();
   await expect(page.getByText("Quản lý chi tiêu", { exact: true })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("admin-expenses-1440.png"), fullPage: false });
+  await context.close();
+});
+
+test("expense menu keeps totals and CRUD usable from a collapsed module", async ({ browser, permissionFixture: f }) => {
+  const context = await browser.newContext({ viewport: { width: 320, height: 760 }, extraHTTPHeaders: f.headers.leader });
+  const page = await context.newPage();
+  await page.goto(`/?trip=${f.slug}`);
+  const section = page.getByRole("button", { name: "Thêm khoản chi cho Matrix start" }).locator("xpath=ancestor::section[1]");
+  await section.getByRole("button", { name: "Thêm khoản chi cho Matrix start" }).click();
+  const dialog = page.getByRole("dialog", { name: "Thêm khoản chi" });
+  await dialog.getByLabel("Người chi").selectOption({ label: f.people.member.name });
+  await dialog.getByLabel(/Số tiền/).fill("125");
+  await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
+  await expect(section).toContainText(/125.*¥|¥.*125/);
+  await expect(section).toContainText("· 1");
+  const more = section.getByRole("button", { name: /Thêm thao tác với Chi tiêu/ });
+  await more.click();
+  await page.getByRole("menuitem", { name: "Sửa" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Sửa khoản chi" });
+  await editDialog.getByLabel(/Số tiền/).fill("250");
+  await editDialog.getByRole("button", { name: "Lưu thay đổi" }).click();
+  await expect(section).toContainText(/250.*¥|¥.*250/);
+  await expect(more).toBeFocused();
+  await more.click();
+  await page.getByRole("menuitem", { name: "Xóa" }).click();
+  await expect(page.getByRole("alertdialog", { name: "Xóa khoản chi này?" })).toBeVisible();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Huỷ" }).click();
+  await expect(more).toBeFocused();
+  await more.click();
+  await page.getByRole("menuitem", { name: "Xóa" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Xóa" }).click();
+  await expect(section).toContainText("· 0");
+  await expect(section).toContainText("Chưa có khoản chi cho hoạt động này.");
+  await expect(section.getByRole("button", { name: /Thu gọn chi tiêu của Matrix start/ })).toBeFocused();
+  await section.getByRole("button", { name: "Thêm khoản chi cho Matrix start" }).click();
+  await dialog.getByLabel("Người chi").selectOption({ label: f.people.member.name });
+  await dialog.getByLabel(/Số tiền/).fill("125");
+  await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
+  await section.getByRole("button", { name: "Thêm khoản chi cho Matrix start" }).click();
+  await dialog.getByLabel("Người chi").selectOption({ label: f.people.leader.name });
+  await dialog.getByLabel(/Số tiền/).fill("123456789");
+  await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
+  await expect(section).toContainText("· 2");
+  await expect(section.locator('[class*="expenseRow"]')).toHaveCount(2);
+  await f.sql`UPDATE users SET display_name='A very long payer description that must wrap within the expense row without moving its amount or action' WHERE email=${f.people.member.email}`;
+  await page.reload();
+  await page.getByRole("button", { name: /Mở chi tiêu của Matrix start/ }).click();
+  const row = section.locator('[class*="expenseRow"]').filter({ hasText: "A very long payer description" });
+  await expect(row).toContainText("A very long payer description");
+  const rowBox = await row.boundingBox();
+  const amountBox = await row.locator('[class*="expenseAmount"]').boundingBox();
+  const actionBox = await row.getByRole("button", { name: /Thêm thao tác/ }).boundingBox();
+  expect(amountBox.x + amountBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+  expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 8);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
   await context.close();
 });
