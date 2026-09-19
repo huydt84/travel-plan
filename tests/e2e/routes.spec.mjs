@@ -52,15 +52,22 @@ test("trip selection stays readable beside a long current trip title", async ({ 
     const geometry = await select.evaluate((element) => {
       const control = element.closest(".trip-picker-control").getBoundingClientRect();
       const affordance = element.parentElement.querySelector(".trip-picker-affordance").getBoundingClientRect();
+      const actions = document.querySelector(".trip-context-actions").getBoundingClientRect();
+      const clock = document.querySelector(".trip-context .live-clock").getBoundingClientRect();
+      const context = document.querySelector(".trip-context");
+      const contextBox = context.getBoundingClientRect();
+      const styles = getComputedStyle(context);
       return {
         controlWidth: control.width,
         controlRight: control.right,
         affordanceRight: affordance.right,
-        viewportWidth: document.documentElement.clientWidth,
+        availableWidth: contextBox.width - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight)
+          - actions.width - clock.width - 2 * parseFloat(styles.columnGap),
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       };
     });
-    expect(geometry.controlWidth).toBeLessThanOrEqual(width === 320 ? 296 : 560);
+    if (width > 680) expect(Math.abs(geometry.controlWidth - geometry.availableWidth)).toBeLessThanOrEqual(2);
+    else expect(geometry.controlWidth).toBeLessThanOrEqual(296);
     expect(geometry.affordanceRight).toBeLessThanOrEqual(geometry.controlRight);
     expect(geometry.overflow, `long title should not cause page overflow at ${width}px`).toBeLessThanOrEqual(0);
     await expect(page.locator(".trip-context .trip-context-actions").getByRole("button", { name: "Chia sẻ" })).toBeVisible();

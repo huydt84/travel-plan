@@ -115,12 +115,16 @@ for (const viewport of viewports) {
             const picker = context.querySelector(".trip-picker");
             const select = picker.querySelector("select");
             const actions = context.querySelector(".trip-context-actions");
+            const clock = context.querySelector(".live-clock");
+            const metadata = context.querySelector('[class*="trip-metadata"]');
             const header = document.querySelector(".trip-bar");
             const appActions = header.querySelector("nav");
             const contextBox = context.getBoundingClientRect();
             const pickerBox = picker.getBoundingClientRect();
             const selectBox = select.getBoundingClientRect();
             const actionsBox = actions.getBoundingClientRect();
+            const clockBox = clock.getBoundingClientRect();
+            const metadataBox = metadata.getBoundingClientRect();
             const style = getComputedStyle(select);
             const canvas = document.createElement("canvas");
             const measure = canvas.getContext("2d");
@@ -135,15 +139,29 @@ for (const viewport of viewports) {
               pickerBottom: pickerBox.bottom,
               pickerTop: pickerBox.top,
               actionsBottom: actionsBox.bottom,
+              pickerRight: pickerBox.right,
+              actionsLeft: actionsBox.left,
+              actionsRight: actionsBox.right,
+              clockLeft: clockBox.left,
+              clockRight: clockBox.right,
+              metadataTop: metadataBox.top,
+              gap: parseFloat(getComputedStyle(context).columnGap),
+              contentRight: contextBox.right - parseFloat(getComputedStyle(context).paddingRight),
               appActionsInHeader: Boolean(appActions?.querySelector("a")),
               tripActionsCount: actions.querySelectorAll("a, button").length,
               shareInContext: Boolean(context.querySelector('[class*="share-action"]')),
               shareInHeader: Boolean(header.querySelector('[class*="share-action"]')),
             };
           });
-          expect(tripControls.pickerWidth).toBeLessThanOrEqual(tripControls.contextWidth * (viewport.touch ? 1 : 0.5));
+          expect(tripControls.selectWidth).toBeGreaterThanOrEqual(tripControls.pickerWidth - 2);
           if (viewport.touch) expect(tripControls.actionsTop).toBeGreaterThanOrEqual(tripControls.pickerBottom - 1);
-          else expect(tripControls.actionsTop).toBeLessThan(tripControls.pickerBottom);
+          else {
+            expect(tripControls.actionsTop).toBeLessThan(tripControls.pickerBottom);
+            expect(Math.abs(tripControls.actionsLeft - tripControls.pickerRight - tripControls.gap)).toBeLessThanOrEqual(2);
+            expect(Math.abs(tripControls.clockLeft - tripControls.actionsRight - tripControls.gap)).toBeLessThanOrEqual(2);
+            expect(Math.abs(tripControls.clockRight - tripControls.contentRight)).toBeLessThanOrEqual(2);
+            expect(tripControls.metadataTop).toBeGreaterThanOrEqual(tripControls.pickerBottom - 1);
+          }
           expect(tripControls.appActionsInHeader).toBe(true);
           expect(tripControls.tripActionsCount).toBe(3);
           expect(tripControls.shareInContext).toBe(true);
