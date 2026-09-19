@@ -26,7 +26,7 @@ for (const viewport of [
       await page.setViewportSize(viewport);
       await gotoHealthy(page, `/?trip=${trips[0].slug}`);
       const assertTrip = async (trip) => {
-        await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toHaveValue(trip.slug);
+        await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toHaveAttribute("data-trip-slug", trip.slug);
         await expect(page.getByRole("region", { name: `Lịch trình chi tiết ${trip.date}`, exact: true })).toBeVisible();
         await expect(page.getByRole("heading", { name: `${trip.title} activity`, exact: true })).toBeVisible();
         await expect(page.getByRole("navigation", { name: "Chọn ngày trong chuyến đi" }).getByRole("button")).toHaveAttribute("aria-current", "date");
@@ -34,7 +34,8 @@ for (const viewport of [
       };
       await assertTrip(trips[0]);
       for (const trip of [trips[1], trips[0], trips[1]]) {
-        await page.getByRole("combobox", { name: "Chọn chuyến đi" }).selectOption(trip.slug);
+        await page.getByRole("combobox", { name: "Chọn chuyến đi" }).click();
+        await page.getByRole("option", { name: new RegExp(trip.title) }).click();
         await assertTrip(trip);
       }
       await page.goBack();

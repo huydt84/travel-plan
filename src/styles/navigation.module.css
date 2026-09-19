@@ -77,11 +77,15 @@
   composes: trip-picker-control from global;
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   height: 40px;
-  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
   border: 1px solid var(--navy);
   border-radius: 3px;
   background: white;
@@ -93,41 +97,31 @@
   border-color: var(--green);
   background: var(--green-soft);
 }
-.trip-picker-control:focus-within {
-  overflow: visible;
+.trip-picker-control:focus-visible,
+.trip-picker-control[data-state="open"] {
   border-color: var(--green);
   background: var(--green-soft);
 }
-.trip-picker-control:has(select:focus-visible) {
+.trip-picker-control:focus-visible {
   outline: 3px solid var(--yellow);
   outline-offset: 3px;
 }
-.trip-picker select {
-  position: relative;
-  z-index: 1;
-  grid-area: 1 / 1;
-  width: 100%;
-  max-width: 100%;
+.trip-picker-title {
+  display: block;
+  align-self: center;
   min-width: 0;
-  height: 100%;
-  padding: 0 76px 0 11px;
+  padding: 0 11px;
   overflow: hidden;
-  border: 0;
-  outline: 0;
-  appearance: none;
   color: var(--navy);
-  background: transparent;
   font: 600 20px/1.1 var(--display);
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .trip-picker-affordance {
   composes: trip-picker-affordance from global;
-  z-index: 2;
-  grid-area: 1 / 1;
   display: inline-flex;
   align-items: center;
   align-self: stretch;
-  justify-self: end;
   gap: 5px;
   padding: 0 10px;
   color: var(--paper-bright);
@@ -144,11 +138,64 @@
   height: 14px;
 }
 .trip-picker-control:hover .trip-picker-affordance,
-.trip-picker-control:focus-within .trip-picker-affordance {
+.trip-picker-control:focus-visible .trip-picker-affordance,
+.trip-picker-control[data-state="open"] .trip-picker-affordance {
   background: var(--green-dark);
 }
 .trip-picker-control:active .trip-picker-affordance {
   background: var(--navy);
+}
+.trip-picker-popup {
+  z-index: 100;
+  width: min(560px, calc(100vw - 24px));
+  max-height: min(420px, var(--radix-select-content-available-height));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper-bright);
+  box-shadow: 0 8px 24px rgb(16 36 61 / 14%);
+  color: var(--navy);
+  font: 400 16px/1.45 var(--body);
+}
+.trip-picker-options {
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.trip-picker-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 48px 10px 16px;
+  outline: none;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.trip-picker-option + .trip-picker-option {
+  border-top: 1px solid var(--paper-deep);
+}
+.trip-picker-option[data-state="checked"] {
+  background: var(--green-soft);
+}
+.trip-picker-option[data-highlighted] {
+  background: var(--paper-deep);
+}
+.trip-picker-option[data-highlighted]:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: -3px;
+}
+.trip-picker-check {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  display: flex;
+  transform: translateY(-50%);
+  color: var(--green-dark);
+}
+.trip-picker-check :global(.action-icon) {
+  width: 18px;
+  height: 18px;
 }
 .trip-metadata {
   grid-area: metadata;
@@ -435,7 +482,6 @@
   .trip-picker-control { height: 44px; }
   .trip-context-actions .trip-action { height: 44px; min-height: 44px; }
   .trip-picker-control { width: 100%; }
-  .trip-picker select { width: 100%; }
   .trip-context-actions {
     justify-content: flex-start;
     gap: 6px;
@@ -445,8 +491,7 @@
     min-width: 0;
     white-space: normal;
   }
-  .trip-picker select {
-    padding-right: 44px;
+  .trip-picker-title {
     font-size: 17px;
   }
   .trip-picker-affordance {

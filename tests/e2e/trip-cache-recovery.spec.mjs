@@ -19,7 +19,8 @@ test(`home recovers a deleted cached trip at ${viewport.width}`, async ({ page, 
     // exactly what two local Next servers sharing a test database can produce.
     await expect.poll(async () => (await (await request.get("/api/trips")).json()).trips.some((trip) => trip.slug === slug)).toBe(true);
     await page.goto(`/?trip=${original[0].slug}`);
-    await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" }).locator(`option[value="${slug}"]`)).toHaveCount(1);
+    await page.getByRole("combobox", { name: "Chọn chuyến đi" }).click();
+    await expect(page.getByRole("option", { name: /Disposable cache regression/ })).toHaveCount(1);
     await page.goto(`/admin/trips?trip=${slug}`);
     await expect(page.locator(".plan-summary .plan-slug")).toHaveText(slug);
     await sql`DELETE FROM trips WHERE slug=${slug}`;
@@ -30,16 +31,18 @@ test(`home recovers a deleted cached trip at ${viewport.width}`, async ({ page, 
     const response = await page.goto("/");
     expect(response.status()).toBe(200);
     await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toBeVisible();
-    await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).not.toHaveValue(slug);
+    await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).not.toHaveAttribute("data-trip-slug", slug);
     await expect(page.getByText(/Trip not found:/)).toHaveCount(0);
-    await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" }).locator(`option[value="${slug}"]`)).toHaveCount(0);
+    await page.getByRole("combobox", { name: "Chọn chuyến đi" }).click();
+    await expect(page.getByRole("option", { name: /Disposable cache regression/ })).toHaveCount(0);
+    await page.keyboard.press("Escape");
     await page.screenshot({ path: testInfo.outputPath("recovered-tracker.png") });
     // Exercise the integration after recovery, not merely the HTTP status.
-    const selected = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+    const selected = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).getAttribute("data-trip-slug");
     await page.getByRole("button", { name: /^Trợ lý/ }).click();
     await expect(page.getByRole("textbox", { name: "Yêu cầu cho trợ lý" })).toBeEnabled();
     await expect(page.getByRole("button", { name: "Thêm chuyến đi này", exact: true })).toBeVisible();
-    await expect(page.getByRole("combobox", { name: "Chọn chuyến đi", includeHidden: true })).toHaveValue(selected);
+    await expect(page.getByRole("combobox", { name: "Chọn chuyến đi", includeHidden: true })).toHaveAttribute("data-trip-slug", selected);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
     await page.screenshot({ path: testInfo.outputPath("recovered-companion.png") });
     await page.getByRole("button", { name: "Lịch sử", exact: true }).click();

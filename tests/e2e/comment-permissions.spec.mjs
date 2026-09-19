@@ -214,7 +214,7 @@ test("visibility notifications open the hidden drawer and remain idempotent", as
 test("deletion confirmation contains keyboard focus, blocks pending dismissal, and recovers from errors", async ({ page, request, runtimeHealth }) => {
   await page.setViewportSize({ width: 320, height: 760 });
   await gotoHealthy(page, "/");
-  const slug = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+  const slug = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).getAttribute("data-trip-slug");
   const created = await request.post(`/api/trips/${slug}/suggestions`, {
     data: { activityId: null, kind: "comment", body: `Confirmation behavior ${Date.now()}` },
   });

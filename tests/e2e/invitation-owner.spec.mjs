@@ -40,7 +40,7 @@ test("mobile invitation dialog closes with Escape and restores focus", async ({ 
 
 test("owner invitation access contract is available to the sheet", async ({ page, request }) => {
   await gotoHealthy(page, "/");
-  const tripSlug = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+  const tripSlug = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).getAttribute("data-trip-slug");
 
   const response = await request.get(`/api/invitation-access?tripSlug=${encodeURIComponent(tripSlug)}`);
   expect(response.ok()).toBe(true);
@@ -118,7 +118,7 @@ test("invitation permission states gate the composer and recover after access er
 
 test("Gmail return restores the edited draft and focus remains inside the invitation", async ({ page }) => {
   await gotoHealthy(page, "/");
-  const slug = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).inputValue();
+  const slug = await page.getByRole("combobox", { name: "Chọn chuyến đi" }).getAttribute("data-trip-slug");
   await page.evaluate(({ slug }) => sessionStorage.setItem(`travel-plan:invite:local-admin@localhost.invalid:${slug}`, JSON.stringify({ savedAt: Date.now(), recipients: ["friend@example.com"], subject: "Edited subject", message: "Edited message", draftTouched: true })), { slug });
   await gotoHealthy(page, `/?trip=${slug}&invite=1&gmail=return`);
   const dialog = page.getByRole("dialog");

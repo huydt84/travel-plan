@@ -199,7 +199,7 @@ for (const viewport of viewports) {
           const tripControls = await page.evaluate(() => {
             const context = document.querySelector(".trip-context");
             const picker = context.querySelector(".trip-picker");
-            const select = picker.querySelector("select");
+            const select = picker.querySelector('[role="combobox"]');
             const actions = context.querySelector(".trip-context-actions");
             const clock = context.querySelector(".live-clock");
             const metadata = context.querySelector('[class*="trip-metadata"]');
@@ -215,7 +215,7 @@ for (const viewport of viewports) {
             const canvas = document.createElement("canvas");
             const measure = canvas.getContext("2d");
             measure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-            const selectedText = select.selectedOptions[0]?.textContent || "";
+            const selectedText = select.querySelector('[class*="trip-picker-title"]')?.textContent || "";
             return {
               contextWidth: contextBox.width,
               pickerWidth: pickerBox.width,

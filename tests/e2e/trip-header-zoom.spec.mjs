@@ -60,9 +60,10 @@ test("application and trip controls retain their actions on a narrow screen", as
   await expect(page.getByRole("dialog", { name: "Thành viên" })).toBeVisible();
   await page.keyboard.press("Escape");
 
-  await tripSection.getByRole("combobox", { name: "Chọn chuyến đi" }).selectOption(tripSlug);
+  await tripSection.getByRole("combobox", { name: "Chọn chuyến đi" }).click();
+  await page.getByRole("option", { name: /Fixture itinerary/ }).click();
   await expect(page).toHaveURL(new RegExp(`trip=${tripSlug}`));
-  await expect(tripSection.getByRole("combobox", { name: "Chọn chuyến đi" })).toHaveValue(tripSlug);
+  await expect(tripSection.getByRole("combobox", { name: "Chọn chuyến đi" })).toHaveAttribute("data-trip-slug", tripSlug);
 
   for (const locale of ["en", "ja"]) {
     await appHeader.getByTestId("language-switcher").selectOption(locale);
@@ -82,8 +83,8 @@ test("trip controls share the selector centerline and remain compact with a long
     await page.setViewportSize({ width, height: width === 320 ? 760 : 900 });
     await gotoHealthy(page, "/");
     const geometry = await page.locator(".trip-context").evaluate((context) => {
-      const select = context.querySelector("select");
-      select.selectedOptions[0].textContent = "Chuyến hành trình rất dài qua nhiều thành phố và địa điểm cùng bạn bè trong mùa thu Nhật Bản";
+      const title = context.querySelector('[class*="trip-picker-title"]');
+      title.textContent = "Chuyến hành trình rất dài qua nhiều thành phố và địa điểm cùng bạn bè trong mùa thu Nhật Bản";
       const picker = context.querySelector(".trip-picker-control");
       const actions = [...context.querySelectorAll(".trip-context-actions button")];
       const clock = context.querySelector(".live-clock");

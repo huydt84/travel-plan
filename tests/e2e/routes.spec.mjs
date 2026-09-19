@@ -48,10 +48,10 @@ test("trip selection stays readable beside a long current trip title", async ({ 
     await page.setViewportSize({ width, height: 900 });
     await gotoHealthy(page, `/?trip=${tripSlug}`);
     const select = page.getByRole("combobox", { name: "Chọn chuyến đi" });
-    await expect(select).toHaveValue(tripSlug);
+    await expect(select).toHaveAttribute("data-trip-slug", tripSlug);
     const geometry = await select.evaluate((element) => {
       const control = element.closest(".trip-picker-control").getBoundingClientRect();
-      const affordance = element.parentElement.querySelector(".trip-picker-affordance").getBoundingClientRect();
+      const affordance = element.querySelector(".trip-picker-affordance").getBoundingClientRect();
       const actions = document.querySelector(".trip-context-actions").getBoundingClientRect();
       const clock = document.querySelector(".trip-context .live-clock").getBoundingClientRect();
       const context = document.querySelector(".trip-context");

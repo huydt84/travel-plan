@@ -32,7 +32,7 @@ itineraryTest("owner can maintain activities from the normal schedule", async ({
   await expect(confirmation).toContainText("Trip vẫn được giữ nguyên");
   await confirmation.getByRole("button", { name: "Xoá", exact: true }).click();
   await expect(page.getByRole("heading", { level: 3, name: "Bữa trưa thử nghiệm" })).toHaveCount(0);
-  await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toHaveValue(tripSlug);
+  await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toHaveAttribute("data-trip-slug", tripSlug);
 
   const plan = await (await request.get(`/api/itinerary?slug=${tripSlug}`)).json();
   expect(plan.itinerary.map((item) => item.title)).toContain(updatedTitle);

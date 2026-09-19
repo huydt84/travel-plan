@@ -13,6 +13,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import Footer from "./ui/Footer";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
+import * as Select from "@radix-ui/react-select";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
@@ -660,12 +661,9 @@ export default function TripTracker({
         <div className={navigationStyles["trip-picker-group"]}>
           <label className={navigationStyles["trip-picker-label"]} htmlFor="trip-picker-select">{t("nav.selectTrip")}</label>
           <div className={navigationStyles["trip-picker"]}>
-            <span className={navigationStyles["trip-picker-control"]}>
-              <select
-                id="trip-picker-select"
+            <Select.Root
                 value={data.trip.slug}
-                onChange={(event) => {
-                  const nextSlug = event.target.value;
+                onValueChange={(nextSlug) => {
                   guardScheduleDraft(
                     () => {
                       const url = new URL(window.location.href);
@@ -680,27 +678,54 @@ export default function TripTracker({
                   );
                 }}
               >
-                {trips.map((trip) => (
-                  <option value={trip.slug} key={trip.slug}>
-                    {formatTripTitle(
-                      trip.title,
-                      trip.startDate,
-                      trip.timezone,
-                      now,
-                      trip.endDate,
-                      locale,
-                    )}
-                  </option>
-                ))}
-              </select>
-              <span
-                className={navigationStyles["trip-picker-affordance"]}
-                aria-hidden="true"
+              <Select.Trigger
+                id="trip-picker-select"
+                data-trip-slug={data.trip.slug}
+                className={navigationStyles["trip-picker-control"]}
+                onKeyDown={(event) => {
+                  // Radix typeahead on a closed trigger commits a value immediately.
+                  // Trip changes require an explicit selection from the open list.
+                  if (event.key.length === 1 && event.key !== " ") event.preventDefault();
+                }}
               >
-                <span>{t("nav.change")}</span>
-                <ActionIcon name="down" />
-              </span>
-            </span>
+                <span className={navigationStyles["trip-picker-title"]}>
+                  <Select.Value>
+                    {formatTripTitle(data.trip.title, data.trip.startDate, data.trip.timezone, now, data.trip.endDate, locale)}
+                  </Select.Value>
+                </span>
+                <Select.Icon className={navigationStyles["trip-picker-affordance"]}>
+                  <span>{t("nav.change")}</span>
+                  <ActionIcon name="down" />
+                </Select.Icon>
+              </Select.Trigger>
+              <Select.Portal>
+                <Select.Content
+                  className={navigationStyles["trip-picker-popup"]}
+                  position="popper"
+                  side="bottom"
+                  align="end"
+                  sideOffset={7}
+                  collisionPadding={12}
+                >
+                  <Select.Viewport className={navigationStyles["trip-picker-options"]}>
+                    {trips.map((trip) => (
+                      <Select.Item
+                        className={navigationStyles["trip-picker-option"]}
+                        value={trip.slug}
+                        key={trip.slug}
+                      >
+                        <Select.ItemText>
+                          {formatTripTitle(trip.title, trip.startDate, trip.timezone, now, trip.endDate, locale)}
+                        </Select.ItemText>
+                        <Select.ItemIndicator className={navigationStyles["trip-picker-check"]}>
+                          <ActionIcon name="check" />
+                        </Select.ItemIndicator>
+                      </Select.Item>
+                    ))}
+                  </Select.Viewport>
+                </Select.Content>
+              </Select.Portal>
+            </Select.Root>
           </div>
         </div>
         <div className={navigationStyles["trip-metadata"]}>

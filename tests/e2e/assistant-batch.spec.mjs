@@ -473,7 +473,7 @@ for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) test(`an 
     await expect(page.locator(`#contribution-${note.id}`)).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     await page.screenshot({ path: testInfo.outputPath(`empty-trip-${width}.png`) });
-    await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toHaveValue(f.slug);
+    await expect(page.getByRole("combobox", { name: "Chọn chuyến đi" })).toHaveAttribute("data-trip-slug", f.slug);
     await expect(page.getByRole("button", { name: "Trợ lý", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Rủ bạn đi cùng", exact: true }).click();
     await expect(page.getByRole("dialog", { name: /Rủ bạn đi/ })).toBeVisible();
