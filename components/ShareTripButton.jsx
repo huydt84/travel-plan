@@ -5,6 +5,7 @@ import Dialog, { DialogDescription, DialogTitle } from "./ui/Dialog";
 import { useLocale } from "./LocaleProvider";
 import { requestJson } from "../lib/request-json.mjs";
 import styles from "./share-trip.module.css";
+import { ActionIcon } from "./Icons";
 
 export default function ShareTripButton({ slug, className = "" }) {
   const { t, intlLocale } = useLocale();
@@ -41,7 +42,10 @@ export default function ShareTripButton({ slug, className = "" }) {
   }
 
   return <>
-    <button type="button" className={className || styles.trigger} onClick={createLink}>{t("share.create")}</button>
+    <button type="button" className={className || styles.trigger} onClick={createLink}>
+      <ActionIcon name="share" />
+      <span>{t("share.create")}</span>
+    </button>
     {open && <Dialog onClose={() => setOpen(false)} overlayClassName={styles.overlay}>
       <section className={styles.dialog}>
         <div className={styles.dialogHead}>

@@ -1,4 +1,8 @@
 .trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   min-height: 42px;
   padding: 10px 14px;
   border: 1px solid var(--green);
@@ -8,6 +12,7 @@
   font: 700 11px/1.2 var(--font-body);
   cursor: pointer;
 }
+.trigger :global(.action-icon) { flex: none; }
 .trigger:hover { color: white; background: var(--green); }
 .overlay {
   position: fixed;

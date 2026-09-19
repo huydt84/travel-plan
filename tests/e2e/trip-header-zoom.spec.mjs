@@ -40,7 +40,9 @@ test("application and trip controls retain their actions on a narrow screen", as
   const tripSection = page.locator(".trip-context");
   await expect(appHeader.getByRole("button", { name: "Trợ lý", exact: true })).toBeVisible();
   await expect(appHeader.getByRole("link", { name: "Quản lý", exact: true })).toHaveAttribute("href", /\/trips\/manage/);
-  await expect(tripSection.getByRole("button", { name: "Chia sẻ" })).toBeVisible();
+  const shareButton = tripSection.getByRole("button", { name: "Chia sẻ" });
+  await expect(shareButton).toBeVisible();
+  await expect(shareButton.locator("svg.action-icon")).toBeVisible();
   await expect(tripSection.getByRole("button", { name: "Rủ bạn đi cùng" })).toBeVisible();
   await expect(tripSection.getByRole("button", { name: "Thành viên" })).toBeVisible();
 
