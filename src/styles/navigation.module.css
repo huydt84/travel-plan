@@ -45,7 +45,8 @@
   composes: trip-context from global;
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content max-content;
-  grid-template-areas: "picker actions clock" "metadata . .";
+  grid-template-areas: "label . ." "picker actions clock" "metadata . .";
+  grid-template-rows: auto 40px auto;
   align-items: center;
   column-gap: 20px;
   row-gap: 5px;
@@ -56,18 +57,17 @@
   background: var(--paper-bright);
 }
 .trip-picker-group {
+  display: contents;
+}
+.trip-picker {
+  composes: trip-picker from global;
   grid-area: picker;
   display: grid;
   min-width: 0;
 }
-.trip-picker {
-  composes: trip-picker from global;
-  display: grid;
-  align-content: center;
-  min-width: 0;
-}
 .trip-picker-label {
-  margin-bottom: 5px;
+  grid-area: label;
+  align-self: end;
   color: var(--green-dark);
   font: 700 10px/1 var(--display);
   letter-spacing: 0.09em;
@@ -80,6 +80,7 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  height: 40px;
   overflow: hidden;
   border: 1px solid var(--navy);
   border-radius: 3px;
@@ -108,7 +109,8 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  padding: 8px 76px 8px 11px;
+  height: 100%;
+  padding: 0 76px 0 11px;
   overflow: hidden;
   border: 0;
   outline: 0;
@@ -179,7 +181,13 @@
   height: 6px;
 }
 .trip-context :global(.live-clock) span:last-child {
-  font-size: 12px;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 680px) {
+  .trip-context :global(.live-clock) span:last-child {
+    font-size: 12px;
+  }
 }
 .trip-context-actions {
   composes: trip-context-actions from global;
@@ -191,11 +199,17 @@
   gap: 6px;
 }
 .trip-context-actions .trip-action {
-  min-height: 44px;
-  padding: 9px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 12px;
   border-color: transparent;
   color: var(--navy);
   background: transparent;
+  font-size: 10px;
+  font-weight: 700;
   white-space: nowrap;
 }
 .trip-context-actions .trip-action:hover {
@@ -203,15 +217,14 @@
   color: var(--navy);
   background: var(--paper-bright);
 }
-.trip-context-actions .share-action {
-  border-color: var(--green);
-  color: var(--paper-bright);
-  background: var(--green);
+.trip-context-actions .trip-action:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 2px;
 }
-.trip-context-actions .share-action:hover {
-  border-color: var(--green-dark);
+.trip-context-actions .trip-action:active {
+  border-color: var(--navy);
   color: var(--paper-bright);
-  background: var(--green-dark);
+  background: var(--navy);
 }
 .viewer-utilities {
   composes: viewer-utilities from global;
@@ -415,10 +428,12 @@
   .application-actions { grid-area: app-actions; }
   .trip-context {
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: "picker picker" "actions actions" "metadata clock";
+    grid-template-areas: "label label" "picker picker" "actions actions" "metadata clock";
+    grid-template-rows: auto 44px auto auto;
     padding: 9px 12px 12px;
   }
-  .trip-picker-group { width: 100%; max-width: 100%; }
+  .trip-picker-control { height: 44px; }
+  .trip-context-actions .trip-action { height: 44px; min-height: 44px; }
   .trip-picker-control { width: 100%; }
   .trip-picker select { width: 100%; }
   .trip-context-actions {

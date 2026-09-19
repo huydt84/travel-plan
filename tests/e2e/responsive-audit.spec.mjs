@@ -235,8 +235,8 @@ for (const viewport of viewports) {
               contentRight: contextBox.right - parseFloat(getComputedStyle(context).paddingRight),
               appActionsInHeader: Boolean(appActions?.querySelector("a")),
               tripActionsCount: actions.querySelectorAll("a, button").length,
-              shareInContext: Boolean(context.querySelector('[class*="share-action"]')),
-              shareInHeader: Boolean(header.querySelector('[class*="share-action"]')),
+              shareInContext: [...actions.querySelectorAll("button")].some((button) => button.textContent.trim() === "Chia sẻ"),
+              shareInHeader: [...header.querySelectorAll("button")].some((button) => button.textContent.trim() === "Chia sẻ"),
             };
           });
           expect(tripControls.selectWidth).toBeGreaterThanOrEqual(tripControls.pickerWidth - 2);

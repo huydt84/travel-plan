@@ -74,3 +74,57 @@ test("application and trip controls retain their actions on a narrow screen", as
   await appHeader.locator("nav a").click();
   await expect(page).toHaveURL(new RegExp(`/trips/manage\\?trip=${tripSlug}`));
 });
+
+test("trip controls share the selector centerline and remain compact with a long title", async ({ page }) => {
+  for (const width of [320, 680, 1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: width === 320 ? 760 : 900 });
+    await gotoHealthy(page, "/");
+    const geometry = await page.locator(".trip-context").evaluate((context) => {
+      const select = context.querySelector("select");
+      select.selectedOptions[0].textContent = "Chuyến hành trình rất dài qua nhiều thành phố và địa điểm cùng bạn bè trong mùa thu Nhật Bản";
+      const picker = context.querySelector(".trip-picker-control");
+      const actions = [...context.querySelectorAll(".trip-context-actions button")];
+      const clock = context.querySelector(".live-clock");
+      const digits = clock.querySelector("span:last-child");
+      const digitStyle = getComputedStyle(digits);
+      const box = (element) => {
+        const rect = element.getBoundingClientRect();
+        return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, height: rect.height, center: (rect.top + rect.bottom) / 2 };
+      };
+      return {
+        picker: box(picker),
+        actions: actions.map(box),
+        clock: box(clock),
+        digitSize: digitStyle.fontSize,
+        digitWeight: digitStyle.fontWeight,
+        digitVariant: digitStyle.fontVariantNumeric,
+        backgrounds: actions.map((button) => getComputedStyle(button).backgroundColor),
+        colors: actions.map((button) => getComputedStyle(button).color),
+        weights: actions.map((button) => getComputedStyle(button).fontWeight),
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    const controlHeight = width <= 680 ? 44 : 40;
+    expect(geometry.picker.height).toBe(controlHeight);
+    expect(geometry.actions).toHaveLength(3);
+    expect(geometry.actions.map(({ height }) => height)).toEqual([controlHeight, controlHeight, controlHeight]);
+    expect(geometry.digitSize).toBe(width <= 680 ? "12px" : "20px");
+    expect(geometry.digitWeight).toBe("600");
+    expect(geometry.digitVariant).toContain("tabular-nums");
+    expect(geometry.clock.height).toBeLessThanOrEqual(controlHeight);
+    expect(new Set(geometry.backgrounds).size).toBe(1);
+    expect(new Set(geometry.colors).size).toBe(1);
+    expect(new Set(geometry.weights).size).toBe(1);
+    expect(geometry.overflow, `horizontal overflow at ${width}px`).toBeLessThanOrEqual(0);
+    if (width > 680) {
+      for (const action of geometry.actions) {
+        expect(Math.abs(action.center - geometry.picker.center), `action center at ${width}px`).toBeLessThanOrEqual(1);
+      }
+      expect(Math.abs(geometry.clock.center - geometry.picker.center), `clock center at ${width}px`).toBeLessThanOrEqual(1);
+      expect(geometry.actions[0].left).toBeGreaterThanOrEqual(geometry.picker.right);
+      expect(geometry.clock.left).toBeGreaterThanOrEqual(geometry.actions[2].right);
+    } else {
+      expect(geometry.actions[0].top).toBeGreaterThanOrEqual(geometry.picker.bottom);
+    }
+  }
+});

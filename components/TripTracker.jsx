@@ -658,10 +658,11 @@ export default function TripTracker({
       </header>
       <section className={navigationStyles["trip-context"]} aria-label={t("nav.selectTrip")}>
         <div className={navigationStyles["trip-picker-group"]}>
-          <label className={navigationStyles["trip-picker"]}>
-            <span className={navigationStyles["trip-picker-label"]}>{t("nav.selectTrip")}</span>
+          <label className={navigationStyles["trip-picker-label"]} htmlFor="trip-picker-select">{t("nav.selectTrip")}</label>
+          <div className={navigationStyles["trip-picker"]}>
             <span className={navigationStyles["trip-picker-control"]}>
               <select
+                id="trip-picker-select"
                 value={data.trip.slug}
                 onChange={(event) => {
                   const nextSlug = event.target.value;
@@ -700,7 +701,7 @@ export default function TripTracker({
                 <ActionIcon name="down" />
               </span>
             </span>
-          </label>
+          </div>
         </div>
         <div className={navigationStyles["trip-metadata"]}>
           <small>{tripDateLabel} · {data.trip.location}</small>
@@ -716,7 +717,7 @@ export default function TripTracker({
             <span>{clock}</span>
           </div>
           <div className={navigationStyles["trip-context-actions"]}>
-            {access?.canManage && <ShareTripButton key={data.trip.slug} slug={data.trip.slug} className={`${navigationStyles["admin-link"]} ${navigationStyles["trip-action"]} ${navigationStyles["share-action"]}`} />}
+            {access?.canManage && <ShareTripButton key={data.trip.slug} slug={data.trip.slug} className={`${navigationStyles["admin-link"]} ${navigationStyles["trip-action"]}`} />}
             {access?.canManageMembers && <button
               className={`${navigationStyles["admin-link"]} ${navigationStyles["trip-action"]}`}
               type="button"
