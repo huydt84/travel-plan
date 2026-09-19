@@ -8,25 +8,9 @@
 
 @media (max-width: 1199px) { .withCompanion { margin-right: 0; } }
 
-:global(.trip-context):has(.launcher) { grid-template-columns: minmax(0, 1fr) auto auto; }
-@container (max-width: 1100px) {
-  .withCompanion :global(.trip-bar) { grid-template-columns: 1fr auto; }
-  .withCompanion :global(.product-mark) { display: none; }
-  .withCompanion :global(.trip-context) { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--navy); }
-}
 @media (max-width: 680px) {
   .launcher { padding-inline: 9px; gap: 5px; }
   .launcher > svg { display: none; }
-  :global(.trip-context):has(.launcher) { grid-template-columns: minmax(0, 1fr) auto; }
-  :global(.trip-context):has(.launcher) :global(.trip-picker) { grid-column: 1 / -1; }
-}
-
-@media (max-width: 680px) {
-  :global(.trip-bar):has(.launcher) { grid-template-columns: minmax(0, 1fr) auto; }
-  :global(.trip-bar):has(.launcher) :global(.product-mark) { display: none; }
-  :global(.trip-bar):has(.launcher) :global(.trip-context) { grid-column: 1 / -1; grid-row: 1; border-right: 0; }
-  :global(.trip-bar):has(.launcher) :global(.viewer-utilities) { grid-column: 2; grid-row: 2; }
-  :global(.trip-bar):has(.launcher) :global(.live-clock) { grid-column: 1; grid-row: 2; }
 }
 
 /* A native pointer-capture separator resizes the panel and tracker together. */

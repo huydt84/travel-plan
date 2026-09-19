@@ -40,6 +40,27 @@ test("public tracker renders its primary controls", async ({ page }) => {
   await expect(page.getByRole("group", { name: "Tài khoản" })).toContainText("Local admin");
 });
 
+test("trip selection stays readable beside a long current trip title", async ({ page, request, tripSlug }) => {
+  const title = "Silver Week 2026 Tokyo, Kyoto and Osaka";
+  expect((await request.patch(`/api/trips/${tripSlug}`, { data: { title } })).status()).toBe(200);
+
+  for (const width of [1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await gotoHealthy(page, `/?trip=${tripSlug}`);
+    const select = page.getByRole("combobox", { name: "Chọn chuyến đi" });
+    await expect(select).toHaveValue(tripSlug);
+    const textFits = await select.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const measure = document.createElement("canvas").getContext("2d");
+      measure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      return measure.measureText(element.selectedOptions[0].textContent).width + 90 < element.clientWidth;
+    });
+    expect(textFits, `selected trip title should fit at ${width}px`).toBe(true);
+    await expect(page.locator(".trip-context .trip-context-actions").getByRole("button", { name: "Chia sẻ" })).toBeVisible();
+    await expect(page.locator(".trip-bar").getByRole("button", { name: "Chia sẻ" })).toHaveCount(0);
+  }
+});
+
 test("public tracker title reflects the current trip state", async ({ page, tripSlug }) => {
   await gotoHealthy(page, `/?trip=${tripSlug}`);
 

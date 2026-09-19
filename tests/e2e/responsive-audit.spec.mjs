@@ -112,6 +112,39 @@ for (const viewport of viewports) {
         if (surface.name === "public tracker" && viewport.touch) {
           await expect(page.locator(".desktop-manage-link")).toBeHidden();
         }
+        if (surface.name === "public tracker") {
+          const tripControls = await page.evaluate(() => {
+            const context = document.querySelector(".trip-context");
+            const picker = context.querySelector(".trip-picker");
+            const select = picker.querySelector("select");
+            const actions = context.querySelector(".trip-context-actions");
+            const header = document.querySelector(".trip-bar");
+            const contextBox = context.getBoundingClientRect();
+            const pickerBox = picker.getBoundingClientRect();
+            const selectBox = select.getBoundingClientRect();
+            const actionsBox = actions.getBoundingClientRect();
+            const style = getComputedStyle(select);
+            const canvas = document.createElement("canvas");
+            const measure = canvas.getContext("2d");
+            measure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+            const selectedText = select.selectedOptions[0]?.textContent || "";
+            return {
+              contextWidth: contextBox.width,
+              pickerWidth: pickerBox.width,
+              selectWidth: selectBox.width,
+              selectedTextWidth: measure.measureText(selectedText).width,
+              actionsTop: actionsBox.top,
+              pickerBottom: pickerBox.bottom,
+              shareInContext: Boolean(context.querySelector('[class*="share-action"]')),
+              shareInHeader: Boolean(header.querySelector('[class*="share-action"]')),
+            };
+          });
+          expect(tripControls.pickerWidth).toBeGreaterThan(tripControls.contextWidth * (viewport.touch ? 0.9 : 0.7));
+          expect(tripControls.actionsTop).toBeGreaterThanOrEqual(tripControls.pickerBottom - 1);
+          expect(tripControls.shareInContext).toBe(true);
+          expect(tripControls.shareInHeader).toBe(false);
+          if (!viewport.touch) expect(tripControls.selectWidth).toBeGreaterThan(tripControls.selectedTextWidth + 90);
+        }
         if (surface.name === "admin users" && viewport.touch) {
           const splitDates = await page.locator(".admin-users-table time").evaluateAll((times) => times.flatMap((time) => {
             const text = [...time.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());

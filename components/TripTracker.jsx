@@ -617,7 +617,7 @@ export default function TripTracker({
     month: "2-digit",
     year: "numeric",
   }, intlLocale);
-  const tripHeader = (
+  const tripHeader = (<>
       <header className={navigationStyles["trip-bar"]} id="top">
         <a
           className={navigationStyles["product-mark"]}
@@ -627,9 +627,25 @@ export default function TripTracker({
           <TypeIcon type="Transit" />
           <span>{t("app.title")}</span>
         </a>
-        <div className={navigationStyles["trip-context"]}>
+        <div className={navigationStyles["viewer-utilities"]}>
+          <LanguageSwitcher />
+          {viewer && <NotificationCenter />}
+          {viewer ? (
+            <ViewerMenu viewer={viewer} />
+          ) : (
+            <button
+              className={`${navigationStyles["admin-link"]} ${navigationStyles["user-link"]}`}
+              type="button"
+              onClick={() => signIn("google", { redirectTo: "/" })}
+            >
+              {t("common.login")}
+            </button>
+          )}
+        </div>
+      </header>
+      <section className={navigationStyles["trip-context"]} aria-label={t("nav.selectTrip")}>
           <label className={navigationStyles["trip-picker"]}>
-            <span className="sr-only">{t("nav.selectTrip")}</span>
+            <span className={navigationStyles["trip-picker-label"]}>{t("nav.selectTrip")}</span>
             <span className={navigationStyles["trip-picker-control"]}>
               <select
                 value={data.trip.slug}
@@ -674,11 +690,20 @@ export default function TripTracker({
               {tripDateLabel} · {data.trip.location}
             </small>
           </label>
+          <div
+            className={trackerStyles["live-clock"]}
+            aria-label={t("nav.currentTimeAt", { timezone: data.trip.timezone })}
+          >
+            <span className={trackerStyles["live-dot"]} aria-hidden="true" />
+            <small>
+              {data.trip.timezone === "Asia/Tokyo" ? "JST" : data.trip.timezone}
+            </small>
+            <span>{clock}</span>
+          </div>
           <div className={navigationStyles["trip-context-actions"]}>
-            <AssistantLauncher tripSlug={data.trip.slug} />
-            {access?.canManage && <ShareTripButton key={data.trip.slug} slug={data.trip.slug} className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`} />}
+            {access?.canManage && <ShareTripButton key={data.trip.slug} slug={data.trip.slug} className={`${navigationStyles["admin-link"]} ${navigationStyles["trip-action"]} ${navigationStyles["share-action"]}`} />}
             {access?.canManageMembers && <button
-              className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`}
+              className={`${navigationStyles["admin-link"]} ${navigationStyles["trip-action"]}`}
               type="button"
               onClick={() => setInvitationOpen(true)}
             >
@@ -686,49 +711,25 @@ export default function TripTracker({
               <span>{t("nav.invite")}</span>
             </button>}
             <button
-              className={`${navigationStyles["admin-link"]} ${navigationStyles["invite-link"]}`}
+              className={`${navigationStyles["admin-link"]} ${navigationStyles["trip-action"]}`}
               type="button"
               onClick={() => setMembersOpen(true)}
             >
               <ActionIcon name="invite" />
               <span>{t("visibility.members")}</span>
             </button>
+            <AssistantLauncher tripSlug={data.trip.slug} className={navigationStyles["trip-action"]} />
+            {access?.canManage && (
+              <Link
+                className={`${navigationStyles["admin-link"]} ${navigationStyles["trip-action"]} ${trackerStyles["desktop-manage-link"]}`}
+                href={`/trips/manage?trip=${encodeURIComponent(data.trip.slug)}`}
+              >
+                {t("common.manage")}
+              </Link>
+            )}
           </div>
-        </div>
-        <div className={navigationStyles["viewer-utilities"]}>
-          <LanguageSwitcher />
-          {access?.canManage && (
-            <Link
-              className={`${navigationStyles["admin-link"]} ${trackerStyles["desktop-manage-link"]}`}
-              href={`/trips/manage?trip=${encodeURIComponent(data.trip.slug)}`}
-            >
-              {t("common.manage")}
-            </Link>
-          )}
-          {viewer && <NotificationCenter />}
-          {viewer ? (
-            <ViewerMenu viewer={viewer} />
-          ) : (
-            <button
-              className={`${navigationStyles["admin-link"]} ${navigationStyles["user-link"]}`}
-              type="button"
-              onClick={() => signIn("google", { redirectTo: "/" })}
-            >
-              {t("common.login")}
-            </button>
-          )}
-        </div>
-        <div
-          className={trackerStyles["live-clock"]}
-          aria-label={t("nav.currentTimeAt", { timezone: data.trip.timezone })}
-        >
-          <span className={trackerStyles["live-dot"]} aria-hidden="true" />
-          <small>
-            {data.trip.timezone === "Asia/Tokyo" ? "JST" : data.trip.timezone}
-          </small>
-          <span>{clock}</span>
-        </div>
-      </header>
+      </section>
+    </>
   );
   const invitation = invitationOpen && (
         <InvitationDialog

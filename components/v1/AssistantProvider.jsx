@@ -31,13 +31,13 @@ function AssistantLocation({ onChange }) {
   }, [pathname, query, onChange]);
   return null;
 }
-export function AssistantLauncher({ tripSlug }) {
+export function AssistantLauncher({ tripSlug, className = "" }) {
   const assistant = useContext(AssistantContext);
   const { t } = useLocale();
   const setTrackerTrip = assistant?.setTrackerTrip;
   useEffect(() => { if (tripSlug) setTrackerTrip?.(tripSlug); }, [tripSlug, setTrackerTrip]);
   if (!assistant?.enabled) return null;
-  return <button type="button" className={styles.launcher} onClick={() => assistant.open(tripSlug)} aria-label={t("assistant.launcherLabel")}>
+  return <button type="button" className={`${styles.launcher} ${className}`} onClick={() => assistant.open(tripSlug)} aria-label={t("assistant.launcherLabel")}>
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M5 4h14v12H9l-4 4V4Z" /><path d="M9 8h6M9 12h4" /></svg>
     {t("assistant.launcherLabel")}{assistant.count > 0 && <span aria-label={t("assistant.newAnswers", { count: assistant.count })}>{assistant.count}</span>}
   </button>;
