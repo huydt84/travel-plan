@@ -941,8 +941,13 @@ function Dashboard({
                     onCancel={() => setSourceEditor(null)}
                   />
                 )}
-                <div className={scheduleEditorStyles["admin-source-list"]}>
-                  {plan.sources.map((source) => (
+                {[["route", "adminSources.route"], ["reference", "adminSources.reference"]].map(([kind, label]) => {
+                  const sources = plan.sources.filter((source) => (source.kind ?? "reference") === kind);
+                  if (!sources.length) return null;
+                  return <div key={kind}>
+                    <h3 className={scheduleEditorStyles["source-group-title"]}>{sources.length} {t(label)}</h3>
+                    <div className={scheduleEditorStyles["admin-source-list"]}>
+                  {sources.map((source) => (
                     <article
                       className={`${scheduleEditorStyles["admin-source-item"]}${sourceEditor?.source?.number === source.number ? " is-editing" : ""}`}
                       key={source.number}
@@ -988,12 +993,14 @@ function Dashboard({
                       </span>
                     </article>
                   ))}
+                    </div>
+                  </div>;
+                })}
                   {!plan.sources.length && (
                     <p className={scheduleEditorStyles["admin-empty"]}>
                       {t("adminExtra.message038")}
                     </p>
                   )}
-                </div>
               </section>
 
               <section

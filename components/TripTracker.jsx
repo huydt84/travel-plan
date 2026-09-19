@@ -764,15 +764,20 @@ export default function TripTracker({
 
       <SavedPlaces places={data.places} activities={data.itinerary} />
 
-      <section
-        className={contributionsStyles["sources"]}
-        aria-labelledby="sources-title"
-      >
-        <div className={`${trackerStyles["section-heading"]} compact`}>
-          <h2 id="sources-title">{t("tracker.placeSources")}</h2>
-        </div>
-        <div className={contributionsStyles["source-list"]}>
-          {data.sources.map((source) => (
+      {[["route", "trackerExtra.routes", "routes-title"], ["reference", "tracker.placeSources", "references-title"]].map(([kind, label, id]) => {
+        const sources = data.sources.filter((source) => (source.kind ?? "reference") === kind);
+        if (!sources.length) return null;
+        const headingId = kind === "route" || !data.sources.some((source) => source.kind === "route") ? "sources-title" : id;
+        return <section
+          key={kind}
+          className={contributionsStyles["sources"]}
+          aria-labelledby={headingId}
+        >
+          <div className={`${trackerStyles["section-heading"]} compact`}>
+            <h2 id={headingId}>{t(label)}</h2>
+          </div>
+          <div className={contributionsStyles["source-list"]}>
+          {sources.map((source) => (
             <a
               className={contributionsStyles["source-card"]}
               href={source.url}
@@ -792,8 +797,9 @@ export default function TripTracker({
               </span>
             </a>
           ))}
-        </div>
-      </section>
+          </div>
+        </section>;
+      })}
       <Footer>
         <span>{tripTitle}</span>
         <span>{t("trackerExtra.footer")}</span>
@@ -1973,9 +1979,9 @@ function Citation({ source }) {
       href={source.url}
       target="_blank"
       rel="noreferrer"
-      aria-label={t("trackerExtra.openSource", { number: source.number })}
+      aria-label={t(source.kind === "route" ? "trackerExtra.openRoute" : "trackerExtra.openSource", { number: source.number })}
     >
-      {t("trackerExtra.source", { number: source.number })}
+      {t(source.kind === "route" ? "trackerExtra.route" : "trackerExtra.source", { number: source.number })}
       <ActionIcon name="external" />
     </a>
   );

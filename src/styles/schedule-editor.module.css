@@ -102,6 +102,13 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
+.source-group-title {
+  margin: 22px 0 0;
+  padding: 9px 12px;
+  border-top: 1px solid var(--navy);
+  color: var(--navy);
+  font: 700 16px/1.2 var(--display);
+}
 .admin-source-item {
   composes: admin-source-item from global;
   display: grid;
@@ -1015,7 +1022,8 @@
   font-size: 9px;
   font-weight: 700;
 }
-.source-inline-fields input {
+.source-inline-fields input,
+.source-inline-fields select {
   width: 100%;
   min-width: 0;
   padding: 11px 12px;
@@ -1027,7 +1035,8 @@
   font-size: 12px;
   line-height: 1.4;
 }
-.source-inline-fields input:focus {
+.source-inline-fields input:focus,
+.source-inline-fields select:focus {
   border-color: var(--green);
   box-shadow: 0 0 0 3px rgba(0, 143, 104, 0.15);
 }

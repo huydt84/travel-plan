@@ -54,11 +54,12 @@ export async function applyTripImport(sql, payload, { createOnly = false, ownerE
 
     for (const source of sources) {
       queries.push(tx`
-        INSERT INTO sources (trip_id, source_number, title, host, url)
-        SELECT id, ${source.number}, ${source.title}, ${source.host}, ${source.url}
+        INSERT INTO sources (trip_id, source_number, kind, title, host, url)
+        SELECT id, ${source.number}, ${source.kind ?? "reference"}, ${source.title}, ${source.host}, ${source.url}
         FROM trips WHERE slug = ${trip.slug}
         ON CONFLICT (trip_id, source_number) DO UPDATE SET
           title = EXCLUDED.title,
+          kind = COALESCE(${source.kind}, sources.kind),
           host = EXCLUDED.host,
           url = EXCLUDED.url
       `);

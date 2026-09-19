@@ -92,6 +92,20 @@ test("normalizes stable keys for nested branch imports and rejects nested forks"
   assert.throws(() => normalizeTripImport(base), /cannot be nested/);
 });
 
+test("trip imports accept route links without silently reclassifying older links", () => {
+  const base = {
+    trip: { slug: "route-import", title: "Route import", date: "2030-01-01", location: "Tokyo" },
+    sources: [
+      { number: 1, title: "Directions", url: "https://maps.example/dir", kind: "route" },
+      { number: 2, title: "Official site", url: "https://example.com" },
+    ],
+    schedule: [{ start: "09:00", end: "10:00", type: "Travel", icon: "🚆", title: "Train", detail: "Train ride", refs: [1] }],
+  };
+  assert.deepEqual(normalizeTripImport(base).sources.map((source) => source.kind), ["route", null]);
+  base.sources[0].kind = "place";
+  assert.throws(() => normalizeTripImport(base), /kind must be reference or route/);
+});
+
 test("normalizes a trip-start branch group before the shared schedule", () => {
   const normalized = normalizeTripImport({
     trip: { slug: "start-fork", title: "Start fork", date: "2030-01-01", timezone: "Asia/Tokyo", location: "Tokyo" },

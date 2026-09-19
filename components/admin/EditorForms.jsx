@@ -12,7 +12,7 @@ import { EDITOR_ACTIVITY_TYPES } from "../../lib/activity-types.mjs";
 import { ActionIcon } from "../Icons";
 import { requestJson as api } from "../../lib/request-json.mjs";
 
-const emptySource = { title: "", url: "" };
+const emptySource = { kind: "reference", title: "", url: "" };
 const emptyPlace = { name: "", address: "", latitude: "", longitude: "", website: "", googleMapsUrl: "", googlePlaceId: "", notes: "" };
 const openTimePicker = (event) => {
   try {
@@ -564,7 +564,7 @@ export function SourceForm({
 }) {
   const { t, locale } = useLocale();
   const [values, setValues] = useState(
-    source ? { title: source.title, url: source.url } : emptySource,
+    source ? { kind: source.kind ?? "reference", title: source.title, url: source.url } : emptySource,
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -611,6 +611,13 @@ export function SourceForm({
       ref={fieldsRef}
     >
       <label className={compact ? "" : "wide"}>
+        <FormFieldLabel>{t("adminSources.kind")}</FormFieldLabel>
+        <select {...field("kind")}>
+          <option value="reference">{t("adminSources.reference")}</option>
+          <option value="route">{t("adminSources.route")}</option>
+        </select>
+      </label>
+      <label className={compact ? "" : "wide"}>
         <FormFieldLabel required>{t("adminExtra.message221")}</FormFieldLabel>
         <input
           {...field("title")}
@@ -628,7 +635,7 @@ export function SourceForm({
           spellCheck={false}
           {...field("url")}
           maxLength={2000}
-          placeholder="https://example.com/dia-diem"
+          placeholder="https://example.com/lien-ket"
           aria-describedby={hintId}
           required
         />

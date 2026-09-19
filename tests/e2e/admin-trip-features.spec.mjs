@@ -44,6 +44,7 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
     await page.getByRole("button", { name: "Thêm nguồn", exact: true }).click();
     const createSourceForm = page.locator(".source-form");
     await expect(createSourceForm.locator('[title="Bắt buộc"]')).toHaveCount(2);
+    await createSourceForm.getByLabel("Loại liên kết").selectOption("route");
     await createSourceForm.getByLabel("Tên nguồn").fill(sourceTitle);
     await createSourceForm.getByLabel("URL").fill(`https://example.com/source-${runId}`);
     await createSourceForm.getByRole("button", { name: "Thêm nguồn" }).click();
@@ -53,15 +54,23 @@ test("admin manages picnic activities, optional details, source CRUD, and visibl
     plan = await planResponse.json();
     sourceNumber = plan.sources.find((source) => source.title === sourceTitle)?.number;
     expect(sourceNumber).toBeTruthy();
+    expect(plan.sources.find((source) => source.number === sourceNumber)?.kind).toBe("route");
+    await expect(page.getByRole("heading", { name: "1 Tuyến đường" })).toBeVisible();
+    await gotoHealthy(page, `/?trip=${slug}`);
+    await expect(page.getByRole("heading", { name: "Tuyến đường" })).toBeVisible();
+    await expect(page.getByRole("link", { name: new RegExp(sourceTitle) })).toHaveAttribute("href", `https://example.com/source-${runId}`);
+    await gotoHealthy(page, `/admin/trips?trip=${slug}`);
 
     const sourceRow = page.locator(".admin-source-item", { hasText: sourceTitle });
     await sourceRow.getByRole("button", { name: "Sửa" }).click();
     const editSourceForm = page.locator(".source-form");
     await expect(editSourceForm.getByRole("heading", { name: `Sửa nguồn ${sourceNumber}` })).toBeVisible();
     await editSourceForm.getByLabel("Tên nguồn").fill(updatedSourceTitle);
+    await editSourceForm.getByLabel("Loại liên kết").selectOption("reference");
     await editSourceForm.getByLabel("URL").fill(`https://example.org/source-${runId}`);
     await editSourceForm.getByRole("button", { name: "Lưu nguồn" }).click();
     await expect(page.locator(".admin-source-item", { hasText: updatedSourceTitle })).toContainText("example.org");
+    await expect(page.getByRole("heading", { name: "1 Nguồn tham khảo" })).toBeVisible();
 
     page.once("dialog", (dialog) => dialog.accept());
     await page.locator(".admin-source-item", { hasText: updatedSourceTitle }).getByRole("button", { name: "Xoá" }).click();

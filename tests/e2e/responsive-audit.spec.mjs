@@ -38,6 +38,12 @@ const surfaces = [
     ready: (page) => page.getByRole("heading", { level: 1, name: "Quản lý lịch" }),
   },
   {
+    name: "admin source editor",
+    path: "/admin/trips",
+    setup: async (page) => page.getByRole("button", { name: "Thêm nguồn", exact: true }).click(),
+    ready: (page) => page.locator(".source-form").getByLabel("Loại liên kết"),
+  },
+  {
     name: "admin collections",
     path: "/admin/collections",
     ready: (page) => page.getByRole("heading", { level: 1, name: "Bộ sưu tập địa điểm" }),
@@ -93,6 +99,7 @@ for (const viewport of viewports) {
         await gotoHealthy(page, surface.path);
         await surface.setup?.(page);
         await expect(surface.ready(page)).toBeVisible();
+        if (surface.name === "admin source editor") await surface.ready(page).scrollIntoViewIfNeeded();
         if (surface.name === "assistant management") {
           await expect(page.getByRole("button", { name: "Trợ lý", exact: true })).toHaveCount(0);
         }

@@ -61,11 +61,15 @@ export function normalizeTripImport(raw) {
     catch { fail(`sources[${index}].url must be a valid URL`); }
     return {
       number: source.number,
+      kind: source.kind ?? null,
       title: text(source.title, `sources[${index}].title`, 300),
       host: source.host ? text(source.host, `sources[${index}].host`, 200) : inferredHost,
       url,
     };
   });
+  for (const [index, source] of sources.entries()) {
+    if (source.kind != null && !["reference", "route"].includes(source.kind)) fail(`sources[${index}].kind must be reference or route`);
+  }
 
   const parseActivity = (value, field, { allowBranch = true } = {}) => {
     const item = object(value, field);
