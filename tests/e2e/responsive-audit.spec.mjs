@@ -1,9 +1,17 @@
 import { expect, gotoHealthy, test } from "./fixtures.mjs";
+import { anonymousHeaders } from "./permission-fixture.mjs";
 
 const viewports = [
   { name: "phone", width: 320, height: 760, touch: true },
   { name: "macbook", width: 1440, height: 900, touch: false },
   { name: "dell", width: 1920, height: 1080, touch: false },
+];
+const authViewports = [
+  viewports[0],
+  { name: "small phone", width: 390, height: 844 },
+  { name: "compact desktop", width: 1024, height: 768 },
+  viewports[1],
+  viewports[2],
 ];
 
 const surfaces = [
@@ -95,6 +103,84 @@ const surfaces = [
     ready: (page) => page.getByRole("heading", { level: 1, name: "Trợ lý hành trình" }),
   },
 ];
+
+for (const viewport of authViewports) {
+  test(`${viewport.name} keeps signed-out copy beside the grouped auth panel`, async ({ browser }, testInfo) => {
+    const context = await browser.newContext({
+      viewport: { width: viewport.width, height: viewport.height },
+      extraHTTPHeaders: anonymousHeaders,
+    });
+    try {
+      const page = await context.newPage();
+      await gotoHealthy(page, "/");
+      const heading = page.getByRole("heading", { level: 1, name: "Lịch trình riêng của nhóm bạn" });
+      const panel = page.getByRole("complementary", { name: "Chỉ thành viên mới có quyền truy cập" });
+      const intro = page.getByText("Đăng nhập để mở những chuyến đi mà bạn đang tham gia.");
+      const privacy = panel.getByText("Tên chuyến, lịch trình và thành viên không hiển thị công khai.");
+      const button = panel.getByRole("button", { name: "Tiếp tục với Google" });
+      await expect(heading).toBeVisible();
+      await expect(intro).toBeVisible();
+      await expect(privacy).toBeVisible();
+      await expect(button).toBeVisible();
+      const boxes = await Promise.all([heading, intro, panel, privacy, button].map((locator) => locator.boundingBox()));
+      const [headingBox, introBox, panelBox, privacyBox, buttonBox] = boxes;
+      const layout = await heading.evaluate((element) => {
+        const row = element.parentElement.parentElement;
+        const hero = row.parentElement;
+        const line = hero.lastElementChild;
+        const box = (node) => {
+          const rect = node.getBoundingClientRect();
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, right: rect.right, bottom: rect.bottom };
+        };
+        const text = element.firstChild;
+        const lines = new Map();
+        for (const word of text.textContent.matchAll(/\S+/g)) {
+          const range = document.createRange();
+          range.setStart(text, word.index);
+          range.setEnd(text, word.index + word[0].length);
+          const top = Math.round(range.getBoundingClientRect().top);
+          lines.set(top, [...(lines.get(top) || []), word[0]]);
+        }
+        return {
+          row: box(row), hero: box(hero), line: box(line),
+          headingLines: [...lines.values()].map((words) => words.join(" ").toLocaleUpperCase("vi-VN")),
+          fontSize: parseFloat(getComputedStyle(element).fontSize),
+          lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+        };
+      });
+      expect(Math.abs(layout.line.x - layout.row.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(layout.line.right - layout.row.right)).toBeLessThanOrEqual(1);
+      expect(layout.line.y - layout.row.bottom).toBeGreaterThanOrEqual(40);
+      expect(layout.line.y - layout.row.bottom).toBeLessThanOrEqual(56);
+      expect(layout.lineHeight).toBeGreaterThanOrEqual(layout.fontSize);
+      if (viewport.width >= 1024) {
+        expect(layout.headingLines).toEqual(["LỊCH TRÌNH RIÊNG", "CỦA NHÓM BẠN"]);
+        expect(panelBox.x).toBeGreaterThanOrEqual(headingBox.x + headingBox.width - 1);
+        expect(Math.abs(panelBox.y + panelBox.height / 2 - (layout.row.y + layout.row.height / 2))).toBeLessThanOrEqual(1);
+        expect(Math.abs(headingBox.y + (introBox.y + introBox.height - headingBox.y) / 2 - (panelBox.y + panelBox.height / 2))).toBeLessThanOrEqual(1);
+        expect(introBox.y - (headingBox.y + headingBox.height)).toBeGreaterThanOrEqual(24);
+        expect(introBox.y - (headingBox.y + headingBox.height)).toBeLessThanOrEqual(32);
+        expect(layout.hero.height).toBeLessThan(550);
+        if (viewport.width >= 1440) {
+          expect(panelBox.x - layout.row.x - headingBox.width).toBeGreaterThanOrEqual(64);
+          expect(panelBox.x - layout.row.x - headingBox.width).toBeLessThanOrEqual(96);
+        }
+      } else {
+        expect(panelBox.y).toBeGreaterThanOrEqual(introBox.y + introBox.height - 1);
+      }
+      for (const box of [privacyBox, buttonBox]) {
+        expect(box.x).toBeGreaterThanOrEqual(panelBox.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(panelBox.x + panelBox.width);
+        expect(box.y + box.height).toBeLessThanOrEqual(panelBox.y + panelBox.height);
+      }
+      expect(await panel.evaluate((element) => getComputedStyle(element).writingMode)).toBe("horizontal-tb");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+      await page.screenshot({ path: testInfo.outputPath("signed-out-auth.png"), fullPage: false });
+    } finally {
+      await context.close();
+    }
+  });
+}
 
 for (const viewport of viewports) {
   test(`${viewport.name} audits every public and admin surface`, async ({ page }, testInfo) => {

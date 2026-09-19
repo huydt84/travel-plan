@@ -4,9 +4,14 @@
 .brand :global(.type-icon) { width: 27px; height: 27px; color: var(--green); }
 .utilities { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
 .stage { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 180px; min-height: 570px; margin-top: 18px; overflow: hidden; border: 2px solid var(--navy); background: var(--paper-bright); }
+.contentRow { display: contents; }
+.signedOutStage { display: flex; flex-direction: column; align-items: center; gap: 48px; min-height: 0; padding: 64px clamp(28px, 5vw, 72px); }
+.signedOutStage .contentRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 380px); align-items: center; gap: clamp(48px, 5vw, 80px); width: min(100%, 1100px); }
 .copy { display: grid; align-content: center; max-width: 820px; padding: clamp(42px, 8vw, 110px); }
 .copy h1 { max-width: 11ch; margin: 0; font: 700 clamp(52px, 8vw, 96px)/.88 var(--display); letter-spacing: -.03em; text-wrap: balance; text-transform: uppercase; }
 .copy p { max-width: 62ch; margin: 28px 0 0; color: var(--muted); font-size: 16px; line-height: 1.65; }
+.signedOutStage .copy { max-width: none; padding: 0; }
+.signedOutStage .copy h1 { max-width: none; font-size: clamp(52px, 7.4vw, 96px); line-height: 1; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 32px; }
 .actions button,.actions a { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px; border: 1px solid var(--navy); border-radius: 3px; font-weight: 800; text-decoration: none; transition: background-color 160ms ease-out,color 160ms ease-out,transform 160ms ease-out; }
 .actions button,.primary { color: white; background: var(--green); }
@@ -17,8 +22,20 @@
 .signal { display: grid; align-content: space-between; padding: 24px 18px; border-left: 1px solid var(--navy); color: white; background: var(--green); writing-mode: vertical-rl; }
 .signal strong { font: 700 48px/1 var(--display); letter-spacing: -.02em; }
 .signal span { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.authPanel { position: relative; z-index: 1; border: 2px solid var(--navy); background: var(--paper-bright); }
+.authHeading { display: grid; gap: 10px; padding: 24px; color: white; background: var(--green); }
+.authHeading strong { font: 700 48px/1 var(--display); letter-spacing: -.02em; }
+.authHeading span { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.authPanel p { margin: 0; padding: 28px 24px 0; color: var(--muted); font-size: 16px; line-height: 1.65; }
+.authPanel .actions { margin: 28px 24px 24px; }
 .routeLine { position: absolute; right: 178px; bottom: 72px; left: 0; display: flex; align-items: center; justify-content: space-around; border-top: 2px solid var(--navy); }
 .routeLine span { width: 14px; height: 14px; margin-top: -8px; border: 2px solid var(--navy); border-radius: 50%; background: var(--yellow); }
+.signedOutStage .routeLine { position: relative; inset: auto; width: min(100%, 1100px); }
+@media (max-width: 1000px) {
+  .signedOutStage { padding: 48px clamp(22px, 5vw, 42px) 40px; }
+  .signedOutStage .contentRow { grid-template-columns: 1fr; gap: 32px; width: min(100%, 540px); }
+  .signedOutStage .routeLine { width: min(100%, 540px); }
+}
 @media (max-width: 680px) {
   .shell { width: min(100% - 20px, 1380px); padding-top: 10px; }
   .header { align-items: stretch; }
@@ -30,6 +47,12 @@
   .copy h1 { font-size: clamp(48px, 17vw, 68px); }
   .copy p { margin-top: 22px; font-size: 15px; }
   .actions { display: grid; }
+  .signedOutStage { min-height: 0; }
+  .signedOutStage .copy h1 { font-size: clamp(48px, 17vw, 68px); }
+  .authPanel { width: 100%; }
+  .authHeading { padding: 20px; }
+  .authPanel p { padding: 22px 20px 0; font-size: 15px; }
+  .authPanel .actions { margin: 22px 20px 20px; }
   .signal { position: absolute; right: 0; bottom: 0; left: 0; display: flex; min-height: 70px; align-items: center; justify-content: space-between; border-top: 1px solid var(--navy); border-left: 0; writing-mode: horizontal-tb; }
   .signal strong { font-size: 34px; }
   .routeLine { right: 0; bottom: 68px; }

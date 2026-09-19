@@ -21,28 +21,39 @@ export default function TripAccessState({ state, viewer = null, localPersonaSwit
           {!viewer && localPersonaSwitcher && <Link href="/dev/personas">Test personas</Link>}
         </div>
       </header>
-      <section className={styles.stage}>
-        <div className={styles.routeLine} aria-hidden="true"><span /><span /><span /></div>
-        <div className={styles.copy}>
-          <h1>{signedOut ? t("visibility.accessTitle") : t("visibility.emptyTitle")}</h1>
-          <p>{signedOut ? t("visibility.accessDescription") : t("visibility.emptyDescription")}</p>
-          <div className={styles.actions}>
-            {signedOut ? (
-              <button type="button" onClick={() => signIn("google", { redirectTo: "/" })}>
-                {t("common.loginGoogle")}
-              </button>
-            ) : (
-              <>
+      <section className={`${styles.stage} ${signedOut ? styles.signedOutStage : ""}`}>
+        <div className={styles.contentRow}>
+          <div className={styles.copy}>
+            <h1>{signedOut ? t("visibility.accessTitle") : t("visibility.emptyTitle")}</h1>
+            <p>{signedOut ? t("visibility.accessIntro") : t("visibility.emptyDescription")}</p>
+            {!signedOut && (
+              <div className={styles.actions}>
                 <Link className={styles.primary} href="/trips/manage?create=1">{t("visibility.createTrip")}</Link>
                 <Link className={styles.secondary} href="/requests">{t("visibility.sendRequest")}</Link>
-              </>
+              </div>
             )}
           </div>
+          {signedOut ? (
+            <aside className={styles.authPanel} aria-label={t("visibility.privateLabel")}>
+              <div className={styles.authHeading}>
+                <strong>AUTH</strong>
+                <span>{t("visibility.privateLabel")}</span>
+              </div>
+              <p>{t("visibility.accessPrivacy")}</p>
+              <div className={styles.actions}>
+                <button type="button" onClick={() => signIn("google", { redirectTo: "/" })}>
+                  {t("common.loginGoogle")}
+                </button>
+              </div>
+            </aside>
+          ) : (
+            <aside className={styles.signal} aria-label={t("visibility.privateLabel")}>
+              <strong>READY</strong>
+              <span>{t("visibility.privateLabel")}</span>
+            </aside>
+          )}
         </div>
-        <aside className={styles.signal} aria-label={t("visibility.privateLabel")}>
-          <strong>{signedOut ? "AUTH" : "READY"}</strong>
-          <span>{t("visibility.privateLabel")}</span>
-        </aside>
+        <div className={styles.routeLine} aria-hidden="true"><span /><span /><span /></div>
       </section>
     </main>
   );
