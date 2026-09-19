@@ -5,7 +5,7 @@
 .panel header p { margin: 7px 0 0; color: white; font-size: 11px; }
 .panel header button { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid white; border-radius: 3px; color: white; background: transparent; }
 .list { position: relative; padding: 0 22px; }
-.list::before { position: absolute; top: 0; bottom: 0; left: 59px; width: 2px; background: var(--navy); content: ""; }
+.list::before { position: absolute; top: 0; bottom: 0; left: 67px; width: 2px; background: var(--navy); content: ""; }
 .row { position: relative; display: grid; grid-template-columns: 28px 20px minmax(0,1fr) auto; align-items: center; gap: 8px; min-height: 68px; border-bottom: 1px solid var(--line); }
 .row > span { color: var(--muted); font: 700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace; }
 .row i { z-index: 1; width: 12px; height: 12px; justify-self: center; border: 2px solid var(--navy); border-radius: 50%; background: var(--yellow); }

@@ -80,6 +80,14 @@ for (const [width, height] of [[320, 760], [1440, 900], [1920, 1080]]) {
       await expect(panel).toContainText("UI Member");
       await expect(panel).not.toContainText(member);
       await expect(panel.getByRole("link", { name: "Quản lý thành viên" })).toHaveCount(0);
+      const alignment = await panel.locator('[class*="list"]').evaluate((list) => {
+        const guide = getComputedStyle(list, "::before");
+        const guideLeft = list.getBoundingClientRect().left + parseFloat(guide.left);
+        const guideCenter = guideLeft + parseFloat(guide.width) / 2;
+        const dot = list.querySelector("i").getBoundingClientRect();
+        return { guideCenter, dotCenter: dot.left + dot.width / 2 };
+      });
+      expect(Math.abs(alignment.guideCenter - alignment.dotCenter), "member route guide must pass through the member node").toBeLessThanOrEqual(1);
       if (width === 320) expect(await panel.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(320);
     } finally {
       await context.close();
