@@ -6,7 +6,7 @@ import contributionsStyles from "../src/styles/contributions.module.css";
 import scheduleEditorStyles from "../src/styles/schedule-editor.module.css";
 
 import { AssistantLauncher } from "./v1/AssistantProvider";
-import { ScheduleForm } from "./admin/EditorForms";
+import { ScheduleForm, SourceForm } from "./admin/EditorForms";
 import { useScheduleDraft } from "./admin/useScheduleDraft";
 import Button from "./ui/Button";
 import ConfirmDialog from "./ConfirmDialog";
@@ -127,6 +127,8 @@ export default function TripTracker({
   const [scheduleNotice, setScheduleNotice] = useState("");
   const [activityToDelete, setActivityToDelete] = useState(null);
   const [scheduleDeleteError, setScheduleDeleteError] = useState("");
+  const [sourceEditor, setSourceEditor] = useState(null);
+  const [sourceActionError, setSourceActionError] = useState("");
   const {
     editor: scheduleEditor,
     setEditor: setScheduleEditor,
@@ -215,6 +217,53 @@ export default function TripTracker({
       sources: [...current.sources, source],
     }));
     return source;
+  };
+
+  const savePublicSource = async (values, sourceNumber) => {
+    const base = `/api/trips/${encodeURIComponent(data.trip.slug)}/sources`;
+    await api(sourceNumber == null ? base : `${base}/${sourceNumber}`, {
+      method: sourceNumber == null ? "POST" : "PATCH",
+      body: JSON.stringify(values),
+    });
+    await loadLatestItinerary();
+    setSourceEditor(null);
+    setSourceActionError("");
+  };
+
+  const deletePublicSource = async (source) => {
+    if (!window.confirm(t("adminExtra.message019", {
+      value0: source.number,
+      value1: source.title,
+      value2: "",
+    }))) return;
+    setSourceActionError("");
+    try {
+      await api(`/api/trips/${encodeURIComponent(data.trip.slug)}/sources/${source.number}`, { method: "DELETE" });
+      await loadLatestItinerary();
+      setSourceEditor(null);
+    } catch (error) {
+      setSourceActionError(adminErrorMessage(error, t, locale));
+    }
+  };
+
+  const savePublicPlace = async (values, placeId) => {
+    const base = `/api/trips/${encodeURIComponent(data.trip.slug)}/places`;
+    await api(placeId == null ? base : `${base}/${placeId}`, {
+      method: placeId == null ? "POST" : "PATCH",
+      body: JSON.stringify(values),
+    });
+    await loadLatestItinerary();
+  };
+
+  const deletePublicPlace = async (place) => {
+    const usageCount = data.itinerary.filter((activity) => activity.placeId === place.id).length;
+    if (!window.confirm(t("adminPlaces.deleteConfirm", {
+      name: place.name,
+      usage: usageCount ? t("adminPlaces.unlinkWarning", { count: usageCount }) : "",
+    }))) return false;
+    await api(`/api/trips/${encodeURIComponent(data.trip.slug)}/places/${place.id}`, { method: "DELETE" });
+    await loadLatestItinerary();
+    return true;
   };
 
   const openNewScheduleEditor = (trigger) => {
@@ -797,29 +846,38 @@ export default function TripTracker({
         />
       </section>
 
-      <SavedPlaces places={data.places} activities={data.itinerary} />
+      <SavedPlaces
+        places={data.places}
+        activities={data.itinerary}
+        canManage={access?.canManage}
+        onSave={savePublicPlace}
+        onDelete={deletePublicPlace}
+      />
 
       {[["route", "trackerExtra.routes", "routes-title"], ["reference", "tracker.placeSources", "references-title"]].map(([kind, label, id]) => {
         const sources = data.sources.filter((source) => (source.kind ?? "reference") === kind);
-        if (!sources.length) return null;
-        const headingId = kind === "route" || !data.sources.some((source) => source.kind === "route") ? "sources-title" : id;
+        if (!sources.length && !access?.canManage) return null;
+        const headingId = kind === "route" ? "sources-title" : id;
+        const editing = sourceEditor?.kind === kind;
         return <section
           key={kind}
           className={contributionsStyles["sources"]}
           aria-labelledby={headingId}
         >
-          <div className={`${trackerStyles["section-heading"]} compact`}>
+          <div className={`${trackerStyles["section-heading"]} ${contributionsStyles["resource-heading"]} compact`}>
             <h2 id={headingId}>{t(label)}</h2>
+            {access?.canManage && <Button type="button" variant="ghost" aria-expanded={editing && !sourceEditor.source}
+              onClick={() => { setSourceEditor(editing && !sourceEditor.source ? null : { kind, source: null }); setSourceActionError(""); }}>
+              {editing && !sourceEditor.source ? t("adminExtra.message035") : t(kind === "route" ? "adminRoutes.add" : "adminSources.addReference")}
+            </Button>}
           </div>
+          {editing && <SourceForm key={sourceEditor.source?.number ?? `new-${kind}`} kind={kind} source={sourceEditor.source}
+            onSave={(values) => savePublicSource(values, sourceEditor.source?.number)} onCancel={() => setSourceEditor(null)} />}
+          {sourceActionError && <p role="alert" className="form-error">{sourceActionError}</p>}
           <div className={contributionsStyles["source-list"]}>
           {sources.map((source) => (
-            <a
-              className={contributionsStyles["source-card"]}
-              href={source.url}
-              target="_blank"
-              rel="noreferrer"
-              key={source.number}
-            >
+            <div className={contributionsStyles["source-entry"]} key={source.number}>
+            <a className={contributionsStyles["source-card"]} href={source.url} target="_blank" rel="noreferrer">
               <span className={contributionsStyles["source-number"]}>
                 {String(source.number).padStart(2, "0")}
               </span>
@@ -831,6 +889,11 @@ export default function TripTracker({
                 <ActionIcon name="external" />
               </span>
             </a>
+            {access?.canManage && <div className={contributionsStyles["resource-actions"]}>
+              <Button type="button" variant="ghost" onClick={() => { setSourceEditor({ kind, source }); setSourceActionError(""); }}>{t("adminPlaces.edit")}</Button>
+              <Button type="button" variant="danger" onClick={() => deletePublicSource(source)}>{t("adminPlaces.delete")}</Button>
+            </div>}
+            </div>
           ))}
           </div>
         </section>;

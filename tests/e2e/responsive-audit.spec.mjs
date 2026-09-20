@@ -30,6 +30,24 @@ const surfaces = [
     ready: (page) => page.locator("#schedule-editor-new"),
   },
   {
+    name: "public route editor",
+    path: "/",
+    setup: async (page) => page.getByRole("region", { name: "Tuyến đường" }).getByRole("button", { name: "Thêm tuyến đường" }).click(),
+    ready: (page) => page.getByRole("region", { name: "Tuyến đường" }).locator("form").getByLabel("Điểm bắt đầu"),
+  },
+  {
+    name: "public reference editor",
+    path: "/",
+    setup: async (page) => page.getByRole("region", { name: "Nguồn tham khảo" }).getByRole("button", { name: "Thêm nguồn tham khảo" }).click(),
+    ready: (page) => page.getByRole("region", { name: "Nguồn tham khảo" }).locator("form").getByLabel("Tên nguồn"),
+  },
+  {
+    name: "public place editor",
+    path: "/",
+    setup: async (page) => page.getByRole("region", { name: "Địa điểm đã lưu" }).getByRole("button", { name: "Thêm địa điểm" }).click(),
+    ready: (page) => page.getByRole("region", { name: "Địa điểm đã lưu" }).getByRole("form", { name: "Thêm địa điểm" }).getByLabel("Tên địa điểm"),
+  },
+  {
     name: "public invitation",
     path: "/",
     setup: async (page) => page.getByRole("button", { name: "Rủ bạn đi cùng", exact: true }).click(),

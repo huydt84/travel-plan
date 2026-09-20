@@ -272,6 +272,58 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
+.source-entry {
+  min-width: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+}
+.source-entry:nth-child(even) {
+  border-right: 0;
+}
+.source-entry .source-card {
+  border: 0;
+}
+.resource-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.sources .resource-heading button {
+  border-color: var(--yellow);
+  color: var(--navy);
+  background: var(--yellow);
+}
+.sources .resource-heading button:hover {
+  border-color: var(--paper-bright);
+  background: var(--paper-bright);
+}
+.sources > :global(form) {
+  margin: 18px 0;
+  padding: 20px;
+  color: var(--navy);
+  background: var(--paper-bright);
+}
+.resource-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+.sources .resource-actions button:first-child {
+  border-color: var(--paper-bright);
+  color: var(--paper-bright);
+}
+.sources .resource-actions button:first-child:hover {
+  border-color: var(--yellow);
+  color: var(--navy);
+  background: var(--yellow);
+}
+.saved-place-actions .resource-actions {
+  padding: 0;
+}
 .source-card {
   composes: source-card from global;
   display: grid;
@@ -425,6 +477,9 @@
   }
   .source-list {
     grid-template-columns: 1fr;
+  }
+  .source-entry {
+    border-right: 0;
   }
   .source-card,
   .source-card:nth-child(even) {
