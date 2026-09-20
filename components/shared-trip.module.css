@@ -9,6 +9,7 @@
 .hero aside strong { font: 700 30px/1 var(--font-display); color: var(--green-dark); }
 .hero aside span { font-size: 12px; line-height: 1.4; }
 .actions { display: flex; align-items: center; gap: 14px; min-height: 92px; }
+.actionButtons { display: flex; flex-wrap: wrap; gap: 8px; }
 .actions button { min-height: 44px; padding: 12px 20px; border: 0; color: white; background: var(--navy); font-weight: 700; cursor: pointer; }
 .actions button:hover { background: var(--green-dark); }
 .actions button:focus-visible, .refs a:focus-visible, .sourceIndex a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
@@ -40,7 +41,25 @@
   .hero { grid-template-columns: 1fr; gap: 26px; padding: 34px 0 30px; }
   .hero aside { width: fit-content; max-width: 100%; }
   .actions { align-items: flex-start; flex-direction: column; justify-content: center; padding: 20px 0; }
+  .actionButtons { width: 100%; }
+  .actionButtons button { flex: 1 1 100%; }
   .activity { grid-template-columns: 74px minmax(0, 1fr); gap: 12px; padding: 16px 12px; }
   .activity time { font-size: 23px; }
   .dayHeading { gap: 12px; padding: 12px; }
+}
+@media print {
+  @page { size: A4; margin: 16mm; }
+  :global(body) { background: white; }
+  .shell { min-height: 0; padding: 0; color: #10243d; background: white; print-color-adjust: exact; }
+  .topbar, .actions, .hero aside { display: none; }
+  .hero { display: block; padding: 0 0 18px; border-bottom: 2px solid #10243d; }
+  .hero h1 { font-size: 38px; }
+  .hero p { font-size: 12px; }
+  .schedule { padding-top: 18px; }
+  .day { break-inside: auto; margin-bottom: 18px; }
+  .dayHeading, .activity, .sourceIndex li { break-inside: avoid; }
+  .dayHeading { color: #10243d; background: #e7e1d3; }
+  .dayHeading span { color: #006e52; }
+  .sourceIndex { padding-bottom: 0; }
+  .sourceIndex a::after { content: " (" attr(href) ")"; color: #586473; font-size: 10px; }
 }

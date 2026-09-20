@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
 import { createPostgresSql } from "../../lib/sql-adapter.mjs";
 import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
 import { expect, test } from "./fixtures.mjs";
@@ -51,6 +52,38 @@ test("leader creates a short-lived public read-only link", async ({ request, bro
         expect(width, `shared page must fit ${viewport.width}px`).toBeLessThanOrEqual(viewport.width);
         await page.getByRole("button", { name: "Sao chép toàn bộ lịch trình" }).click();
         expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("09:00–10:00  Temple visit");
+        const downloadPromise = page.waitForEvent("download");
+        await page.getByRole("button", { name: "Xuất Markdown" }).click();
+        const download = await downloadPromise;
+        expect(download.suggestedFilename()).toBe("shared-kyoto.md");
+        const markdown = await readFile(await download.path(), "utf8");
+        expect(markdown).toContain("# Shared Kyoto");
+        expect(markdown).toContain("**09:00–10:00** Temple visit");
+        expect(markdown).toContain("East gate");
+        await page.evaluate(() => { window.print = () => { window.__printCalled = true; }; });
+        await page.getByRole("button", { name: "Xuất PDF" }).click();
+        expect(await page.evaluate(() => window.__printCalled)).toBe(true);
+        const actionBoxes = await page.locator('button').filter({ hasText: /Sao chép toàn bộ lịch trình|Xuất Markdown|Xuất PDF/ }).evaluateAll((buttons) => buttons.map((button) => {
+          const box = button.getBoundingClientRect();
+          return { left: box.left, right: box.right, width: box.width, height: box.height };
+        }));
+        expect(actionBoxes).toHaveLength(3);
+        for (const box of actionBoxes) {
+          expect(box.left).toBeGreaterThanOrEqual(0);
+          expect(box.right).toBeLessThanOrEqual(viewport.width);
+          expect(box.width).toBeGreaterThanOrEqual(44);
+          expect(box.height).toBeGreaterThanOrEqual(44);
+        }
+        if (viewport.width === 1440) {
+          await page.emulateMedia({ media: "print" });
+          await expect(page.getByRole("button", { name: "Xuất PDF" })).toBeHidden();
+          await expect(page.getByRole("heading", { name: "Shared Kyoto" })).toBeVisible();
+          const pdf = await page.pdf({ format: "A4", printBackground: true });
+          expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+          expect(pdf.length).toBeGreaterThan(1000);
+          await writeFile(testInfo.outputPath("shared-itinerary.pdf"), pdf);
+          await page.emulateMedia({ media: "screen" });
+        }
         await page.screenshot({ path: testInfo.outputPath(`shared-${viewport.width}.png`), fullPage: true });
       } finally { await context.close(); }
       const leaderContext = await browser.newContext({ viewport, extraHTTPHeaders: asUser(leader), permissions: ["clipboard-read", "clipboard-write"] });
