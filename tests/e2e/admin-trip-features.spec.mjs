@@ -2,6 +2,26 @@ import { expect, gotoHealthy, test } from "./fixtures.mjs";
 import { createPostgresSql } from "../../lib/sql-adapter.mjs";
 import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
 
+test("moon icon is available and remains selected for Rest activities", async ({ page, request }) => {
+  const slug = `moon-icon-${Date.now()}`;
+  try {
+    expect((await request.post("/api/trips", { data: { slug, title: "Moon icon", startDate: "2030-04-01", endDate: "2030-04-01", timezone: "Asia/Tokyo", location: "Kyoto" } })).status()).toBe(201);
+    for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+      await page.setViewportSize(viewport);
+      await gotoHealthy(page, `/admin/trips?trip=${slug}`);
+      await page.getByRole("button", { name: "Thêm hoạt động", exact: true }).click();
+      const form = page.locator(".schedule-create-editor");
+      const icon = form.getByLabel("Icon");
+      await expect(icon.locator('option[value="🌙"]')).toHaveCount(1);
+      await icon.selectOption("🌙");
+      await form.getByLabel("Loại").selectOption("Rest");
+      await expect(icon).toHaveValue("🌙");
+    }
+  } finally {
+    await request.delete(`/api/trips/${slug}`);
+  }
+});
+
 test("admin manages picnic activities, optional details, source CRUD, and visible slugs", async ({ page, request }) => {
   const runId = Date.now();
   const activityTitle = `E2E picnic ${runId}`;
