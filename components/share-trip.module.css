@@ -37,8 +37,11 @@
 .close { align-self: start; min-width: 38px; min-height: 38px; border: 1px solid var(--navy); background: transparent; font-size: 26px; cursor: pointer; }
 .linkLabel { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; }
 .dialog input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid var(--navy); color: var(--navy); background: white; font: 13px/1.4 var(--font-body); }
+.dialog input[type="number"] { min-height: 44px; font-variant-numeric: tabular-nums; }
+.hint { margin: 8px 0 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .expiry { margin: 10px 0 20px; color: var(--muted); font-size: 12px; }
 .copy { width: 100%; min-height: 44px; border: 0; color: white; background: var(--green); font-weight: 700; cursor: pointer; }
 .copy:hover { background: var(--green-dark); }
+.copy:disabled { opacity: .65; cursor: wait; }
 .error { margin: 14px 0 0; color: var(--red); font-size: 13px; }
 .trigger:focus-visible, .close:focus-visible, .copy:focus-visible, .dialog input:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }

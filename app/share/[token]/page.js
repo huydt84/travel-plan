@@ -29,7 +29,7 @@ export default async function SharedTripPage({ params }) {
     <header className={styles.topbar}><span className={styles.brand}>TRAVEL PLAN / {t("share.kicker")}</span><LanguageSwitcher /></header>
     <div className={styles.hero}>
       <div><span className={styles.kicker}>{t("share.readOnly")}</span><h1>{data.trip.title}</h1><p>{data.trip.location} · {dayLabel(data.trip.startDate)}{data.trip.endDate !== data.trip.startDate && ` – ${dayLabel(data.trip.endDate)}`}</p></div>
-      <aside><strong>10 MIN</strong><span>{t("share.expiresAt", { time: new Intl.DateTimeFormat(LOCALE_META[locale].intl, { dateStyle: "medium", timeStyle: "short" }).format(new Date(link.expiresAt)) })}</span></aside>
+      <aside><strong>{t("share.duration", { minutes: link.minutes })}</strong><span>{t("share.expiresAt", { time: new Intl.DateTimeFormat(LOCALE_META[locale].intl, { dateStyle: "medium", timeStyle: "short" }).format(new Date(link.expiresAt)) })}</span></aside>
     </div>
     <SharedTripActions itinerary={data} />
     <div className={styles.schedule}>
