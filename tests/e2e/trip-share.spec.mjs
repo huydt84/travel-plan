@@ -34,13 +34,19 @@ test("leader creates a short-lived public read-only link", async ({ request, bro
       expect(new Date(result.expiresAt).getTime() - Date.now()).toBeGreaterThan((minutes - 0.1) * 60_000);
       expect(await (await request.get(result.path)).text()).toContain(`${minutes} PHÚT`);
     }
-    for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
-      const context = await browser.newContext({ viewport, permissions: ["clipboard-read", "clipboard-write"] });
+    for (const [viewport, timeZone] of [
+      [{ width: 320, height: 760 }, "Pacific/Honolulu"],
+      [{ width: 1440, height: 900 }, "Asia/Tokyo"],
+      [{ width: 1920, height: 1080 }, "America/New_York"],
+    ]) {
+      const context = await browser.newContext({ viewport, timezoneId: timeZone, permissions: ["clipboard-read", "clipboard-write"] });
       const page = await context.newPage();
       try {
         const response = await page.goto(path);
         expect(response.status()).toBe(200);
         await expect(page.getByRole("heading", { name: "Shared Kyoto" })).toBeVisible();
+        const localExpiry = new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(expiresAt));
+        await expect(page.locator("main aside span")).toHaveText(`Hết hạn lúc ${localExpiry}`);
         await expect(page.getByText("Temple visit")).toBeVisible();
         await expect(page.getByRole("button", { name: "Sao chép toàn bộ lịch trình" })).toBeVisible();
         await expect(page.locator("body")).not.toContainText(leader);
