@@ -96,17 +96,19 @@ test("leader creates a short-lived public read-only link", async ({ request, bro
       try {
         const leaderPage = await leaderContext.newPage();
         await leaderPage.goto(`/?trip=${slug}`);
+        const preparedLink = leaderPage.waitForResponse((response) => response.url().includes(`/api/trips/${slug}/share`) && response.request().method() === "POST");
         await leaderPage.getByRole("button", { name: "Chia sẻ", exact: true }).click();
         const dialog = leaderPage.getByRole("dialog", { name: "Chia sẻ lịch trình" });
         const duration = dialog.getByRole("spinbutton", { name: "Thời hạn link (phút)" });
         await expect(duration).toHaveValue("10");
-        const firstLink = dialog.getByLabel("Link xem chuyến đi");
-        await expect(firstLink).toHaveValue(/\/share\//);
+        expect((await preparedLink).status()).toBe(201);
+        await expect(dialog.getByLabel("Link xem chuyến đi")).toHaveCount(0);
         await leaderPage.screenshot({ path: testInfo.outputPath(`share-ready-${viewport.width}.png`), fullPage: false });
-        await dialog.getByRole("button", { name: "Sao chép link" }).click();
-        expect(await leaderPage.evaluate(() => navigator.clipboard.readText())).toBe(await firstLink.inputValue());
+        await dialog.getByRole("button", { name: "Sao chép liên kết" }).click();
+        await expect(dialog.getByRole("button", { name: "Đã sao chép thành công" })).toBeVisible();
+        expect(await leaderPage.evaluate(() => navigator.clipboard.readText())).toMatch(/\/share\/[A-Za-z0-9_-]{43}$/);
         await duration.fill("61");
-        await dialog.getByRole("button", { name: "Tạo link với thời hạn mới" }).click();
+        await dialog.getByRole("button", { name: "Sao chép liên kết" }).click();
         await expect(duration).toHaveValue("61");
         await expect(dialog.getByLabel("Link xem chuyến đi")).toHaveCount(0);
         await duration.fill("60");
@@ -114,14 +116,22 @@ test("leader creates a short-lived public read-only link", async ({ request, bro
         expect(box.x).toBeGreaterThanOrEqual(0);
         expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
         await leaderPage.screenshot({ path: testInfo.outputPath(`share-dialog-${viewport.width}.png`), fullPage: false });
-        await dialog.getByRole("button", { name: "Tạo link với thời hạn mới" }).click();
-        await expect(dialog.getByLabel("Link xem chuyến đi")).toHaveValue(/\/share\//);
+        await leaderPage.route("**/api/trips/*/share", async (route) => {
+          if (route.request().postDataJSON()?.minutes === 60) await new Promise((resolve) => setTimeout(resolve, 150));
+          await route.continue();
+        });
+        await dialog.getByRole("button", { name: "Sao chép liên kết" }).click();
+        await expect(dialog.getByRole("button", { name: "Đang tạo và sao chép…" })).toBeDisabled();
+        await expect(dialog.getByRole("button", { name: "Đã sao chép thành công" })).toBeVisible();
+        expect(await leaderPage.evaluate(() => navigator.clipboard.readText())).toMatch(/\/share\/[A-Za-z0-9_-]{43}$/);
         expect(await leaderPage.evaluate(() => localStorage.getItem("travel-plan-share-minutes"))).toBe("60");
         await dialog.getByRole("button", { name: "Đóng" }).click();
         await leaderPage.reload();
+        const restoredPreparedLink = leaderPage.waitForResponse((response) => response.url().includes(`/api/trips/${slug}/share`) && response.request().method() === "POST");
         await leaderPage.getByRole("button", { name: "Chia sẻ", exact: true }).click();
         await expect(leaderPage.getByRole("spinbutton", { name: "Thời hạn link (phút)" })).toHaveValue("60");
-        await expect(leaderPage.getByLabel("Link xem chuyến đi")).toHaveValue(/\/share\//);
+        expect((await restoredPreparedLink).status()).toBe(201);
+        await expect(leaderPage.getByLabel("Link xem chuyến đi")).toHaveCount(0);
       } finally { await leaderContext.close(); }
     }
     await sql`UPDATE activities SET title='Updated temple' WHERE trip_id=(SELECT id FROM trips WHERE slug=${slug})`;

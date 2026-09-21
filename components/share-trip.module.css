@@ -34,14 +34,30 @@
 .dialogHead { display: flex; justify-content: space-between; gap: 16px; }
 .dialogHead h2 { margin: 0; font: 700 clamp(30px, 5vw, 42px)/1 var(--font-display); }
 .dialogHead p { margin: 12px 0 24px; font-size: 14px; line-height: 1.5; }
-.close { align-self: start; min-width: 38px; min-height: 38px; border: 1px solid var(--navy); background: transparent; font-size: 26px; cursor: pointer; }
+.close { align-self: start; min-width: 38px; min-height: 38px; border: 1px solid var(--navy); background: transparent; font-size: 24px; cursor: pointer; }
 .linkLabel { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 700; }
 .dialog input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid var(--navy); color: var(--navy); background: white; font: 13px/1.4 var(--font-body); }
 .dialog input[type="number"] { min-height: 44px; font-variant-numeric: tabular-nums; }
 .hint { margin: 8px 0 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.expiry { margin: 10px 0 20px; color: var(--muted); font-size: 12px; }
-.copy { width: 100%; min-height: 44px; border: 0; color: white; background: var(--green); font-weight: 700; cursor: pointer; }
+.copy { display: inline-flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border: 0; color: white; background: var(--green); font-weight: 700; cursor: pointer; }
+.copy :global(.action-icon) { width: 19px; height: 19px; flex: none; }
 .copy:hover { background: var(--green-dark); }
 .copy:disabled { opacity: .65; cursor: wait; }
-.error { margin: 14px 0 0; color: var(--red); font-size: 13px; }
+.copySuccess, .copySuccess:hover { background: var(--green-dark); }
+.spinner {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 2px solid rgb(255 255 255 / 45%);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: share-spin .7s linear infinite;
+}
+.error { margin: 14px 0 0; color: var(--red); font-size: 14px; }
 .trigger:focus-visible, .close:focus-visible, .copy:focus-visible, .dialog input:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+
+@keyframes share-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}

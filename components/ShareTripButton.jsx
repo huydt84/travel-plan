@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Dialog, { DialogDescription, DialogTitle } from "./ui/Dialog";
 import { useLocale } from "./LocaleProvider";
 import { requestJson } from "../lib/request-json.mjs";
@@ -11,14 +11,16 @@ const SHARE_MINUTES_KEY = "travel-plan-share-minutes";
 const validMinutes = (value) => Number.isInteger(value) && value >= 1 && value <= 60;
 
 export default function ShareTripButton({ slug, className = "" }) {
-  const { t, intlLocale } = useLocale();
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [share, setShare] = useState(null);
+  const [copying, setCopying] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [minutes, setMinutes] = useState("10");
-  const linkIsCurrent = share && String(share.minutes) === minutes;
+  const preparedShare = useRef(null);
+  const inFlight = useRef(new Map());
+  const session = useRef(0);
+  const selectedMinutes = useRef("10");
 
   function openDialog() {
     let duration = 10;
@@ -26,47 +28,75 @@ export default function ShareTripButton({ slug, className = "" }) {
       const saved = Number(window.localStorage.getItem(SHARE_MINUTES_KEY));
       if (validMinutes(saved)) duration = saved;
     } catch { /* Storage may be unavailable; sharing still works. */ }
+    const currentSession = session.current + 1;
+    session.current = currentSession;
+    preparedShare.current = null;
     setOpen(true);
-    setShare(null);
     setCopied(false);
     setError("");
     setMinutes(String(duration));
-    generateLink(duration);
+    selectedMinutes.current = String(duration);
+    setCopying(false);
+    void prepareLink(duration, currentSession).catch(() => {
+      // Preparation is opportunistic. If it fails, Copy retries and reports the error.
+    });
   }
 
-  async function generateLink(duration) {
-    setBusy(true);
-    setError("");
-    try {
-      const result = await requestJson(`/api/trips/${encodeURIComponent(slug)}/share`, { method: "POST", body: JSON.stringify({ minutes: duration }) });
-      setShare({ url: new URL(result.path, window.location.origin).href, expiresAt: result.expiresAt, minutes: duration });
-      setCopied(false);
-      try { window.localStorage.setItem(SHARE_MINUTES_KEY, String(duration)); }
-      catch { /* Storage may be unavailable; the link remains usable. */ }
-    } catch {
-      setError(t("share.createError"));
-    } finally {
-      setBusy(false);
+  function closeDialog() {
+    session.current += 1;
+    setOpen(false);
+  }
+
+  function prepareLink(duration, currentSession) {
+    const prepared = preparedShare.current;
+    if (prepared?.minutes === duration && Date.parse(prepared.expiresAt) > Date.now()) {
+      return Promise.resolve(prepared);
     }
+
+    const requestKey = `${currentSession}:${duration}`;
+    const pending = inFlight.current.get(requestKey);
+    if (pending) return pending;
+
+    const request = (async () => {
+      const result = await requestJson(`/api/trips/${encodeURIComponent(slug)}/share`, { method: "POST", body: JSON.stringify({ minutes: duration }) });
+      const nextShare = { url: new URL(result.path, window.location.origin).href, expiresAt: result.expiresAt, minutes: duration };
+      if (session.current === currentSession && Number(selectedMinutes.current) === duration) preparedShare.current = nextShare;
+      return nextShare;
+    })().finally(() => inFlight.current.delete(requestKey));
+
+    inFlight.current.set(requestKey, request);
+    return request;
   }
 
-  function createLink(event) {
+  async function copyLink(event) {
     event.preventDefault();
     const duration = Number(minutes);
     if (!validMinutes(duration)) {
       setError(t("share.minutesError"));
       return;
     }
-    generateLink(duration);
-  }
-
-  async function copyLink() {
+    const currentSession = session.current;
+    setCopying(true);
+    setCopied(false);
+    setError("");
     try {
+      let share;
+      try {
+        share = await prepareLink(duration, currentSession);
+      } catch {
+        if (session.current === currentSession) setError(t("share.createError"));
+        return;
+      }
+      if (session.current !== currentSession) return;
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
       await navigator.clipboard.writeText(share.url);
+      try { window.localStorage.setItem(SHARE_MINUTES_KEY, String(duration)); }
+      catch { /* Storage may be unavailable; the link remains copied. */ }
       setCopied(true);
-      setError("");
     } catch {
-      setError(t("share.copyError"));
+      if (session.current === currentSession) setError(t("share.copyError"));
+    } finally {
+      if (session.current === currentSession) setCopying(false);
     }
   }
 
@@ -75,27 +105,29 @@ export default function ShareTripButton({ slug, className = "" }) {
       <ActionIcon name="share" />
       <span>{t("share.create")}</span>
     </button>
-    {open && <Dialog onClose={() => setOpen(false)} pending={busy} overlayClassName={styles.overlay}>
+    {open && <Dialog onClose={closeDialog} pending={copying} overlayClassName={styles.overlay}>
       <section className={styles.dialog}>
         <div className={styles.dialogHead}>
           <div>
             <DialogTitle asChild><h2>{t("share.title")}</h2></DialogTitle>
             <DialogDescription>{t("share.description")}</DialogDescription>
           </div>
-          <button type="button" className={styles.close} onClick={() => setOpen(false)} disabled={busy} aria-label={t("common.close")}>×</button>
+          <button type="button" className={styles.close} onClick={closeDialog} disabled={copying} aria-label={t("common.close")}>×</button>
         </div>
-        <form onSubmit={createLink}>
+        <form onSubmit={copyLink}>
           <label className={styles.linkLabel} htmlFor="share-minutes">{t("share.minutesLabel")}</label>
-          <input id="share-minutes" type="number" inputMode="numeric" min="1" max="60" step="1" required value={minutes} onChange={(event) => setMinutes(event.target.value)} disabled={busy} />
+          <input id="share-minutes" type="number" inputMode="numeric" min="1" max="60" step="1" required value={minutes} onChange={(event) => {
+            setMinutes(event.target.value);
+            selectedMinutes.current = event.target.value;
+            setCopied(false);
+            setError("");
+          }} disabled={copying} />
           <p className={styles.hint}>{t("share.minutesHint")}</p>
-          {!linkIsCurrent && <button type="submit" className={styles.copy} disabled={busy}>{busy ? t("common.loading") : share ? t("share.updateLink") : t("share.createLink")}</button>}
+          <button type="submit" className={`${styles.copy} ${copied ? styles.copySuccess : ""}`} disabled={copying} aria-live="polite">
+            {copying ? <span className={styles.spinner} aria-hidden="true" /> : <ActionIcon name={copied ? "check" : "copy"} />}
+            <span>{copying ? t("share.copying") : copied ? t("share.copied") : t("share.copyLink")}</span>
+          </button>
         </form>
-        {linkIsCurrent && <>
-          <label className={styles.linkLabel} htmlFor="share-link">{t("share.linkLabel")}</label>
-          <input id="share-link" readOnly value={share.url} onFocus={(event) => event.target.select()} />
-          <p className={styles.expiry}>{t("share.expiresAt", { time: new Intl.DateTimeFormat(intlLocale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(share.expiresAt)) })}</p>
-          <button type="button" className={styles.copy} onClick={copyLink}>{copied ? t("share.copied") : t("share.copyLink")}</button>
-        </>}
         {error && <p role="alert" className={styles.error}>{error}</p>}
       </section>
     </Dialog>}
