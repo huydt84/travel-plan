@@ -10,6 +10,7 @@ import { ScheduleForm, SourceForm } from "./admin/EditorForms";
 import { useScheduleDraft } from "./admin/useScheduleDraft";
 import Button from "./ui/Button";
 import ConfirmDialog from "./ConfirmDialog";
+import Dialog, { DialogTitle } from "./ui/Dialog";
 import Footer from "./ui/Footer";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
@@ -129,6 +130,7 @@ export default function TripTracker({
   const [scheduleDeleteError, setScheduleDeleteError] = useState("");
   const [sourceEditor, setSourceEditor] = useState(null);
   const [sourceActionError, setSourceActionError] = useState("");
+  const [sourceManagement, setSourceManagement] = useState({ route: false, reference: false });
   const {
     editor: scheduleEditor,
     setEditor: setScheduleEditor,
@@ -858,21 +860,23 @@ export default function TripTracker({
         const sources = data.sources.filter((source) => (source.kind ?? "reference") === kind);
         if (!sources.length && !access?.canManage) return null;
         const headingId = kind === "route" ? "sources-title" : id;
-        const editing = sourceEditor?.kind === kind;
+        const managing = sourceManagement[kind];
         return <section
           key={kind}
           className={contributionsStyles["sources"]}
           aria-labelledby={headingId}
+          data-managing={managing || undefined}
         >
           <div className={`${trackerStyles["section-heading"]} ${contributionsStyles["resource-heading"]} compact`}>
             <h2 id={headingId}>{t(label)}</h2>
-            {access?.canManage && <Button type="button" variant="ghost" aria-expanded={editing && !sourceEditor.source}
-              onClick={() => { setSourceEditor(editing && !sourceEditor.source ? null : { kind, source: null }); setSourceActionError(""); }}>
-              {editing && !sourceEditor.source ? t("adminExtra.message035") : t(kind === "route" ? "adminRoutes.add" : "adminSources.addReference")}
+            {access?.canManage && <Button type="button" variant="ghost" aria-pressed={managing}
+              onClick={() => {
+                setSourceManagement((current) => ({ ...current, [kind]: !current[kind] }));
+                setSourceActionError("");
+              }}>
+              {managing ? t("publicSources.finishUpdating") : t(kind === "route" ? "publicSources.updateRoutes" : "publicSources.updateReferences")}
             </Button>}
           </div>
-          {editing && <SourceForm key={sourceEditor.source?.number ?? `new-${kind}`} kind={kind} source={sourceEditor.source}
-            onSave={(values) => savePublicSource(values, sourceEditor.source?.number)} onCancel={() => setSourceEditor(null)} />}
           {sourceActionError && <p role="alert" className="form-error">{sourceActionError}</p>}
           <div className={contributionsStyles["source-list"]}>
           {sources.map((source) => (
@@ -889,12 +893,20 @@ export default function TripTracker({
                 <ActionIcon name="external" />
               </span>
             </a>
-            {access?.canManage && <div className={contributionsStyles["resource-actions"]}>
+            {access?.canManage && managing && <div className={`${contributionsStyles["resource-actions"]} ${contributionsStyles["resource-actions-active"]}`}>
               <Button type="button" variant="ghost" onClick={() => { setSourceEditor({ kind, source }); setSourceActionError(""); }}>{t("adminPlaces.edit")}</Button>
               <Button type="button" variant="danger" onClick={() => deletePublicSource(source)}>{t("adminPlaces.delete")}</Button>
             </div>}
             </div>
           ))}
+          {access?.canManage && managing && <button
+            type="button"
+            className={contributionsStyles["source-add-card"]}
+            onClick={() => { setSourceEditor({ kind, source: null }); setSourceActionError(""); }}
+            aria-label={t(kind === "route" ? "adminRoutes.add" : "adminSources.addReference")}
+          >
+            <span aria-hidden="true">+</span>
+          </button>}
           </div>
         </section>;
       })}
@@ -905,6 +917,27 @@ export default function TripTracker({
 
       {contributionDialogs}
       {discardDialog}
+      {sourceEditor && <Dialog
+        onClose={() => setSourceEditor(null)}
+        overlayClassName={`${contributionsStyles["suggestion-overlay"]} ${contributionsStyles["source-editor-overlay"]}`}
+      >
+        <section className={contributionsStyles["source-editor-dialog"]}>
+          <DialogTitle asChild>
+            <span className="sr-only">
+              {sourceEditor.source
+                ? t(sourceEditor.kind === "route" ? "adminRoutes.edit" : "adminExtra.message227", { number: sourceEditor.source.number, value0: sourceEditor.source.number })
+                : t(sourceEditor.kind === "route" ? "adminRoutes.new" : "adminExtra.message228")}
+            </span>
+          </DialogTitle>
+          <SourceForm
+            key={sourceEditor.source?.number ?? `new-${sourceEditor.kind}`}
+            kind={sourceEditor.kind}
+            source={sourceEditor.source}
+            onSave={(values) => savePublicSource(values, sourceEditor.source?.number)}
+            onCancel={() => setSourceEditor(null)}
+          />
+        </section>
+      </Dialog>}
       {activityToDelete && (
         <ConfirmDialog
           title={t("adminExtra.message021")}

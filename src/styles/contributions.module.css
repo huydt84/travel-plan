@@ -299,12 +299,6 @@
   border-color: var(--paper-bright);
   background: var(--paper-bright);
 }
-.sources > :global(form) {
-  margin: 18px 0;
-  padding: 20px;
-  color: var(--navy);
-  background: var(--paper-bright);
-}
 .resource-actions {
   display: flex;
   justify-content: flex-end;
@@ -323,6 +317,76 @@
 }
 .saved-place-actions .resource-actions {
   padding: 0;
+}
+.resource-actions-active button {
+  transform-origin: 50% 80%;
+  animation: resource-action-jiggle 520ms ease-in-out infinite alternate;
+}
+.resource-actions-active button:nth-child(2) {
+  animation-delay: -260ms;
+}
+.source-add-card {
+  display: grid;
+  min-height: 104px;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.22);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+  place-items: center;
+  color: var(--yellow);
+  background: transparent;
+  cursor: pointer;
+}
+.source-add-card:nth-child(even) {
+  border-right: 0;
+}
+.source-add-card span {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  border: 2px solid currentColor;
+  place-items: center;
+  font: 500 46px/1 var(--display);
+  transition: color 150ms ease, background 150ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.source-add-card:hover span,
+.source-add-card:focus-visible span {
+  color: var(--navy);
+  background: var(--yellow);
+  transform: rotate(90deg);
+}
+.source-editor-overlay {
+  z-index: 110;
+  overflow-y: auto;
+}
+.source-editor-dialog {
+  width: min(100%, 760px);
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  color: var(--navy);
+  background: var(--paper-bright);
+  clip-path: polygon(0 14px, 14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+  animation: source-dialog-enter 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.source-editor-dialog :global(form) {
+  margin: 0;
+}
+
+@keyframes resource-action-jiggle {
+  0%, 42% { transform: rotate(-1.5deg); }
+  58%, 100% { transform: rotate(1.5deg); }
+}
+
+@keyframes source-dialog-enter {
+  from {
+    opacity: 0;
+    filter: blur(5px);
+    transform: scale(0.97) translateY(14px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1) translateY(0);
+  }
 }
 .source-card {
   composes: source-card from global;
@@ -452,6 +516,9 @@
   margin-top: 18px;
 }
 @media (max-width: 680px) {
+  .source-editor-dialog button {
+    min-height: 44px;
+  }
   .suggestion-composer button,
   .suggestion-composer select,
   .suggestion-composer textarea {
@@ -481,6 +548,10 @@
   .source-entry {
     border-right: 0;
   }
+  .source-add-card {
+    min-height: 92px;
+    border-right: 0;
+  }
   .source-card,
   .source-card:nth-child(even) {
     border-right: 0;
@@ -504,6 +575,21 @@
   }
   .suggestion-composer {
     padding: 20px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resource-actions-active button,
+  .source-editor-dialog {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
+  }
+  .source-add-card span {
+    transition-duration: 1ms;
+  }
+  .source-add-card:hover span,
+  .source-add-card:focus-visible span {
+    transform: none;
   }
 }
 

@@ -53,8 +53,8 @@ itineraryTest("members keep suggestion access without schedule management contro
   await expect(page.getByRole("button", { name: "Thêm vào ngày này" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sửa", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Xoá", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Thêm tuyến đường" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Thêm nguồn tham khảo" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Cập nhật tuyến đường" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Cập nhật nguồn tham khảo" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Thêm địa điểm" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Góp ý cho hoạt động này" }).first()).toBeVisible();
 });
@@ -72,15 +72,35 @@ itineraryTest("owner manages route, place, and source references in the public t
   await gotoHealthy(page, `/?trip=${tripSlug}`);
 
   const routes = page.getByRole("region", { name: "Tuyến đường" });
+  await expect(routes.getByRole("button", { name: "Sửa", exact: true })).toHaveCount(0);
+  await expect(routes.getByRole("button", { name: "Xoá", exact: true })).toHaveCount(0);
+  await routes.getByRole("button", { name: "Cập nhật tuyến đường" }).click();
+  await expect(routes.getByRole("button", { name: "Sửa", exact: true })).toBeVisible();
+  await expect(routes.getByRole("button", { name: "Thêm tuyến đường" })).toBeVisible();
+  expect(await routes.getByRole("button", { name: "Sửa", exact: true }).evaluate((element) =>
+    getComputedStyle(element).animationName.includes("resource-action-jiggle"),
+  )).toBe(true);
+  await routes.getByRole("button", { name: "Sửa", exact: true }).scrollIntoViewIfNeeded();
+  const routeScrollPosition = await page.evaluate(() => window.scrollY);
   await routes.getByRole("button", { name: "Sửa", exact: true }).click();
-  await routes.locator("form").getByLabel("Điểm kết thúc").fill("Museum");
-  await routes.locator("form").getByRole("button", { name: "Lưu tuyến đường" }).click();
+  let editorDialog = page.getByRole("dialog");
+  await expect(editorDialog).toBeVisible();
+  expect(await page.evaluate(() => window.scrollY)).toBe(routeScrollPosition);
+  const dialogBox = await editorDialog.boundingBox();
+  expect(dialogBox).not.toBeNull();
+  expect(Math.abs(dialogBox.y + dialogBox.height / 2 - page.viewportSize().height / 2)).toBeLessThan(16);
+  await editorDialog.getByLabel("Điểm kết thúc").fill("Museum");
+  await editorDialog.getByRole("button", { name: "Lưu tuyến đường" }).click();
+  await expect(editorDialog).toHaveCount(0);
   await expect(routes.getByRole("link", { name: /Hotel → Museum/ })).toBeVisible();
 
   const references = page.getByRole("region", { name: "Nguồn tham khảo" });
+  await expect(references.getByRole("button", { name: "Sửa", exact: true })).toHaveCount(0);
+  await references.getByRole("button", { name: "Cập nhật nguồn tham khảo" }).click();
   await references.getByRole("button", { name: "Sửa", exact: true }).click();
-  await references.locator("form").getByLabel("Tên nguồn").fill("Museum hours");
-  await references.locator("form").getByRole("button", { name: "Lưu" }).click();
+  editorDialog = page.getByRole("dialog");
+  await editorDialog.getByLabel("Tên nguồn").fill("Museum hours");
+  await editorDialog.getByRole("button", { name: "Lưu" }).click();
   await expect(references.getByRole("link", { name: /Museum hours/ })).toBeVisible();
 
   const places = page.getByRole("region", { name: "Địa điểm đã lưu" });
@@ -90,19 +110,21 @@ itineraryTest("owner manages route, place, and source references in the public t
   await expect(places.getByRole("heading", { name: "Museum" })).toBeVisible();
 
   await routes.getByRole("button", { name: "Thêm tuyến đường" }).click();
-  await routes.locator("form").getByLabel("Điểm bắt đầu").fill("Museum");
-  await routes.locator("form").getByLabel("Điểm kết thúc").fill("Park");
-  await routes.locator("form").getByLabel("Google Maps URL").fill("https://maps.google.com/?q=park");
-  await routes.locator("form").getByRole("button", { name: "Thêm tuyến đường" }).click();
+  editorDialog = page.getByRole("dialog");
+  await editorDialog.getByLabel("Điểm bắt đầu").fill("Museum");
+  await editorDialog.getByLabel("Điểm kết thúc").fill("Park");
+  await editorDialog.getByLabel("Google Maps URL").fill("https://maps.google.com/?q=park");
+  await editorDialog.getByRole("button", { name: "Thêm tuyến đường" }).click();
   await expect(routes.getByRole("link", { name: /Museum → Park/ })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await routes.getByRole("link", { name: /Museum → Park/ }).locator("..").getByRole("button", { name: "Xoá" }).click();
   await expect(routes.getByRole("link", { name: /Museum → Park/ })).toHaveCount(0);
 
   await references.getByRole("button", { name: "Thêm nguồn tham khảo" }).click();
-  await references.locator("form").getByLabel("Tên nguồn").fill("Park guide");
-  await references.locator("form").getByLabel("URL").fill("https://example.com/park");
-  await references.locator("form").getByRole("button", { name: "Thêm nguồn" }).click();
+  editorDialog = page.getByRole("dialog");
+  await editorDialog.getByLabel("Tên nguồn").fill("Park guide");
+  await editorDialog.getByLabel("URL").fill("https://example.com/park");
+  await editorDialog.getByRole("button", { name: "Thêm nguồn" }).click();
   await expect(references.getByRole("link", { name: /Park guide/ })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await references.getByRole("link", { name: /Park guide/ }).locator("..").getByRole("button", { name: "Xoá" }).click();

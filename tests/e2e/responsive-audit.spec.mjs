@@ -30,16 +30,36 @@ const surfaces = [
     ready: (page) => page.locator("#schedule-editor-new"),
   },
   {
+    name: "public route management",
+    path: "/",
+    setup: async (page) => page.getByRole("region", { name: "Tuyến đường" }).getByRole("button", { name: "Cập nhật tuyến đường" }).click(),
+    ready: (page) => page.getByRole("region", { name: "Tuyến đường" }).getByRole("button", { name: "Thêm tuyến đường" }),
+  },
+  {
     name: "public route editor",
     path: "/",
-    setup: async (page) => page.getByRole("region", { name: "Tuyến đường" }).getByRole("button", { name: "Thêm tuyến đường" }).click(),
-    ready: (page) => page.getByRole("region", { name: "Tuyến đường" }).locator("form").getByLabel("Điểm bắt đầu"),
+    setup: async (page) => {
+      const routes = page.getByRole("region", { name: "Tuyến đường" });
+      await routes.getByRole("button", { name: "Cập nhật tuyến đường" }).click();
+      await routes.getByRole("button", { name: "Thêm tuyến đường" }).click();
+    },
+    ready: (page) => page.getByRole("dialog").getByLabel("Điểm bắt đầu"),
+  },
+  {
+    name: "public reference management",
+    path: "/",
+    setup: async (page) => page.getByRole("region", { name: "Nguồn tham khảo" }).getByRole("button", { name: "Cập nhật nguồn tham khảo" }).click(),
+    ready: (page) => page.getByRole("region", { name: "Nguồn tham khảo" }).getByRole("button", { name: "Thêm nguồn tham khảo" }),
   },
   {
     name: "public reference editor",
     path: "/",
-    setup: async (page) => page.getByRole("region", { name: "Nguồn tham khảo" }).getByRole("button", { name: "Thêm nguồn tham khảo" }).click(),
-    ready: (page) => page.getByRole("region", { name: "Nguồn tham khảo" }).locator("form").getByLabel("Tên nguồn"),
+    setup: async (page) => {
+      const references = page.getByRole("region", { name: "Nguồn tham khảo" });
+      await references.getByRole("button", { name: "Cập nhật nguồn tham khảo" }).click();
+      await references.getByRole("button", { name: "Thêm nguồn tham khảo" }).click();
+    },
+    ready: (page) => page.getByRole("dialog").getByLabel("Tên nguồn"),
   },
   {
     name: "public place editor",
