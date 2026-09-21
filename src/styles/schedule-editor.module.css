@@ -69,6 +69,25 @@
   color: var(--muted);
   font-size: 10px;
 }
+.trip-date-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.trip-date-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  font-variant-numeric: tabular-nums;
+}
+.trip-date-controls button :global(.action-icon) {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
 .plan-slug {
   composes: plan-slug from global;
   display: inline-block;
@@ -1384,6 +1403,14 @@
   .plan-summary {
     display: grid;
   }
+  .trip-date-controls {
+    display: grid;
+    grid-template-columns: 1fr minmax(128px, 1.35fr) 1fr;
+  }
+  .trip-date-controls button {
+    min-width: 0;
+    padding-inline: 9px;
+  }
   .admin-schedule-list::before {
     left: 57px;
   }
@@ -1624,6 +1651,13 @@
   }
 }
 @media (max-width: 380px) {
+  .trip-date-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .trip-date-controls button:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
   .admin-branch-options {
     padding: 8px;
   }

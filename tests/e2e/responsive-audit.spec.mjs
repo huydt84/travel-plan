@@ -306,6 +306,27 @@ for (const viewport of viewports) {
           expect(splitDates, "dates must not split their year across lines").toEqual([]);
         }
         if (surface.name === "admin trips") {
+          const tripDateControls = page.getByRole("group", { name: "Điều chỉnh ngày chuyến đi" });
+          await expect(tripDateControls).toBeVisible();
+          const dateControlGeometry = await tripDateControls.evaluate((group) => {
+            const groupRect = group.getBoundingClientRect();
+            return [...group.querySelectorAll("button")].map((button) => {
+              const rect = button.getBoundingClientRect();
+              return {
+                left: rect.left,
+                right: rect.right,
+                height: rect.height,
+                groupLeft: groupRect.left,
+                groupRight: groupRect.right,
+              };
+            });
+          });
+          expect(dateControlGeometry).toHaveLength(3);
+          for (const control of dateControlGeometry) {
+            expect(control.height).toBeGreaterThanOrEqual(44);
+            expect(control.left).toBeGreaterThanOrEqual(control.groupLeft - 1);
+            expect(control.right).toBeLessThanOrEqual(control.groupRight + 1);
+          }
           const memberDelete = page.getByRole("button", { name: "Xóa", exact: true });
           await expect(memberDelete).toBeVisible();
           const memberLayout = await memberDelete.evaluate((button) => {

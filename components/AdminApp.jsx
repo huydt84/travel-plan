@@ -18,11 +18,13 @@ import ConfirmDialog from "./ConfirmDialog";
 import LanguageSwitcher from "./LanguageSwitcher";
 import ShareTripButton from "./ShareTripButton";
 import InvitationDialog from "./InvitationDialog";
+import TripDateShiftDialog from "./TripDateShiftDialog";
 import { useLocale } from "./LocaleProvider";
 import { adminErrorMessage } from "../lib/i18n-admin.mjs";
 import { translateActivityType } from "../lib/i18n.mjs";
 import { ActivityExpenses, ExpenseSummary, useExpenseLedger } from "./tracker/Expenses";
 import {
+  addCalendarDays,
   activityInstants,
   calendarDayDifference,
   enumerateTripDays,
@@ -208,6 +210,9 @@ function Dashboard({
   const [auditEvents, setAuditEvents] = useState([]);
   const [ownershipFilter, setOwnershipFilter] = useState("all");
   const [invitationOpen, setInvitationOpen] = useState(false);
+  const [dateShift, setDateShift] = useState(null);
+  const [dateShiftError, setDateShiftError] = useState("");
+  const dateShiftReturnFocusRef = useRef(null);
   const expenseLedger = useExpenseLedger(selectedSlug);
   const {
     editor: scheduleEditor,
@@ -375,6 +380,70 @@ function Dashboard({
       const nextSlug = await loadTrips(saved.slug);
       await refreshPlan(nextSlug);
     });
+
+  const restoreDateShiftFocus = () => requestAnimationFrame(() => {
+    const trigger = dateShiftReturnFocusRef.current;
+    const target = trigger?.isConnected
+      ? trigger
+      : trigger?.dataset.tripDateShift
+        ? document.querySelector(`[data-trip-date-shift="${trigger.dataset.tripDateShift}"]`)
+        : null;
+    target?.focus?.();
+  });
+
+  const closeDateShift = () => {
+    if (busy) return;
+    setDateShift(null);
+    setDateShiftError("");
+    restoreDateShiftFocus();
+  };
+
+  const openDateShift = (startDate, trigger) => {
+    if (busy || !plan) return;
+    dateShiftReturnFocusRef.current = trigger;
+    guardScheduleDraft(
+      () => {
+        setScheduleEditor(null);
+        setScheduleError("");
+        setDateShiftError("");
+        setDateShift({ initialStartDate: startDate });
+      },
+      t("adminExtra.message003", {
+        value0: scheduleEditor?.values.title || t("adminExtra.message004"),
+      }),
+    );
+  };
+
+  const confirmDateShift = async ({ startDate, endDate }) => {
+    let shouldRestoreFocus = false;
+    setBusy(true);
+    setDateShiftError("");
+    setError("");
+    setNotice("");
+    try {
+      const saved = await api(`/api/trips/${encodeURIComponent(selectedSlug)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ startDate, endDate, moveSchedule: true }),
+      });
+      setNotice(t("adminTripShift.success", {
+        range: formatTripDateRange(saved, {}, intlLocale),
+      }));
+      try {
+        await Promise.all([loadTrips(saved.slug), refreshPlan(saved.slug)]);
+      } catch (refreshError) {
+        setError(t("adminTripShift.refreshError", {
+          error: adminErrorMessage(refreshError, t, locale),
+        }));
+      }
+      setDateShift(null);
+      shouldRestoreFocus = true;
+    } catch (requestError) {
+      setDateShiftError(adminErrorMessage(requestError, t, locale));
+    } finally {
+      setBusy(false);
+      if (shouldRestoreFocus) restoreDateShiftFocus();
+    }
+  };
 
   const removeTrip = (slug) => {
     if (!window.confirm(t("adminExtra.message005", { value0: slug }))) return;
@@ -848,6 +917,53 @@ function Dashboard({
                     {formatTripDateRange(plan.trip, {}, intlLocale)} ·{" "}
                     {plan.trip.location} · {plan.trip.timezone} · {plan.trip.currency}
                   </p>
+                  <div
+                    className={scheduleEditorStyles["trip-date-controls"]}
+                    role="group"
+                    aria-label={t("adminTripShift.controls")}
+                  >
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={busy}
+                      data-trip-date-shift="back"
+                      aria-label={t("adminTripShift.backOneDay")}
+                      onClick={(event) => openDateShift(
+                        addCalendarDays(plan.trip.startDate, -1),
+                        event.currentTarget,
+                      )}
+                    >
+                      <ActionIcon name="left" />
+                      <span>{t("adminTripShift.oneDay")}</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={busy}
+                      data-trip-date-shift="choose"
+                      onClick={(event) => openDateShift(
+                        plan.trip.startDate,
+                        event.currentTarget,
+                      )}
+                    >
+                      <ActionIcon name="calendar" />
+                      <span>{t("adminTripShift.chooseDate")}</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={busy}
+                      data-trip-date-shift="forward"
+                      aria-label={t("adminTripShift.forwardOneDay")}
+                      onClick={(event) => openDateShift(
+                        addCalendarDays(plan.trip.startDate, 1),
+                        event.currentTarget,
+                      )}
+                    >
+                      <span>{t("adminTripShift.oneDay")}</span>
+                      <ActionIcon name="right" />
+                    </Button>
+                  </div>
                 </div>
                 <div className={scheduleEditorStyles["admin-actions"]}>
                   <ShareTripButton key={plan.trip.slug} slug={plan.trip.slug} />
@@ -1472,6 +1588,16 @@ function Dashboard({
         </section>
       </div>
       {discardDialog}
+      {dateShift && plan && (
+        <TripDateShiftDialog
+          trip={plan.trip}
+          initialStartDate={dateShift.initialStartDate}
+          pending={busy}
+          error={dateShiftError}
+          onCancel={closeDateShift}
+          onConfirm={confirmDateShift}
+        />
+      )}
       {suggestionToDelete && (
         <ConfirmDialog
           title={t("adminExtra.message067")}

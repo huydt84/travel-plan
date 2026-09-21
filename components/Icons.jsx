@@ -14,6 +14,9 @@ export function TypeIcon({ type = "Visit" }) {
 
 export function ActionIcon({ name }) {
   if (name === "add") return <svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>;
+  if (name === "left") return <svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m5 5-5-5 5-5" /></svg>;
+  if (name === "right") return <svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5" /></svg>;
+  if (name === "calendar") return <svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="15" rx="1.5" /><path d="M8 3v5m8-5v5M3.5 10h17M8 14h3m2 0h3M8 17h3" /></svg>;
   if (name === "close") return <svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>;
   if (name === "copy") return <svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="1.5" /><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8" /></svg>;
   if (name === "external") return <svg className="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-9 9" /><path d="M18 13v6H5V6h6" /></svg>;

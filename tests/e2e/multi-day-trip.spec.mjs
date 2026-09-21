@@ -131,6 +131,103 @@ test("admin trip form exposes a date range", async ({ page }) => {
   await expect(page.getByLabel("Ngày kết thúc")).toBeVisible();
 });
 
+test("management controls move a trip by one day or to an arbitrary start date", async ({ page, request }, testInfo) => {
+  const slug = `trip-date-shift-${Date.now()}`;
+  const createActivity = async (input) => {
+    const response = await request.post(`/api/trips/${slug}/schedule`, { data: {
+      start: "09:00", end: "10:00", icon: "📍", detail: "", refs: [], ...input,
+    } });
+    expect(response.status()).toBe(201);
+    return (await response.json()).id;
+  };
+
+  expect((await request.post("/api/trips", { data: {
+    slug, title: "Leap-year shift", startDate: "2032-02-28", endDate: "2032-03-01",
+    timezone: "Asia/Tokyo", location: "Tokyo",
+  } })).status()).toBe(201);
+
+  try {
+    const anchorId = await createActivity({
+      startDate: "2032-02-28", endDate: "2032-02-28", title: "Shift anchor", type: "Visit",
+    });
+    const segmentId = await createActivity({
+      startDate: "2032-02-29", endDate: "2032-02-29", title: "Shift branch stop", type: "Visit",
+    });
+    await createActivity({
+      startDate: "2032-03-01", endDate: "2032-03-01", title: "Shift rejoin", type: "Visit",
+    });
+    await createActivity({
+      startDate: "2032-02-20", endDate: "2032-02-20", title: "Keep reservation date", type: "Reservation",
+    });
+    await createActivity({
+      startDate: "2032-02-21", endDate: "2032-02-21", title: "Keep flight date", type: "FlightBooking",
+    });
+    expect((await request.post(`/api/trips/${slug}/branches`, { data: {
+      title: "Shift branch", anchorActivityId: anchorId, segmentActivityIds: [segmentId],
+      defaultBranch: { key: "default", label: "Default", condition: "Normal" },
+      alternateBranch: { key: "alternate", label: "Alternate", condition: "Backup" },
+    } })).status()).toBe(201);
+
+    await gotoHealthy(page, `/admin/trips?trip=${slug}`);
+    const backButton = page.getByRole("button", { name: "Lùi chuyến đi 1 ngày" });
+    await backButton.click();
+    let dialog = page.getByRole("dialog", { name: "Dời ngày chuyến đi" });
+    await expect(dialog.getByLabel("Ngày bắt đầu mới")).toHaveValue("2032-02-27");
+    await expect(dialog).toContainText("Sớm hơn 1 ngày");
+    await dialog.getByRole("button", { name: "Hủy" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(backButton).toBeFocused();
+    expect((await (await request.get(`/api/trips/${slug}`)).json()).trip.startDate).toBe("2032-02-28");
+
+    const chooseDateButton = page.getByRole("button", { name: "Chọn ngày…" });
+    await chooseDateButton.click();
+    dialog = page.getByRole("dialog", { name: "Dời ngày chuyến đi" });
+    await expect(dialog.getByRole("button", { name: "Dời toàn bộ lịch" })).toBeDisabled();
+    await dialog.getByLabel("Ngày bắt đầu mới").fill("2033-02-28");
+    await expect(dialog).toContainText("Muộn hơn 366 ngày");
+    await expect(dialog).toContainText("28/02/2033 – 02/03/2033");
+    for (const viewport of [
+      { name: "phone", width: 320, height: 760 },
+      { name: "macbook", width: 1440, height: 900 },
+      { name: "dell", width: 1920, height: 1080 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.screenshot({ path: testInfo.outputPath(`trip-date-shift-${viewport.name}.png`) });
+    }
+    await dialog.getByRole("button", { name: "Dời toàn bộ lịch" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(chooseDateButton).toBeFocused();
+
+    let shifted = await (await request.get(`/api/trips/${slug}`)).json();
+    expect([shifted.trip.startDate, shifted.trip.endDate]).toEqual(["2033-02-28", "2033-03-02"]);
+    const shiftedItems = [
+      ...shifted.backbone,
+      ...shifted.branchGroups.flatMap((group) => group.branches.flatMap((branch) => branch.itinerary)),
+    ];
+    const dateFor = (title) => shiftedItems.find((item) => item.title === title)?.startDate;
+    expect(dateFor("Shift anchor")).toBe("2033-02-28");
+    expect(dateFor("Shift branch stop")).toBe("2033-03-01");
+    expect(dateFor("Shift rejoin")).toBe("2033-03-02");
+    expect(dateFor("Keep reservation date")).toBe("2032-02-20");
+    expect(dateFor("Keep flight date")).toBe("2032-02-21");
+
+    const forwardButton = page.getByRole("button", { name: "Đẩy chuyến đi 1 ngày" });
+    await forwardButton.click();
+    dialog = page.getByRole("dialog", { name: "Dời ngày chuyến đi" });
+    await expect(dialog.getByLabel("Ngày bắt đầu mới")).toHaveValue("2033-03-01");
+    await dialog.getByRole("button", { name: "Dời toàn bộ lịch" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(forwardButton).toBeFocused();
+    shifted = await (await request.get(`/api/trips/${slug}`)).json();
+    expect([shifted.trip.startDate, shifted.trip.endDate]).toEqual(["2033-03-01", "2033-03-03"]);
+
+    await gotoHealthy(page, `/trips/manage?trip=${slug}`);
+    await expect(page.getByRole("group", { name: "Điều chỉnh ngày chuyến đi" })).toBeVisible();
+  } finally {
+    await request.delete(`/api/trips/${slug}`);
+  }
+});
+
 test("branch edits order evening and next-morning activities by date", async ({ page, request }) => {
   const slug = `multi-day-branch-${Date.now()}`;
   const schedule = (title, date, start, end) => ({
