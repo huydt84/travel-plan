@@ -8,7 +8,7 @@ for (const viewport of [{ width: 320, height: 760 }, { width: 1440, height: 900 
     await expect(input).toBeEnabled();
     await input.fill("Bản nháp giữ nguyên khi mở rộng và thu nhỏ");
     const before = new URL(page.url());
-    const visibleTrip = await page.getByRole("combobox", { name: "Chọn chuyến đi", includeHidden: true }).inputValue();
+    const visibleTrip = await page.getByRole("combobox", { name: "Chọn chuyến đi", includeHidden: true }).getAttribute("data-trip-slug");
     await page.getByRole("link", { name: "Mở rộng", exact: true }).click();
     await expect(input).toHaveValue("Bản nháp giữ nguyên khi mở rộng và thu nhỏ");
     const collapse = page.getByRole("link", { name: "Thu nhỏ", exact: true });

@@ -166,7 +166,7 @@ for (const [width, height] of [[320,760],[1440,900],[1920,1080]]) {
     await page.getByRole("link", { name: "Thu nhỏ", exact: true }).click();
     await expect(input).toHaveValue("Bản nháp cùng cuộc trò chuyện");
     await expect(page.getByRole("button", { name: "Thêm chuyến đi này", exact: true })).toBeVisible();
-    const visibleTrip = await page.getByRole("combobox", { name: "Chọn chuyến đi", includeHidden: true }).inputValue();
+    const visibleTrip = await page.getByRole("combobox", { name: "Chọn chuyến đi", includeHidden: true }).getAttribute("data-trip-slug");
     expect(new URL(page.url()).searchParams.get("conversation")).toBe(conversation);
     await page.getByRole("link", { name: "Mở rộng", exact: true }).click();
     await expect(input).toHaveValue("Bản nháp cùng cuộc trò chuyện");

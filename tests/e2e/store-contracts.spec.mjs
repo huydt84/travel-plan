@@ -5,11 +5,22 @@ import {
   recordInvitationDeliveries,
 } from "../../lib/invitation-history-store.mjs";
 import {
+  claimInvitationBatch,
+  getInvitationPermission,
+  InvitationPermissionError,
+  InvitationRateLimitError,
+  requestInvitationPermission,
+  reviewInvitationPermission,
+} from "../../lib/invitation-permission-store.mjs";
+import {
   processAdminNotificationOutboxRecords,
 } from "../../lib/admin-notification-outbox-store.mjs";
 import { DEFAULT_LOCAL_POSTGRES_URI } from "../../lib/runtime-config.mjs";
 import { createPostgresSql } from "../../lib/sql-adapter.mjs";
 import {
+  listUserActivity,
+  resolveStoredUserRole,
+  updateStoredUserRole,
   updateStoredUserDisplayName,
   upsertUserActivity,
   upsertUserLogin,
@@ -35,20 +46,34 @@ test("invitation delivery conflicts, leases, filtering, ordering, and the histor
   const requestId = randomUUID();
 
   try {
-    await recordInvitationDeliveries(sql, {
+    const delivery = {
       requestId,
       inviterEmail,
       trip,
       subject: "First attempt",
       deliveries: [{ recipient: "same@example.com", status: "failed", gmailMessageId: null, errorCode: "TEMPORARY" }],
-    }, future);
-    await recordInvitationDeliveries(sql, {
+    };
+    const [failed] = await recordInvitationDeliveries(sql, delivery, future);
+    expect(failed).toEqual({
+      id: expect.any(String), requestId, inviterEmail, recipientEmail: "same@example.com",
+      tripSlug: trip.slug, tripTitle: trip.title, subject: "First attempt",
+      status: "failed", errorCode: "TEMPORARY", attemptedAt: future.toISOString(), sentAt: null,
+    });
+    const claimInput = { requestId, inviterEmail, recipients: ["same@example.com"], trip, subject: "Retry" };
+    expect(await claimInvitationDeliveries(sql, claimInput, new Date(future.getTime() + 500))).toEqual(["same@example.com"]);
+    const [sent] = await recordInvitationDeliveries(sql, {
       requestId,
       inviterEmail,
       trip,
       subject: "Retry",
       deliveries: [{ recipient: "same@example.com", status: "sent", gmailMessageId: "gmail-1", errorCode: null }],
     }, new Date(future.getTime() + 1_000));
+    expect(sent).toEqual({
+      ...failed, subject: "Retry", status: "sent", errorCode: null,
+      attemptedAt: new Date(future.getTime() + 1_000).toISOString(),
+      sentAt: new Date(future.getTime() + 1_000).toISOString(),
+    });
+    expect(await claimInvitationDeliveries(sql, claimInput, new Date(future.getTime() + 1_500))).toEqual([]);
 
     expect(await sql`
       SELECT status, subject, error_code, sent_at IS NOT NULL AS sent
@@ -93,6 +118,53 @@ test("invitation delivery conflicts, leases, filtering, ordering, and the histor
   }
 });
 
+test("invitation permissions and rolling batch limits follow persisted decisions", async () => {
+  const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
+  const marker = randomUUID();
+  const email = `invitation-permission-${marker}@localhost.invalid`;
+  const trip = await createTrip(sql, marker);
+  const requestId = randomUUID();
+
+  try {
+    await upsertUserLogin(sql, { name: "Inviter", email }, future);
+    const requested = await requestInvitationPermission(sql, { userEmail: email.toUpperCase(), trip });
+    expect(requested).toMatchObject({ userEmail: email, status: "pending", requestedTripSlug: trip.slug });
+    const denied = await reviewInvitationPermission(sql, {
+      id: requested.id, action: "deny", reviewerEmail: "owner@example.com", reason: "x".repeat(400),
+    });
+    expect(denied).toMatchObject({ status: "denied", decisionReason: "x".repeat(300) });
+    expect((await requestInvitationPermission(sql, { userEmail: email, trip })).status).toBe("denied");
+    await reviewInvitationPermission(sql, { id: requested.id, action: "approve", reviewerEmail: "owner@example.com" });
+    expect((await reviewInvitationPermission(sql, {
+      id: requested.id, action: "revoke", reviewerEmail: "owner@example.com",
+    })).status).toBe("revoked");
+    expect((await getInvitationPermission(sql, email)).status).toBe("revoked");
+    expect((await reviewInvitationPermission(sql, {
+      id: requested.id, action: "approve", reviewerEmail: "owner@example.com",
+    })).status).toBe("approved");
+
+    for (let index = 0; index < 20; index += 1) {
+      const quota = await claimInvitationBatch(sql, {
+        requestId: index === 0 ? requestId : randomUUID(), inviterEmail: email, now: future,
+      });
+      expect(quota.batchesUsed).toBe(index + 1);
+    }
+    await expect(claimInvitationBatch(sql, { requestId: randomUUID(), inviterEmail: email, now: future }))
+      .rejects.toBeInstanceOf(InvitationRateLimitError);
+    expect((await claimInvitationBatch(sql, { requestId, inviterEmail: email, now: future })).batchesRemaining).toBe(0);
+    await expect(claimInvitationBatch(sql, {
+      requestId, inviterEmail: "other@example.com", now: future,
+    })).rejects.toBeInstanceOf(InvitationPermissionError);
+    expect(await sql`SELECT COUNT(*)::INTEGER AS count FROM invitation_batches WHERE inviter_email=${email}`)
+      .toEqual([{ count: 20 }]);
+  } finally {
+    await sql`DELETE FROM invitation_batches WHERE inviter_email=${email}`;
+    await sql`DELETE FROM users WHERE email=${email}`;
+    await sql`DELETE FROM trips WHERE id=${trip.id}`;
+    await sql.end();
+  }
+});
+
 test("login timestamps, activity throttling, and denormalized display names are enforced by PostgreSQL", async () => {
   const sql = createPostgresSql(DEFAULT_LOCAL_POSTGRES_URI);
   const marker = randomUUID();
@@ -103,10 +175,13 @@ test("login timestamps, activity throttling, and denormalized display names are 
   const trip = await createTrip(sql, marker);
 
   try {
-    await upsertUserLogin(sql, { name: "Original Google Name", email }, firstLogin);
-    await upsertUserLogin(sql, { name: "Refreshed Google Name", email }, secondLogin);
+    const first = await upsertUserLogin(sql, { name: "Original Google Name", email }, firstLogin);
+    expect(first).toMatchObject({ email, name: "Original Google Name", displayName: "Original Google Name", role: "member" });
+    const refreshed = await upsertUserLogin(sql, { name: "Refreshed Google Name", email }, secondLogin);
+    expect(refreshed).toMatchObject({ email, name: "Original Google Name", displayName: "Original Google Name" });
     expect(await upsertUserActivity(sql, { name: "Refreshed Google Name", email }, new Date(secondLogin.getTime() + 4 * 60_000))).toBeNull();
-    expect(await upsertUserActivity(sql, { name: "Refreshed Google Name", email }, new Date(secondLogin.getTime() + 5 * 60_000))).not.toBeNull();
+    const activity = await upsertUserActivity(sql, { name: "Refreshed Google Name", email }, new Date(secondLogin.getTime() + 5 * 60_000));
+    expect(activity.last_active_at).toBe(new Date(secondLogin.getTime() + 5 * 60_000).toISOString());
 
     const [stored] = await sql`
       SELECT name, display_name, first_login, last_login, last_active_at
@@ -133,10 +208,25 @@ test("login timestamps, activity throttling, and denormalized display names are 
       VALUES (${suggestion.id}, ${ownerEmail}, 'Original Google Name', 'comment', 'Contract', ${trip.slug}, ${trip.title})
     `;
 
-    await updateStoredUserDisplayName(sql, { email, displayName: "Chosen Name" });
+    const renamed = await updateStoredUserDisplayName(sql, { email: email.toUpperCase(), displayName: "Chosen Name" });
+    expect(renamed).toMatchObject({ email, name: "Chosen Name", displayName: "Chosen Name" });
     expect((await sql`SELECT author_name FROM suggestions WHERE id = ${suggestion.id}`)[0].author_name).toBe("Chosen Name");
     expect((await sql`SELECT actor_name FROM notifications WHERE suggestion_id = ${suggestion.id}`)[0].actor_name).toBe("Chosen Name");
     expect((await sql`SELECT author_name FROM admin_notification_outbox WHERE suggestion_id = ${suggestion.id}`)[0].author_name).toBe("Chosen Name");
+    const laterLogin = await upsertUserLogin(sql, { name: "Latest Google Name", email }, new Date(secondLogin.getTime() + 10 * 60_000));
+    expect(laterLogin).toMatchObject({ name: "Chosen Name", displayName: "Chosen Name" });
+    expect((await sql`SELECT name,display_name FROM users WHERE email=${email}`)[0])
+      .toEqual({ name: "Latest Google Name", display_name: "Chosen Name" });
+    expect(await resolveStoredUserRole(sql, email.toUpperCase())).toBe("member");
+    expect((await updateStoredUserRole(sql, { email, role: "admin", ownerEmail })).role).toBe("admin");
+    expect(await resolveStoredUserRole(sql, email)).toBe("admin");
+    await expect(updateStoredUserRole(sql, { email: ownerEmail.toUpperCase(), role: "member", ownerEmail }))
+      .rejects.toMatchObject({ code: "USER_ROLE_OWNER_IMMUTABLE" });
+    const listed = await listUserActivity(sql, { ownerEmail });
+    expect(listed.find((user) => user.email === email)).toMatchObject({
+      name: "Chosen Name", displayName: "Chosen Name", role: "admin",
+    });
+    expect(listed.find((user) => user.email === ownerEmail).role).toBe("owner");
   } finally {
     await sql`DELETE FROM trips WHERE id = ${trip.id}`;
     await sql`DELETE FROM users WHERE email IN (${email}, ${ownerEmail})`;

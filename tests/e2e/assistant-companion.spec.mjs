@@ -73,7 +73,9 @@ test("a real workflow streams before completion and survives switching trips and
     const { runId } = await acceptedResponse.json();
     await expect(page.getByText("Đây là chế độ mô phỏng cục bộ.", { exact: false })).toBeVisible();
     await expect(page.getByRole("button", { name: "Dừng", exact: true })).toBeVisible();
-    await page.getByRole("combobox", { name: /^Chọn chuyến đi/ }).selectOption(f.trips[1].slug);
+    await page.getByRole("combobox", { name: /^Chọn chuyến đi/ }).click();
+    await page.getByRole("option", { name: f.trips[1].title }).click();
+    await expect(page.getByRole("combobox", { name: /^Chọn chuyến đi/ })).toHaveAttribute("data-trip-slug", f.trips[1].slug);
     await expect(input).toBeEnabled();
     const [duringSwitch] = await f.sql`SELECT status,output_text FROM assistant_turns WHERE id=${runId}`;
     expect(duringSwitch.status, "the worker must still be running after the trip actually changed").toBe("running");

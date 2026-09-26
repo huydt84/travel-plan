@@ -17,7 +17,7 @@ test("persona switcher changes identity without carrying the previous trip visib
   await expect(page.getByRole("button", { name: "Đang sử dụng" })).toBeVisible();
   await page.getByRole("button", { name: "Test với Local Member" }).click();
   await expect(page).toHaveURL(/\/?(?:\?.*)?$/);
-  await expect(page.getByRole("combobox", { name: /Chọn chuyến đi/ })).toHaveValue("local-permission-lab");
+  await expect(page.getByRole("combobox", { name: /Chọn chuyến đi/ })).toHaveAttribute("data-trip-slug", "local-permission-lab");
   await expect(page.getByRole("link", { name: /Quản lý chuyến/ })).toHaveCount(0);
 });
 

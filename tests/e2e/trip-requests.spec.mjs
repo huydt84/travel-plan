@@ -54,6 +54,13 @@ test("member lifecycle, admin fulfillment, and in-app notification stay connecte
     const fulfillmentNotifications = (await notifications.json()).notifications.filter((item) => item.type === "trip_request_fulfilled" && item.request.id === created.id);
     expect(fulfillmentNotifications).toHaveLength(1);
     expect(fulfillmentNotifications[0].targetUrl).toBe(`/?trip=${encodeURIComponent(trip.slug)}`);
+    expect(fulfillmentNotifications[0].contribution).toBeNull();
+    expect(fulfillmentNotifications[0].request).toMatchObject({
+      id: created.id,
+      startDate: requestPayload(marker).startDate,
+      endDate: requestPayload(marker).endDate,
+      places: requestPayload(marker).places,
+    });
 
     await memberPage.reload();
     await memberPage.getByRole("button", { name: /Mở thông báo/ }).click();

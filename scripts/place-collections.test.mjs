@@ -26,30 +26,13 @@ test("preload discovery parses HTML and requests the verified maximum list size"
   assert.match(url.searchParams.get("pb"), /!4i3000/);
 });
 
-test("normalized snapshots strip contributor data and deduplicate stable aliases", () => {
+test("normalized snapshots keep stable identities, latest values, and no contributor data", () => {
   const snapshot = parseEntityListResponse(entity({ count: 2, duplicate: true }), "https://maps.app.goo.gl/private-token");
   assert.equal(snapshot.items.length, 1); assert.equal(snapshot.items[0].name, "Newer"); assert.equal(snapshot.items[0].position, 0);
   assert.equal(snapshot.items[0].externalIds.find((id) => id.kind === "place_id").value, "ChIJstable_test");
   assert.equal(snapshot.items[0].externalIds.find((id) => id.kind === "knowledge_graph").value, "/g/11test");
-  assert.equal(JSON.stringify(snapshot).includes("Owner"), false); assert.equal(JSON.stringify(snapshot).includes("Contributor"), false);
-});
-
-test("declared count mismatches reject incomplete snapshots", () => {
-  assert.throws(() => parseEntityListResponse(entity({ count: 2 }), "https://www.google.com/maps/placelists/list/id"), (error) => error.code === "COLLECTION_INCOMPLETE");
-});
-
-test("indexed response normalizes typed IDs and removes contributor data", () => {
-  const result = parseEntityListResponse(entity(), "https://maps.app.goo.gl/example");
-  assert.equal(result.items[0].externalIds.find((id) => id.kind === "place_id").value, "ChIJstable_test");
-  assert.equal(result.items[0].externalIds.find((id) => id.kind === "knowledge_graph").value, "/g/11test");
-  assert.deepEqual(Object.keys(result.items[0]).sort(), ["address","externalIds","latitude","longitude","mapsUrl","name","note","position","sourceCreatedAt","sourceUpdatedAt"].sort());
-  assert.doesNotMatch(JSON.stringify(result), /Owner|Contributor|avatar|secret/);
-});
-
-test("duplicates keep earliest position and latest source values", () => {
-  const result = parseEntityListResponse(entity({ count: 2, duplicate: true }), "https://www.google.com/maps/placelists/list/test");
-  assert.equal(result.items.length, 1); assert.equal(result.items[0].position, 0); assert.equal(result.items[0].name, "Newer");
-  assert.deepEqual(result.warnings, [{ code: "DUPLICATE_PLACES", count: 1 }]);
+  assert.deepEqual(snapshot.warnings, [{ code: "DUPLICATE_PLACES", count: 1 }]);
+  assert.doesNotMatch(JSON.stringify(snapshot), /Owner|Contributor|avatar|secret/);
 });
 
 test("count mismatches and unreadable formats are rejected", () => {
@@ -67,4 +50,8 @@ test("short links follow allowlisted redirects only", async () => {
   } });
   const result = await adapter.fetchSnapshot("https://maps.app.goo.gl/example");
   assert.equal(result.title, "Tokyo ideas"); assert.equal(calls.length, 3);
+  const forbidden = createGoogleMapsCollectionAdapter({ fetchImpl: async () => new Response(null, {
+    status: 302, headers: { location: "https://example.com/private" },
+  }) });
+  await assert.rejects(forbidden.fetchSnapshot("https://maps.app.goo.gl/example"), { code: "COLLECTION_REDIRECT_FORBIDDEN" });
 });

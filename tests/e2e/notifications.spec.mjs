@@ -172,6 +172,7 @@ test("participation survives deletion and notification APIs enforce pagination a
 
     const firstPageResponse = await contextA.request.get("/api/notifications?limit=1");
     expect(firstPageResponse.status()).toBe(200);
+    expect((await contextA.request.get("/api/notifications?cursor=not-a-cursor")).status()).toBe(400);
     const firstPage = await firstPageResponse.json();
     expect(firstPage.notifications).toHaveLength(1);
     expect(firstPage.unreadCount).toBe(2);

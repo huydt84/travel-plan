@@ -101,8 +101,9 @@ test("focus refreshes never overlap for itinerary or notifications", async ({ pa
   });
 
   await gotoHealthy(page, `/?trip=${tripSlug}`);
-  await expect(page.getByRole("button", { name: /Mở thông báo/ })).toBeVisible();
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  await page.getByRole("button", { name: /Mở thông báo/ }).click();
+  await expect(page.getByText("Chưa có cập nhật", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   delay = true;
   await page.evaluate(() => {
     window.dispatchEvent(new Event("focus"));
